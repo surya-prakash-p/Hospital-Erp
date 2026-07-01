@@ -1,16 +1,33 @@
-# React + Vite
+# Thangam Hospital - Integrated Hospital ERP Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An integrated single-page application (SPA) portal for Thangam Hospital's clinical workflow. It supports reception desks, clinical consultation desks, lab diagnostics, pharmacy dispensation, and patient billing counters. 
 
-Currently, two official plugins are available:
+## Features
+- **Reception Desk**: Patient registry, search history, walk-in slot booking.
+- **Doctor Consultation**: Clinical diagnosis notes, prescriptions, and routing rules.
+- **Lab Station**: Log diagnostic/lab findings.
+- **Pharmacy Counter**: Regimen dispensation and summary review.
+- **Billing & Pay**: Invoice generation, itemized receipt breakdown, and counter payment recording.
+- **Record Inspector**: Live JSON database viewer for patients and walk-ins.
+- **Frappe Database Proxy**: Seamless connection with local Frappe Bench or fallback offline simulator DB.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Architecture
+- **Backend**: Node.js Express server (`server.js`) that serves static client assets and proxies API calls `/api/*` to the local Frappe Bench at `http://localhost:8000`.
+- **Frontend**: Clean, semantic HTML5, Vanilla CSS3 (reusing HSL gradients and glassmorphism styling), and Vanilla JS (`public/app.js`).
+- **Icons**: Lucide vector icons loaded via CDN.
 
-## React Compiler
+## Installation & Running Locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Expanding the Oxlint configuration
+2. **Start the server**:
+   ```bash
+   npm run dev
+   ```
+   The application will start running on [http://localhost:3000](http://localhost:3000).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Running in VS Code
+A configuration is included in `.vscode/launch.json`. Open the root folder in VS Code, go to the **Run and Debug** sidebar, select **Launch Hospital ERP Server**, and press **F5** to start.
