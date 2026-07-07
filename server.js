@@ -10,8 +10,8 @@ const app = express();
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve the built React app (run `npm run build` first)
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Proxy middleware to forward /api requests to Frappe server
 app.all('/api/*', async (req, res) => {
@@ -57,7 +57,7 @@ app.all('/api/*', async (req, res) => {
 
 // Fallback to index.html for SPA routing
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
