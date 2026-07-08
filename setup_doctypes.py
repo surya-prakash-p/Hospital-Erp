@@ -8,7 +8,8 @@ frappe.connect()
 
 # Create Doctor, Patient, Walk-in DocTypes
 # First delete them if they exist to avoid duplication and get a clean state
-for dt in ["Hospital Patient", "Hospital Doctor", "Hospital Patient Walk In"]:
+for dt in ["Hospital Patient", "Hospital Doctor", "Hospital Patient Walk In",
+           "Hospital Lab Test", "Hospital Appointment", "Hospital Audit Log"]:
     if frappe.db.exists("DocType", dt):
         frappe.delete_doc("DocType", dt)
         print(f"Deleted existing DocType: {dt}")
@@ -83,6 +84,73 @@ walkin_dt = frappe.get_doc({
 })
 walkin_dt.insert()
 print("Created DocType: Hospital Patient Walk In")
+
+# Create Hospital Lab Test DocType (test catalog with fees)
+labtest_dt = frappe.get_doc({
+    "doctype": "DocType",
+    "name": "Hospital Lab Test",
+    "module": "Hospital ERP",
+    "custom": 1,
+    "autoname": "field:test_name",
+    "fields": [
+        {"fieldname": "test_name", "fieldtype": "Data", "label": "Test Name", "reqd": 1, "unique": 1, "in_list_view": 1},
+        {"fieldname": "fee", "fieldtype": "Currency", "label": "Fee", "reqd": 1, "in_list_view": 1}
+    ],
+    "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+})
+labtest_dt.insert()
+print("Created DocType: Hospital Lab Test")
+
+# Create Hospital Appointment DocType (future scheduling)
+appointment_dt = frappe.get_doc({
+    "doctype": "DocType",
+    "name": "Hospital Appointment",
+    "module": "Hospital ERP",
+    "custom": 1,
+    "naming_rule": "Expression (BY PASS)",
+    "autoname": "format:HOSP-APPT-{YYYY}-{#####}",
+    "fields": [
+        {"fieldname": "patient_name", "fieldtype": "Data", "label": "Patient Name", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "mobile_number", "fieldtype": "Data", "label": "Mobile Number", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "doctor", "fieldtype": "Link", "label": "Doctor", "options": "Hospital Doctor", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "appointment_date", "fieldtype": "Date", "label": "Date", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "appointment_time", "fieldtype": "Data", "label": "Time", "reqd": 1},
+        {"fieldname": "notes", "fieldtype": "Small Text", "label": "Notes"},
+        {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Scheduled\nChecked In\nCancelled", "default": "Scheduled", "in_list_view": 1}
+    ],
+    "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+})
+appointment_dt.insert()
+print("Created DocType: Hospital Appointment")
+
+# Create Hospital Audit Log DocType (append-only activity trail)
+audit_dt = frappe.get_doc({
+    "doctype": "DocType",
+    "name": "Hospital Audit Log",
+    "module": "Hospital ERP",
+    "custom": 1,
+    "naming_rule": "Expression (BY PASS)",
+    "autoname": "format:AUD-{YYYY}-{#####}",
+    "fields": [
+        {"fieldname": "role", "fieldtype": "Data", "label": "Role", "in_list_view": 1},
+        {"fieldname": "action", "fieldtype": "Data", "label": "Action", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "entity_type", "fieldtype": "Data", "label": "Entity Type", "in_list_view": 1},
+        {"fieldname": "entity_name", "fieldtype": "Data", "label": "Entity Name", "in_list_view": 1},
+        {"fieldname": "details", "fieldtype": "Small Text", "label": "Details"},
+        {"fieldname": "timestamp", "fieldtype": "Datetime", "label": "Timestamp", "default": "Now"}
+    ],
+    "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+})
+audit_dt.insert()
+print("Created DocType: Hospital Audit Log")
+
+# Add sample Lab Tests
+for test, fee in [("Complete Blood Count (CBC)", 450), ("Blood Sugar (Fasting)", 250),
+                  ("Lipid Profile", 800), ("Liver Function Test", 900),
+                  ("Thyroid Profile (T3 T4 TSH)", 700)]:
+    if not frappe.db.exists("Hospital Lab Test", test):
+        frappe.get_doc({"doctype": "Hospital Lab Test", "test_name": test, "fee": fee}).insert()
+        print(f"Added sample Lab Test: {test}")
 
 # Add some sample Doctors
 for name, spec, fee in [("Dr. Rajesh", "General Physician", 500), ("Dr. Priya", "Cardiologist", 1000), ("Dr. Vignesh", "Pediatrician", 600)]:
