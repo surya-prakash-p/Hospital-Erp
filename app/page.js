@@ -1,19 +1,223 @@
 "use client";
 
-import { useState } from "react";
-import { Search, UserPlus, Activity, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Search, UserPlus, Activity, Users, CheckCircle, AlertCircle, Plus, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import {
+  getQueue,
+  getPatients,
+  getDoctors,
+  searchPatient,
+  createPatient,
+  createWalkIn
+} from "@/lib/hospital-service";
 
 export default function ReceptionPage() {
+  // Database States
+  const [queue, setQueue] = useState([]);
+  const [patientsCount, setPatientsCount] = useState(0);
+  const [doctors, setDoctors] = useState([]);
+
+  // Toast notifications State
+  const [toasts, setToasts] = useState([]);
+
+  // Form States
   const [searchQuery, setSearchQuery] = useState("");
+  const [formState, setFormState] = useState({
+    patient_name: "",
+    mobile_number: "",
+    age: "",
+    gender: "Male",
+    email: "",
+    doctor: "",
+    is_existing: false,
+    medical_history: ""
+  });
+
+  const showToast = (message, type = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  // Load initial data
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const q = await getQueue();
+        setQueue(q);
+
+        const p = await getPatients();
+        setPatientsCount(Object.keys(p).length);
+
+        const d = await getDoctors();
+        setDoctors(d);
+        if (d.length > 0) {
+          setFormState((prev) => ({ ...prev, doctor: prev.doctor || d[0].name }));
+        }
+      } catch (err) {
+        showToast("Error loading reception data", "error");
+        console.error(err);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Search handler
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    if (!searchQuery.trim()) {
+      showToast("Please enter a name or mobile number", "info");
+      return;
+    }
+    showToast(`Searching for "${searchQuery}"...`, "info");
+    
+    try {
+      const patient = await searchPatient(searchQuery.trim());
+      if (patient) {
+        setFormState({
+          patient_name: patient.patient_name,
+          mobile_number: patient.mobile_number,
+          age: patient.age ? String(patient.age) : "",
+          gender: patient.gender || "Male",
+          email: patient.email || "",
+          doctor: formState.doctor || (doctors.length > 0 ? doctors[0].name : ""),
+          is_existing: true,
+          medical_history: patient.medical_history || ""
+        });
+        showToast(`Patient found! Auto-loaded details for ${patient.patient_name}`, "success");
+      } else {
+        showToast(`No record found for "${searchQuery}". Please register as a new patient.`, "info");
+        const isNumeric = /^\d+$/.test(searchQuery.trim());
+        setFormState((prev) => ({
+          ...prev,
+          patient_name: isNumeric ? "" : searchQuery.trim(),
+          mobile_number: isNumeric ? searchQuery.trim() : "",
+          age: "",
+          email: "",
+          is_existing: false,
+          medical_history: ""
+        }));
+      }
+    } catch (err) {
+      showToast("Search failed", "error");
+      console.error(err);
+    }
+  };
+
+  // Submit Registration & Walk-In
+  const handleRegister = async (e) => {
+    e?.preventDefault();
+    const { patient_name, mobile_number, age, gender, email, doctor, is_existing, medical_history } = formState;
+
+    if (!patient_name || !mobile_number) {
+      showToast("Patient Name and Mobile Number are required", "error");
+      return;
+    }
+
+    if (mobile_number.length < 10) {
+      showToast("Please enter a valid 10-digit mobile number", "error");
+      return;
+    }
+
+    try {
+      showToast("Registering patient visit...", "info");
+      
+      // 1. Create/Retrieve Patient
+      await createPatient({
+        patient_name,
+        mobile_number,
+        age: age ? parseInt(age) : null,
+        gender,
+        email,
+        medical_history: medical_history || ""
+      });
+
+      // 2. Create Patient Walk-In
+      const walkIn = await createWalkIn({
+        patient_name,
+        mobile_number,
+        is_existing,
+        doctor,
+        appointment_status: "Doctor Consultation"
+      });
+
+      showToast(`Registered successfully! ID: ${walkIn.name}`, "success");
+
+      // 3. Reload queue and count
+      const updatedQueue = await getQueue();
+      setQueue(updatedQueue);
+
+      const updatedPatients = await getPatients();
+      setPatientsCount(Object.keys(updatedPatients).length);
+
+      // Reset form
+      setFormState({
+        patient_name: "",
+        mobile_number: "",
+        age: "",
+        gender: "Male",
+        email: "",
+        doctor: doctors.length > 0 ? doctors[0].name : "",
+        is_existing: false,
+        medical_history: ""
+      });
+      setSearchQuery("");
+    } catch (err) {
+      showToast(err.message || "Failed to register patient", "error");
+      console.error(err);
+    }
+  };
+
+  const handleSelectDoctor = (val) => {
+    setFormState((prev) => ({ ...prev, doctor: val }));
+  };
+
+  const handleSelectGender = (val) => {
+    setFormState((prev) => ({ ...prev, gender: val }));
+  };
+
+  const handleResetForm = () => {
+    setFormState({
+      patient_name: "",
+      mobile_number: "",
+      age: "",
+      gender: "Male",
+      email: "",
+      doctor: doctors.length > 0 ? doctors[0].name : "",
+      is_existing: false,
+      medical_history: ""
+    });
+    setSearchQuery("");
+    showToast("Form cleared", "info");
+  };
 
   return (
     <div className="flex flex-col gap-4 max-w-7xl mx-auto">
+      {/* Toast notifications container */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg shadow-lg border text-xs font-semibold animate-in slide-in-from-top-2 duration-200
+              ${t.type === "success" ? "bg-emerald-50 text-emerald-800 border-emerald-200" : ""}
+              ${t.type === "error" ? "bg-rose-50 text-rose-800 border-rose-200" : ""}
+              ${t.type === "info" ? "bg-indigo-50 text-indigo-800 border-indigo-200" : ""}`}
+          >
+            {t.type === "success" && <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />}
+            {t.type === "error" && <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />}
+            {t.type === "info" && <Info className="w-4 h-4 text-indigo-500 shrink-0" />}
+            <span>{t.message}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 font-serif">Reception Desk</h2>
@@ -23,6 +227,7 @@ export default function ReceptionPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
+          {/* Find Existing Patient */}
           <Card>
             <CardHeader className="bg-slate-50 border-b py-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -32,91 +237,195 @@ export default function ReceptionPage() {
               <CardDescription className="text-xs">Search by mobile number or name to auto-load reports.</CardDescription>
             </CardHeader>
             <CardContent className="pt-4 pb-4">
-              <div className="flex gap-3">
-                <Input 
-                  placeholder="Search by Mobile (e.g. 9876543210) or Name..." 
+              <form onSubmit={handleSearch} className="flex gap-3">
+                <Input
+                  placeholder="Search by Mobile (e.g. 9876543210) or Name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1 h-9 text-sm"
                 />
-                <Button className="h-9 text-sm">Check Record</Button>
-              </div>
+                <Button type="submit" className="h-9 text-sm bg-slate-900 hover:bg-slate-800 text-white">
+                  Check Record
+                </Button>
+              </form>
               <p className="text-[11px] text-muted-foreground mt-2 italic">
                 💡 Tip: Try typing "9876543210" or "Surya Prakash" to demo auto-loading reports!
               </p>
             </CardContent>
           </Card>
 
+          {/* New Patient Registration */}
           <Card>
             <CardHeader className="bg-slate-50 border-b py-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-emerald-500" />
-                New Patient Registration
+                {formState.is_existing ? "Existing Patient Visit Registration" : "New Patient Registration"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 pb-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="name" className="text-xs">Patient Name *</Label>
-                  <Input id="name" placeholder="Enter full name" className="h-9 text-sm" />
+            <CardContent className="pt-4 pb-4">
+              <form onSubmit={handleRegister} className="space-y-3">
+                {formState.is_existing && (
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-xs text-indigo-800 flex gap-2 items-start mb-2">
+                    <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold">Autoloaded Patient Profile:</span> Records exist in system. Appending visit log will update their permanent history.
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="name" className="text-xs">Patient Name *</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter full name"
+                      value={formState.patient_name}
+                      onChange={(e) => setFormState({ ...formState, patient_name: e.target.value })}
+                      className="h-9 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="mobile" className="text-xs">Mobile Number *</Label>
+                    <Input
+                      id="mobile"
+                      placeholder="Enter 10-digit number"
+                      value={formState.mobile_number}
+                      onChange={(e) => setFormState({ ...formState, mobile_number: e.target.value })}
+                      className="h-9 text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="age" className="text-xs">Age</Label>
+                    <Input
+                      id="age"
+                      placeholder="Age in years"
+                      type="number"
+                      value={formState.age}
+                      onChange={(e) => setFormState({ ...formState, age: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="gender" className="text-xs">Gender</Label>
+                    <Select value={formState.gender} onValueChange={handleSelectGender}>
+                      <SelectTrigger id="gender" className="h-9 text-sm">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="mobile" className="text-xs">Mobile Number *</Label>
-                  <Input id="mobile" placeholder="Enter 10-digit number" className="h-9 text-sm" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-xs">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="patient@example.com"
+                      value={formState.email}
+                      onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="doctor" className="text-xs">Assign Doctor *</Label>
+                    <Select value={formState.doctor} onValueChange={handleSelectDoctor}>
+                      <SelectTrigger id="doctor" className="h-9 text-sm">
+                        <SelectValue placeholder="Select doctor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {doctors.map((d) => (
+                          <SelectItem key={d.name} value={d.name}>
+                            {d.doctor_name} ({d.specialization})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="age" className="text-xs">Age</Label>
-                  <Input id="age" placeholder="Age in years" type="number" className="h-9 text-sm" />
+
+                {formState.is_existing && formState.medical_history && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-indigo-700">Past Diagnosis History</Label>
+                    <pre className="p-3 bg-indigo-50/30 rounded border border-indigo-100/50 text-xs text-indigo-900 overflow-y-auto max-h-[120px] font-mono whitespace-pre-wrap">
+                      {formState.medical_history}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="pt-2 flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={handleResetForm} className="h-9 text-sm">
+                    Clear Form
+                  </Button>
+                  <Button type="submit" className="w-full md:w-auto h-9 text-sm bg-indigo-600 hover:bg-indigo-700 text-white gap-1">
+                    <Plus className="w-4 h-4" />
+                    Register Patient Walk-In
+                  </Button>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="gender" className="text-xs">Gender</Label>
-                  <Select>
-                    <SelectTrigger id="gender" className="h-9 text-sm">
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="email" className="text-xs">Email Address</Label>
-                <Input id="email" type="email" placeholder="patient@example.com" className="h-9 text-sm" />
-              </div>
-              <div className="pt-2 flex justify-end">
-                <Button className="w-full md:w-auto h-9 text-sm">Register Patient</Button>
-              </div>
+              </form>
             </CardContent>
           </Card>
         </div>
 
+        {/* Sidebar panels */}
         <div className="space-y-4">
-          <Card>
-            <CardHeader className="bg-slate-50 border-b py-3">
+          {/* Active Patient Board (Queue) */}
+          <Card className="flex flex-col h-[350px]">
+            <CardHeader className="bg-slate-50 border-b py-3 shrink-0">
               <CardTitle className="text-base flex items-center gap-2">
                 <Activity className="w-4 h-4 text-indigo-500" />
                 Active Patient Board
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="p-3 border-b bg-indigo-50/50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-900">Surya Prakash</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">9876543210 | Dr. Rajesh</p>
+            <CardContent className="p-0 overflow-y-auto flex-1">
+              <div className="divide-y">
+                {queue
+                  .filter((q) => q.appointment_status !== "Completed")
+                  .map((item) => {
+                    let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+                    if (item.appointment_status === "Doctor Consultation") {
+                      badgeClass = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                    } else if (item.appointment_status === "Lab Test") {
+                      badgeClass = "bg-purple-50 text-purple-700 border-purple-200";
+                    } else if (item.appointment_status === "Pharmacy") {
+                      badgeClass = "bg-pink-50 text-pink-700 border-pink-200";
+                    } else if (item.appointment_status === "Billing") {
+                      badgeClass = "bg-teal-50 text-teal-700 border-teal-200";
+                    }
+
+                    return (
+                      <div key={item.name} className="p-3 bg-white hover:bg-slate-50 transition-colors flex justify-between items-start gap-2">
+                        <div>
+                          <h4 className="font-semibold text-xs text-slate-900">{item.patient_name}</h4>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {item.mobile_number} | {item.doctor}
+                          </p>
+                        </div>
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass} whitespace-nowrap`}>
+                          {item.appointment_status === "Doctor Consultation" ? "Consultation" : item.appointment_status}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                {queue.filter((q) => q.appointment_status !== "Completed").length === 0 && (
+                  <div className="text-center text-muted-foreground py-10 text-xs">
+                    No active patients in queue.
                   </div>
-                  <div className="bg-indigo-100 text-indigo-700 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                    Consultation
-                  </div>
-                </div>
+                )}
               </div>
-              {/* Empty state or other patients could go here */}
             </CardContent>
           </Card>
 
+          {/* Patient Registry Summary */}
           <Card>
             <CardHeader className="bg-slate-50 border-b py-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -127,11 +436,13 @@ export default function ReceptionPage() {
             <CardContent className="pt-4 pb-4">
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-2xl font-bold text-slate-900">2</p>
+                  <p className="text-2xl font-bold text-slate-900">{patientsCount}</p>
                   <p className="text-[10px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">Registered</p>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p className="text-2xl font-bold text-slate-900">0</p>
+                  <p className="text-2xl font-bold text-slate-900">
+                    {queue.filter((q) => q.appointment_status === "Completed").length}
+                  </p>
                   <p className="text-[10px] font-medium text-slate-500 mt-0.5 uppercase tracking-wider">Completed</p>
                 </div>
               </div>
