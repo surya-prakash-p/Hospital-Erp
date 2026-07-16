@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getLabTests, getPatient } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines } from "@/lib/hospital-service";
 
 export default function ConsultationPage() {
   const [queue, setQueue] = useState([]);
@@ -23,6 +23,11 @@ export default function ConsultationPage() {
   const [needLabTest, setNeedLabTest] = useState(false);
   const [labTestName, setLabTestName] = useState("");
   const [needMedicines, setNeedMedicines] = useState(false);
+  
+  // Autocomplete Inventory Medicine States
+  const [searchMedQuery, setSearchMedQuery] = useState("");
+  const [inventoryMeds, setInventoryMeds] = useState([]);
+  const [matchingMeds, setMatchingMeds] = useState([]);
 
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -44,6 +49,10 @@ export default function ConsultationPage() {
         if (tests.length > 0) {
           setLabTestName(tests[0].test_name);
         }
+
+        // Load inventory medicines list
+        const meds = await getMedicines();
+        setInventoryMeds(meds);
       } catch (err) {
         showToast("Error loading consultation data", "error");
         console.error(err);
@@ -85,6 +94,29 @@ export default function ConsultationPage() {
       setLabTestName(labTestsList[0].test_name);
     }
     setNeedMedicines(item.need_medicines === 1);
+    setSearchMedQuery("");
+    setMatchingMeds([]);
+  };
+
+  const handleMedSearchChange = (query) => {
+    setSearchMedQuery(query);
+    if (!query.trim()) {
+      setMatchingMeds([]);
+      return;
+    }
+    const filtered = inventoryMeds.filter(med => 
+      med.medicine_name.toLowerCase().includes(query.toLowerCase())
+    );
+    setMatchingMeds(filtered);
+  };
+
+  const handleAddMedToPrescription = (med) => {
+    const newLine = `${med.medicine_name} - 10 tabs (Dosage: 1-0-1 daily after food)`;
+    setPrescription(prev => prev ? `${prev}\n${newLine}` : newLine);
+    setSearchMedQuery("");
+    setMatchingMeds([]);
+    setNeedMedicines(true); // Auto route to pharmacy
+    showToast(`Added ${med.medicine_name} to prescription list!`, "success");
   };
 
   const handleSaveConsultation = async (e) => {
@@ -273,12 +305,64 @@ export default function ConsultationPage() {
                   </div>
 
                   {/* Prescription */}
-                  <div className="space-y-2">
-                    <Label htmlFor="prescription">Prescription / Medication Regimen</Label>
+                  <div className="space-y-2 relative">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="prescription" className="font-semibold">Prescription / Medication Regimen</Label>
+                      <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full select-none">
+                        Connected to Pharmacy Inventory
+                      </span>
+                    </div>
+
+                    {/* Autocomplete Input */}
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="🔍 Type to search & add medicine from inventory..."
+                        value={searchMedQuery}
+                        onChange={(e) => handleMedSearchChange(e.target.value)}
+                        className="h-9 text-xs mb-2 border-indigo-100 focus:border-indigo-400"
+                      />
+
+                      {/* Dropdown Suggestions */}
+                      {matchingMeds.length > 0 && (
+                        <div className="absolute top-9 left-0 right-0 z-30 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto divide-y text-xs">
+                          {matchingMeds.map((med) => {
+                            const isLow = med.stock <= 50;
+                            const isOut = med.stock === 0;
+                            return (
+                              <div
+                                key={med.medicine_name}
+                                onClick={() => handleAddMedToPrescription(med)}
+                                className={`px-4 py-2.5 hover:bg-indigo-50/30 cursor-pointer flex justify-between items-center transition-colors ${
+                                  isOut ? "bg-rose-50/20 text-slate-400" : ""
+                                }`}
+                              >
+                                <div className="font-semibold text-slate-800">{med.medicine_name}</div>
+                                <div className="flex gap-2.5 items-center">
+                                  <span className="text-[10px] text-slate-500 font-medium">₹{med.price}/tab</span>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                      isOut
+                                        ? "bg-rose-100 text-rose-700 border border-rose-200"
+                                        : isLow
+                                        ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                        : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                    }`}
+                                  >
+                                    {isOut ? "Out of Stock" : `${med.stock} units`}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     <textarea
                       id="prescription"
-                      className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950"
-                      placeholder="Enter prescription instructions, e.g. Paracetamol 650mg twice daily..."
+                      className="flex min-h-[90px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 font-mono"
+                      placeholder="Selected medicines will appear here automatically. You can also customize dosage details..."
                       value={prescription}
                       onChange={(e) => setPrescription(e.target.value)}
                     />
