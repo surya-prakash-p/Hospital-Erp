@@ -70,6 +70,9 @@ doctypes = [
             {"fieldname": "email", "fieldtype": "Data", "label": "Email"},
             {"fieldname": "gender", "fieldtype": "Select", "label": "Gender", "options": "Male\nFemale\nOther"},
             {"fieldname": "age", "fieldtype": "Int", "label": "Age"},
+            {"fieldname": "height", "fieldtype": "Data", "label": "Height"},
+            {"fieldname": "weight", "fieldtype": "Data", "label": "Weight"},
+            {"fieldname": "blood_group", "fieldtype": "Select", "label": "Blood Group", "options": "A+\nA-\nB+\nB-\nAB+\nAB-\nO+\nO-"},
             {"fieldname": "medical_history", "fieldtype": "Text", "label": "Medical History"}
         ],
         "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]

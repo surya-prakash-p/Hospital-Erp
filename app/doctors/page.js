@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserRound, MapPin, Award, Star, GraduationCap, DollarSign, Users, Trash2, Upload, PlusCircle, CheckCircle, AlertCircle, Info, Lock, Eye, EyeOff } from "lucide-react";
+import { UserRound, MapPin, Award, Star, GraduationCap, DollarSign, Users, Trash2, Upload, PlusCircle, CheckCircle, AlertCircle, Info, Lock, Eye, EyeOff, Edit3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { getDoctors, createDoctor } from "@/lib/hospital-service";
+import { getDoctors, createDoctor, updateDoctor } from "@/lib/hospital-service";
 
 export default function DoctorsCatalogPage() {
   const [doctorsList, setDoctorsList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingDoctorName, setEditingDoctorName] = useState(null); // name of doctor, null if adding
   const [toasts, setToasts] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -40,11 +42,14 @@ export default function DoctorsCatalogPage() {
   };
 
   async function loadData() {
+    setLoading(true);
     try {
       const docs = await getDoctors();
       setDoctorsList(docs);
     } catch (e) {
       showToast("Error loading doctors", "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -67,14 +72,53 @@ export default function DoctorsCatalogPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleAddDoctor = async (e) => {
+  const handleEditClick = (doc) => {
+    setEditingDoctorName(doc.name);
+    setDocImage(doc.doctor_image || "");
+    setFullName(doc.doctor_name || "");
+    setSpecialization(doc.specialization || "");
+    setLocation(doc.location || "");
+    setExperience(doc.experience || "");
+    setQualifications(doc.qualifications || "");
+    setConsultFee(doc.consultation_fee ? String(doc.consultation_fee) : "");
+    setRating(doc.rating ? String(doc.rating) : "");
+    setPatients(doc.patients || "");
+    setSuccessRate(doc.success_rate || "");
+    setEmail(doc.email || "");
+    setPassword(doc.password || "");
+    setStatus(doc.status || "Available");
+    setAbout(doc.about || "");
+    setIsAdding(true); // Open form
+  };
+
+  const handleToggleAvailability = async (doc) => {
+    const originalList = [...doctorsList];
+    const newStatus = doc.status === "Available" || !doc.status ? "Unavailable" : "Available";
+
+    // Optimistic UI toggle
+    setDoctorsList(prev => 
+      prev.map(d => d.name === doc.name ? { ...d, status: newStatus } : d)
+    );
+    showToast(`Setting ${doc.doctor_name} status to ${newStatus}...`, "info");
+
+    try {
+      await updateDoctor(doc.name, { status: newStatus });
+      showToast(`${doc.doctor_name} availability updated to ${newStatus}!`, "success");
+      await loadData();
+    } catch (err) {
+      setDoctorsList(originalList);
+      showToast(err.message || "Failed to update availability", "error");
+    }
+  };
+
+  const handleSaveSubmit = async (e) => {
     e.preventDefault();
     if (!fullName.trim() || !specialization.trim() || !consultFee) {
       showToast("Full Name, Specialization and Consultation Fee are required", "error");
       return;
     }
 
-    const newDoctor = {
+    const docPayload = {
       doctor_name: fullName.trim(),
       specialization: specialization.trim(),
       consultation_fee: parseFloat(consultFee),
@@ -92,10 +136,44 @@ export default function DoctorsCatalogPage() {
     };
 
     const originalList = [...doctorsList];
-    // Optimistic UI update
-    setDoctorsList(prev => [...prev, { ...newDoctor, name: newDoctor.doctor_name }]);
-    showToast("Adding doctor to registry (updating)...", "info");
     setIsAdding(false);
+
+    if (editingDoctorName) {
+      // Optimistic update for edit
+      setDoctorsList(prev => 
+        prev.map(d => d.name === editingDoctorName ? { ...d, ...docPayload } : d)
+      );
+      showToast("Updating doctor details (updating)...", "info");
+
+      setIsSaving(true);
+      try {
+        await updateDoctor(editingDoctorName, docPayload);
+        showToast(`${docPayload.doctor_name} details updated successfully!`, "success");
+        setEditingDoctorName(null);
+        await loadData();
+      } catch (err) {
+        setDoctorsList(originalList);
+        showToast(err.message || "Failed to update doctor details", "error");
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // Optimistic update for create
+      setDoctorsList(prev => [...prev, { ...docPayload, name: docPayload.doctor_name }]);
+      showToast("Adding doctor to registry (updating)...", "info");
+
+      setIsSaving(true);
+      try {
+        await createDoctor(docPayload);
+        showToast(`${docPayload.doctor_name} successfully added to registry!`, "success");
+        await loadData();
+      } catch (err) {
+        setDoctorsList(originalList);
+        showToast(err.message || "Failed to save doctor", "error");
+      } finally {
+        setIsSaving(false);
+      }
+    }
 
     // Reset Form
     setDocImage("");
@@ -112,19 +190,26 @@ export default function DoctorsCatalogPage() {
     setPassword("");
     setStatus("Available");
     setAbout("");
+  };
 
-    setIsSaving(true);
-    try {
-      await createDoctor(newDoctor);
-      showToast(`${newDoctor.doctor_name} successfully added to registry!`, "success");
-      await loadData();
-    } catch (err) {
-      // Rollback on failure
-      setDoctorsList(originalList);
-      showToast(err.message || "Failed to save doctor", "error");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleCancel = () => {
+    setIsAdding(false);
+    setEditingDoctorName(null);
+    // Reset Form
+    setDocImage("");
+    setFullName("");
+    setSpecialization("");
+    setLocation("");
+    setExperience("");
+    setQualifications("");
+    setConsultFee("");
+    setRating("");
+    setPatients("");
+    setSuccessRate("");
+    setEmail("");
+    setPassword("");
+    setStatus("Available");
+    setAbout("");
   };
 
   return (
@@ -154,8 +239,11 @@ export default function DoctorsCatalogPage() {
         </div>
         {!isAdding && (
           <Button
-            onClick={() => setIsAdding(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-10 text-sm font-semibold"
+            onClick={() => {
+              setEditingDoctorName(null);
+              setIsAdding(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-10 text-sm font-semibold shadow-md transition-all hover:shadow-lg"
           >
             <PlusCircle className="w-4 h-4" />
             Add New Doctor
@@ -164,16 +252,16 @@ export default function DoctorsCatalogPage() {
       </div>
 
       {isAdding ? (
-        <Card className="max-w-3xl mx-auto border-t-4 border-t-indigo-600 shadow-xl">
+        <Card className="max-w-3xl mx-auto border-t-4 border-t-indigo-600 shadow-xl animate-in fade-in duration-200">
           <CardHeader className="bg-slate-50 border-b">
-            <CardTitle className="text-xl flex items-center gap-2 text-slate-800">
+            <CardTitle className="text-xl flex items-center gap-2 text-slate-800 font-serif">
               <UserRound className="w-5 h-5 text-indigo-500" />
-              Add New Doctor
+              {editingDoctorName ? "Edit Doctor Details" : "Add New Doctor"}
             </CardTitle>
-            <CardDescription>Fill out all credentials and profile values for the medical board registry.</CardDescription>
+            <CardDescription>Fill out credentials and availability details for the hospital board registry.</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            <form onSubmit={handleAddDoctor} className="space-y-6">
+            <form onSubmit={handleSaveSubmit} className="space-y-6">
               {/* Profile Image Upload Box */}
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Upload Profile Image</Label>
@@ -368,37 +456,79 @@ export default function DoctorsCatalogPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsAdding(false)}
-                  className="h-9 text-sm"
+                  onClick={handleCancel}
+                  className="h-9 text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={isSaving}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-sm font-semibold"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs font-semibold"
                 >
-                  Save Doctor
+                  {editingDoctorName ? "Save Changes" : "Save Doctor"}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
+      ) : loading ? (
+        /* Skeleton Grid Loading State */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(idx => (
+            <Card key={idx} className="overflow-hidden border-slate-200 animate-pulse h-[250px] flex flex-col justify-between">
+              <CardHeader className="bg-slate-50/50 pb-4">
+                <div className="flex gap-4 items-center">
+                  <div className="w-14 h-14 rounded-full bg-slate-200" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+                    <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                <div className="h-3 w-4/5 bg-slate-200 rounded" />
+                <div className="h-3 w-2/3 bg-slate-200 rounded" />
+                <div className="border-t pt-4 grid grid-cols-3 gap-2">
+                  <div className="h-8 bg-slate-200 rounded" />
+                  <div className="h-8 bg-slate-200 rounded" />
+                  <div className="h-8 bg-slate-200 rounded" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {doctorsList.map((doc) => {
             const isAvailable = doc.status === "Available" || !doc.status;
             return (
-              <Card key={doc.name} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-l-4 border-l-slate-200 hover:border-l-indigo-500 relative flex flex-col justify-between">
-                {/* Doctor Availability Dot overlay */}
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-white/80 px-2 py-0.5 rounded-full border text-[10px] font-bold shadow-sm backdrop-blur-xs select-none">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-slate-400"}`} />
-                  <span className={isAvailable ? "text-emerald-700" : "text-slate-500"}>
+              <Card key={doc.name} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-l-4 border-l-slate-200 hover:border-l-indigo-500 relative flex flex-col justify-between group">
+                {/* Doctor Availability Toggle Badge overlay */}
+                <div 
+                  onClick={() => handleToggleAvailability(doc)}
+                  className={`absolute top-3 right-3 flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold shadow-sm backdrop-blur-xs select-none cursor-pointer transition-colors duration-200
+                    ${isAvailable 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" 
+                      : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"}`}
+                  title="Click to toggle availability status"
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                  <span>
                     {isAvailable ? "Available" : "Away"}
                   </span>
                 </div>
 
-                <CardHeader className="bg-slate-50/50 pb-4">
+                <CardHeader className="bg-slate-50/50 pb-4 pr-16 relative">
+                  {/* Edit Pencil Icon Button */}
+                  <button
+                    onClick={() => handleEditClick(doc)}
+                    className="absolute top-12 right-4 bg-white hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg p-1.5 border border-slate-200 shadow-xs hover:border-indigo-200 transition-all opacity-0 group-hover:opacity-100"
+                    title="Edit Doctor Details"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+
                   <div className="flex gap-4 items-center">
                     {doc.doctor_image ? (
                       <img

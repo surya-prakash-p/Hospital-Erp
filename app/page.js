@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   getQueue,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/hospital-service";
 
 export default function ReceptionPage() {
+  const router = useRouter();
   // Database States
   const [queue, setQueue] = useState([]);
   const [patientsCount, setPatientsCount] = useState(0);
@@ -35,6 +37,9 @@ export default function ReceptionPage() {
     gender: "Male",
     email: "",
     doctor: "",
+    height: "",
+    weight: "",
+    blood_group: "",
     is_existing: false,
     medical_history: ""
   });
@@ -82,17 +87,8 @@ export default function ReceptionPage() {
     try {
       const patient = await searchPatient(searchQuery.trim());
       if (patient) {
-        setFormState({
-          patient_name: patient.patient_name,
-          mobile_number: patient.mobile_number,
-          age: patient.age ? String(patient.age) : "",
-          gender: patient.gender || "Male",
-          email: patient.email || "",
-          doctor: formState.doctor || (doctors.length > 0 ? doctors[0].name : ""),
-          is_existing: true,
-          medical_history: patient.medical_history || ""
-        });
-        showToast(`Patient found! Auto-loaded details for ${patient.patient_name}`, "success");
+        showToast(`Patient found! Redirecting to profile...`, "success");
+        router.push(`/patient/${patient.mobile_number}`);
       } else {
         showToast(`No record found for "${searchQuery}". Please register as a new patient.`, "info");
         const isNumeric = /^\d+$/.test(searchQuery.trim());
@@ -102,6 +98,9 @@ export default function ReceptionPage() {
           mobile_number: isNumeric ? searchQuery.trim() : "",
           age: "",
           email: "",
+          height: "",
+          weight: "",
+          blood_group: "",
           is_existing: false,
           medical_history: ""
         }));
@@ -154,19 +153,24 @@ export default function ReceptionPage() {
       gender: "Male",
       email: "",
       doctor: doctors.length > 0 ? doctors[0].name : "",
+      height: "",
+      weight: "",
+      blood_group: "",
       is_existing: false,
       medical_history: ""
     });
-    setSearchQuery("");
-
     try {
       // 1. Create/Retrieve Patient
+      const { height, weight, blood_group } = formState;
       await createPatient({
         patient_name,
         mobile_number,
         age: age ? parseInt(age) : null,
         gender,
         email,
+        height,
+        weight,
+        blood_group,
         medical_history: medical_history || ""
       });
 
@@ -180,6 +184,9 @@ export default function ReceptionPage() {
       });
 
       showToast(`Registered successfully! ID: ${walkIn.name}`, "success");
+      
+      // Redirect to patient profile page
+      router.push(`/patient/${mobile_number}`);
 
       // Reload actual database states in background
       const updatedQueue = await getQueue();
@@ -371,6 +378,43 @@ export default function ReceptionPage() {
                           <SelectItem key={d.name} value={d.name}>
                             {d.doctor_name} ({d.specialization})
                           </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Vitals fields: Height, Weight, Blood Group */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-slate-100 pt-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="height" className="text-xs">Height</Label>
+                    <Input
+                      id="height"
+                      placeholder="e.g. 175 cm"
+                      value={formState.height}
+                      onChange={(e) => setFormState({ ...formState, height: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="weight" className="text-xs">Weight</Label>
+                    <Input
+                      id="weight"
+                      placeholder="e.g. 72 kg"
+                      value={formState.weight}
+                      onChange={(e) => setFormState({ ...formState, weight: e.target.value })}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="blood" className="text-xs">Blood Group</Label>
+                    <Select value={formState.blood_group} onValueChange={(val) => setFormState({ ...formState, blood_group: val })}>
+                      <SelectTrigger id="blood" className="h-9 text-sm">
+                        <SelectValue placeholder="Select blood..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(bg => (
+                          <SelectItem key={bg} value={bg}>{bg}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
