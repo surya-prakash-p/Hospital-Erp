@@ -219,41 +219,63 @@ export default function LabPage() {
                     />
                   </div>
 
-                  {/* Image Upload Field */}
+                  {/* Premium Image Upload Area */}
                   <div className="space-y-2">
                     <Label className="font-semibold flex items-center gap-1.5">
                       <ImageIcon className="w-4 h-4 text-purple-500" />
                       Attach Test Report Image (Optional)
                     </Label>
-                    <div className="flex gap-4 items-center">
-                      <div className="flex-1">
-                        <Input
+                    
+                    {!labImage ? (
+                      <div 
+                        className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-xl p-6 bg-slate-50/50 hover:bg-purple-50/10 cursor-pointer transition-all duration-200 flex flex-col items-center justify-center group relative min-h-[120px]"
+                        onClick={() => document.getElementById('file-upload-input').click()}
+                      >
+                        <Upload className="w-8 h-8 text-slate-400 group-hover:text-purple-500 group-hover:scale-110 transition-all duration-300" />
+                        <span className="text-sm font-semibold text-slate-700 mt-2">Click to Upload Diagnostic Scan</span>
+                        <span className="text-[10px] text-slate-400 mt-1">PNG, JPG, or GIF (max. 2MB)</span>
+                        <input
+                          id="file-upload-input"
                           type="file"
                           accept="image/*"
                           onChange={handleImageUpload}
-                          className="h-10 text-xs py-1.5"
+                          className="hidden"
                         />
-                        <p className="text-[10px] text-muted-foreground mt-1">Accepts JPG, PNG, GIF up to 2MB.</p>
                       </div>
-                      
-                      {labImage && (
-                        <div className="relative group border border-slate-200 rounded p-1 bg-white flex-shrink-0">
-                          <img
-                            src={labImage}
-                            alt="Lab Test Preview"
-                            className="w-14 h-14 object-cover rounded shadow-sm"
-                          />
+                    ) : (
+                      <div className="relative group border border-slate-200 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center p-2 min-h-[120px]">
+                        <img
+                          src={labImage}
+                          alt="Lab Test Preview"
+                          className="max-h-[140px] rounded-lg shadow-sm object-contain bg-white"
+                        />
+                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('file-upload-input').click()}
+                            className="bg-white text-slate-900 rounded-lg p-2 text-xs font-semibold shadow hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            Change
+                          </button>
                           <button
                             type="button"
                             onClick={() => setLabImage("")}
-                            className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 shadow hover:bg-rose-600 transition-colors"
-                            title="Remove image"
+                            className="bg-rose-600 text-white rounded-lg p-2 text-xs font-semibold shadow hover:bg-rose-700 transition-colors flex items-center gap-1.5"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
+                            Delete
                           </button>
                         </div>
-                      )}
-                    </div>
+                        <input
+                          id="file-upload-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">

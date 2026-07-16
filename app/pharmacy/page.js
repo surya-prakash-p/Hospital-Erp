@@ -50,7 +50,7 @@ export default function PharmacyPage() {
     setSelectedWalkIn(item);
   };
 
-  // Dispense medications & decrement matching stocks
+  // Dispense medications & decrement matching stocks optimistically
   const handleDispense = async (e) => {
     e?.preventDefault();
     if (!selectedWalkIn) {
@@ -58,23 +58,38 @@ export default function PharmacyPage() {
       return;
     }
 
-    try {
-      showToast("Preparing and dispensing medication...", "info");
+    const originalQueue = [...queue];
+    const originalMeds = [...medicines];
+    const targetWalkInName = selectedWalkIn.name;
 
+    // Optimistically update local states
+    setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
+    
+    const prescriptionText = (selectedWalkIn.prescription || "").toLowerCase();
+    setMedicines(prev => 
+      prev.map(med => {
+        if (prescriptionText.includes(med.medicine_name.toLowerCase())) {
+          return { ...med, stock: Math.max(0, med.stock - 10) };
+        }
+        return med;
+      })
+    );
+
+    showToast("Dispensing medications (updating)...", "info");
+    setSelectedWalkIn(null);
+
+    try {
       // Update visit status in Frappe
-      await updateWalkIn(selectedWalkIn.name, {
+      await updateWalkIn(targetWalkInName, {
         pharmacy_status: "Completed",
         appointment_status: "Billing"
       });
 
       // Deduct stock for matching medicines found in the prescription
-      const prescriptionText = (selectedWalkIn.prescription || "").toLowerCase();
       let deductedCount = 0;
-
-      for (const med of medicines) {
+      for (const med of originalMeds) {
         if (prescriptionText.includes(med.medicine_name.toLowerCase())) {
           try {
-            // Deduct a standard course of 10 tablets
             await updateMedicineStock(med.medicine_name, -10);
             deductedCount++;
           } catch (stockErr) {
@@ -84,21 +99,23 @@ export default function PharmacyPage() {
       }
 
       if (deductedCount > 0) {
-        showToast(`Dispensed! Decremented stock for ${deductedCount} matching medicines.`, "success");
+        showToast(`Medication dispensed! Fulfill logs complete.`, "success");
       } else {
         showToast("Medications dispensed! Routed to Billing.", "success");
       }
 
-      // Reload queue and clear select state
+      // Sync final state in background
       await loadAllData();
-      setSelectedWalkIn(null);
     } catch (err) {
+      // Rollback on server failure
+      setQueue(originalQueue);
+      setMedicines(originalMeds);
       showToast(err.message || "Failed to dispense medicines", "error");
       console.error(err);
     }
   };
 
-  // Add new medicine to inventory
+  // Add new medicine to inventory optimistically
   const handleAddMedicine = async (e) => {
     e.preventDefault();
     if (!medName.trim() || !medStock || !medPrice) {
@@ -106,33 +123,56 @@ export default function PharmacyPage() {
       return;
     }
 
+    const newMed = {
+      name: medName.trim(),
+      medicine_name: medName.trim(),
+      stock: parseInt(medStock),
+      price: parseFloat(medPrice)
+    };
+
+    const originalMeds = [...medicines];
+    
+    // Optimistically insert medicine in local list
+    setMedicines(prev => [...prev, newMed]);
+    showToast(`Adding ${newMed.medicine_name} to catalog...`, "info");
+    
+    setMedName("");
+    setMedStock("");
+    setMedPrice("");
+
     setIsSubmittingMed(true);
     try {
-      await createMedicine({
-        medicine_name: medName.trim(),
-        stock: parseInt(medStock),
-        price: parseFloat(medPrice)
-      });
-      showToast(`${medName} added to pharmacy inventory!`, "success");
-      setMedName("");
-      setMedStock("");
-      setMedPrice("");
+      await createMedicine(newMed);
+      showToast(`${newMed.medicine_name} added to pharmacy inventory!`, "success");
       await loadAllData();
     } catch (err) {
+      // Rollback
+      setMedicines(originalMeds);
       showToast(err.message || "Failed to add medicine", "error");
     } finally {
       setIsSubmittingMed(false);
     }
   };
 
-  // Restock an existing medicine quickly
-  const handleQuickRestock = async (medName) => {
+  // Restock an existing medicine quickly with Optimistic UI updates
+  const handleQuickRestock = async (medicineName) => {
+    const originalMeds = [...medicines];
+
+    // Optimistically update stock value instantly
+    setMedicines(prev => 
+      prev.map(med => 
+        med.medicine_name === medicineName ? { ...med, stock: med.stock + 50 } : med
+      )
+    );
+    showToast(`Restocking ${medicineName}...`, "info");
+
     try {
-      showToast(`Restocking ${medName}...`, "info");
-      await updateMedicineStock(medName, 50); // Add 50 qty
-      showToast(`Restocked 50 units of ${medName}!`, "success");
+      await updateMedicineStock(medicineName, 50); // Add 50 qty
+      showToast(`Restocked 50 units of ${medicineName}!`, "success");
       await loadAllData();
     } catch (err) {
+      // Rollback
+      setMedicines(originalMeds);
       showToast(err.message || "Failed to restock", "error");
     }
   };
