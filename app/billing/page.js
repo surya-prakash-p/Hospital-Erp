@@ -200,6 +200,16 @@ Status: Completed.
                 {settledInvoice.diagnosis && (
                   <p className="text-muted-foreground mt-1">Diagnosis: <span className="text-slate-800">{settledInvoice.diagnosis}</span></p>
                 )}
+                {settledInvoice.need_lab_test === 1 && settledInvoice.lab_test_image && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-200">
+                    <p className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Attached Lab Diagnostic Scan</p>
+                    <img
+                      src={settledInvoice.lab_test_image}
+                      alt="Lab Report"
+                      className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Table of Charges */}
@@ -349,11 +359,21 @@ Status: Completed.
                     </div>
 
                     {selectedWalkIn.need_lab_test === 1 && (
-                      <div className="bg-slate-50 p-3 rounded border border-slate-100 space-y-1 md:col-span-2">
+                      <div className="bg-slate-50 p-3 rounded border border-slate-100 space-y-2 md:col-span-2">
                         <span className="font-bold text-purple-600 uppercase tracking-wider block">Lab Diagnostic Report</span>
                         <p className="font-medium text-slate-800">
                           Test: <span className="font-semibold">{selectedWalkIn.lab_test_name}</span> | Results: <span className="font-mono bg-purple-50 px-1 py-0.5 rounded text-purple-700">{selectedWalkIn.lab_result || "normal"}</span>
                         </p>
+                        {selectedWalkIn.lab_test_image && (
+                          <div className="mt-2 pt-2 border-t border-slate-200">
+                            <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Attached Lab Report Image</span>
+                            <img
+                              src={selectedWalkIn.lab_test_image}
+                              alt="Lab Test Attachment"
+                              className="max-h-36 rounded border border-slate-200 object-contain bg-white"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

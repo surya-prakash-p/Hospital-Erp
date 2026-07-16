@@ -45,7 +45,8 @@ doctypes_to_create = [
     "Hospital Patient Walk In",
     "Hospital Lab Test", 
     "Hospital Appointment", 
-    "Hospital Audit Log"
+    "Hospital Audit Log",
+    "Hospital Medicine"
 ]
 
 for dt in doctypes_to_create:
@@ -107,6 +108,7 @@ doctypes = [
             {"fieldname": "lab_test_name", "fieldtype": "Data", "label": "Lab Test Name"},
             {"fieldname": "lab_test_status", "fieldtype": "Select", "label": "Lab Test Status", "options": "Pending\nCompleted", "default": "Pending"},
             {"fieldname": "lab_result", "fieldtype": "Small Text", "label": "Lab Result"},
+            {"fieldname": "lab_test_image", "fieldtype": "Long Text", "label": "Lab Test Image"},
             {"fieldname": "need_medicines", "fieldtype": "Check", "label": "Need Medicines?"},
             {"fieldname": "pharmacy_status", "fieldtype": "Select", "label": "Pharmacy Status", "options": "Pending\nCompleted", "default": "Pending"},
             {"fieldname": "section_billing", "fieldtype": "Section Break", "label": "Billing & Payment"},
@@ -160,6 +162,19 @@ doctypes = [
             {"fieldname": "entity_name", "fieldtype": "Data", "label": "Entity Name", "in_list_view": 1},
             {"fieldname": "details", "fieldtype": "Small Text", "label": "Details"},
             {"fieldname": "timestamp", "fieldtype": "Datetime", "label": "Timestamp", "default": "Now"}
+        ],
+        "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+    },
+    {
+        "doctype": "DocType",
+        "name": "Hospital Medicine",
+        "module": "Core",
+        "custom": 1,
+        "autoname": "field:medicine_name",
+        "fields": [
+            {"fieldname": "medicine_name", "fieldtype": "Data", "label": "Medicine Name", "reqd": 1, "unique": 1, "in_list_view": 1},
+            {"fieldname": "stock", "fieldtype": "Int", "label": "Stock Qty", "reqd": 1, "in_list_view": 1},
+            {"fieldname": "price", "fieldtype": "Currency", "label": "Unit Price", "reqd": 1, "in_list_view": 1}
         ],
         "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
     }
@@ -231,5 +246,21 @@ for pat in patients:
         print(f"Added sample Patient: {pat['patient_name']}")
     except Exception as e:
         print(f"Warning: Failed to add patient {pat['patient_name']}: {e}")
+
+# 7. Insert Sample Medicines
+medicines = [
+    {"medicine_name": "Paracetamol 650mg", "stock": 100, "price": 20},
+    {"medicine_name": "Pantocid 40mg", "stock": 150, "price": 120},
+    {"medicine_name": "Amoxicillin 500mg", "stock": 80, "price": 95},
+    {"medicine_name": "Cetirizine 10mg", "stock": 200, "price": 15},
+    {"medicine_name": "Ibuprofen 400mg", "stock": 120, "price": 30}
+]
+
+for med in medicines:
+    try:
+        make_request("POST", "/api/resource/Hospital Medicine", data=med)
+        print(f"Added sample Medicine: {med['medicine_name']}")
+    except Exception as e:
+        print(f"Warning: Failed to add medicine {med['medicine_name']}: {e}")
 
 print("\nAll DocTypes and Sample Data setup successfully on your live Frappe Cloud backend!")

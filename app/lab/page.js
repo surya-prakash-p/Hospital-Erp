@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FlaskConical, CheckCircle, AlertCircle, Info, Activity, Save } from "lucide-react";
+import { FlaskConical, CheckCircle, AlertCircle, Info, Activity, Save, Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ export default function LabPage() {
   const [queue, setQueue] = useState([]);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [labResult, setLabResult] = useState("");
+  const [labImage, setLabImage] = useState("");
   const [toasts, setToasts] = useState([]);
 
   const showToast = (message, type = "info") => {
@@ -39,6 +40,24 @@ export default function LabPage() {
   const handleSelectWalkIn = (item) => {
     setSelectedWalkIn(item);
     setLabResult(item.lab_result || "");
+    setLabImage(item.lab_test_image || "");
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB Limit
+      showToast("Image size must be less than 2MB", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLabImage(reader.result);
+      showToast("Lab report image uploaded & processed!", "success");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmitResult = async (e) => {
@@ -61,6 +80,7 @@ export default function LabPage() {
 
       await updateWalkIn(selectedWalkIn.name, {
         lab_result: labResult.trim(),
+        lab_test_image: labImage,
         lab_test_status: "Completed",
         appointment_status: nextStatus
       });
@@ -72,6 +92,7 @@ export default function LabPage() {
       setQueue(updatedQueue);
       setSelectedWalkIn(null);
       setLabResult("");
+      setLabImage("");
     } catch (err) {
       showToast(err.message || "Failed to update lab results", "error");
       console.error(err);
@@ -196,6 +217,43 @@ export default function LabPage() {
                       onChange={(e) => setLabResult(e.target.value)}
                       required
                     />
+                  </div>
+
+                  {/* Image Upload Field */}
+                  <div className="space-y-2">
+                    <Label className="font-semibold flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-purple-500" />
+                      Attach Test Report Image (Optional)
+                    </Label>
+                    <div className="flex gap-4 items-center">
+                      <div className="flex-1">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="h-10 text-xs py-1.5"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1">Accepts JPG, PNG, GIF up to 2MB.</p>
+                      </div>
+                      
+                      {labImage && (
+                        <div className="relative group border border-slate-200 rounded p-1 bg-white flex-shrink-0">
+                          <img
+                            src={labImage}
+                            alt="Lab Test Preview"
+                            className="w-14 h-14 object-cover rounded shadow-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setLabImage("")}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 shadow hover:bg-rose-600 transition-colors"
+                            title="Remove image"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
