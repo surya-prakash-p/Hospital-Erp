@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, User, Phone, Mail, Droplet, Ruler, Scale, Calendar, Edit2, Check, RefreshCw, UserRound, BookOpen, Heart, Activity, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Droplet, Ruler, Scale, Calendar, Edit2, Check, RefreshCw, UserRound, BookOpen, Heart, Activity, CheckCircle, AlertCircle, Info, Thermometer, HeartPulse, Wind, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ export default function PatientProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  // Edit fields
+  // Edit fields matching all vital and contact parameters
   const [editState, setEditState] = useState({
     patient_name: "",
     age: "",
@@ -29,6 +29,13 @@ export default function PatientProfilePage() {
     height: "",
     weight: "",
     blood_group: "",
+    temperature: "",
+    bp: "",
+    pulse: "",
+    resp_rate: "",
+    spo2: "",
+    allergies: "",
+    emergency_contact: "",
     medical_history: ""
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +62,13 @@ export default function PatientProfilePage() {
           height: p.height || "",
           weight: p.weight || "",
           blood_group: p.blood_group || "",
+          temperature: p.temperature || "",
+          bp: p.bp || "",
+          pulse: p.pulse || "",
+          resp_rate: p.resp_rate || "",
+          spo2: p.spo2 || "",
+          allergies: p.allergies || "",
+          emergency_contact: p.emergency_contact || "",
           medical_history: p.medical_history || ""
         });
       } else {
@@ -91,6 +105,13 @@ export default function PatientProfilePage() {
         height: editState.height,
         weight: editState.weight,
         blood_group: editState.blood_group,
+        temperature: editState.temperature,
+        bp: editState.bp,
+        pulse: editState.pulse,
+        resp_rate: editState.resp_rate,
+        spo2: editState.spo2,
+        allergies: editState.allergies,
+        emergency_contact: editState.emergency_contact,
         medical_history: editState.medical_history
       });
       setPatient(updated);
@@ -143,7 +164,7 @@ export default function PatientProfilePage() {
       <div className="text-center py-20 text-muted-foreground">
         <AlertCircle className="w-10 h-10 mx-auto text-rose-300 mb-2" />
         <p>No patient record found for mobile: {mobile}</p>
-        <Button onClick={() => router.push('/')} variant="outline" className="mt-4 gap-1">
+        <Button onClick={() => router.push('/reception')} variant="outline" className="mt-4 gap-1">
           <ArrowLeft className="w-4 h-4" /> Go Back
         </Button>
       </div>
@@ -173,7 +194,7 @@ export default function PatientProfilePage() {
       <div className="flex items-center justify-between">
         <Button
           variant="outline"
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/reception')}
           className="gap-1.5 h-9 text-xs border-slate-200 animate-in fade-in duration-200"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -204,7 +225,7 @@ export default function PatientProfilePage() {
                 <UserRound className="w-5 h-5 text-indigo-500" />
                 Edit Patient Profile
               </CardTitle>
-              <CardDescription>Update name, vitals (height, weight, blood group), and contact info.</CardDescription>
+              <CardDescription>Update name, vitals, allergies, contact numbers, and clinical metrics.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <form onSubmit={handleUpdate} className="space-y-4">
@@ -267,7 +288,7 @@ export default function PatientProfilePage() {
                       onChange={(e) => setEditState({ ...editState, weight: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-1 md:col-span-2">
+                  <div className="space-y-1">
                     <Label htmlFor="edit-blood" className="text-xs font-semibold">Blood Group</Label>
                     <Select value={editState.blood_group} onValueChange={(val) => setEditState({ ...editState, blood_group: val })}>
                       <SelectTrigger id="edit-blood" className="h-10">
@@ -280,13 +301,80 @@ export default function PatientProfilePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-temp" className="text-xs font-semibold">Temperature (°F)</Label>
+                    <Input
+                      id="edit-temp"
+                      placeholder="e.g. 98.6"
+                      value={editState.temperature}
+                      onChange={(e) => setEditState({ ...editState, temperature: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-bp" className="text-xs font-semibold">Blood Pressure (mmHg)</Label>
+                    <Input
+                      id="edit-bp"
+                      placeholder="e.g. 120/80"
+                      value={editState.bp}
+                      onChange={(e) => setEditState({ ...editState, bp: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-pulse" className="text-xs font-semibold">Pulse Rate (bpm)</Label>
+                    <Input
+                      id="edit-pulse"
+                      placeholder="e.g. 72"
+                      value={editState.pulse}
+                      onChange={(e) => setEditState({ ...editState, pulse: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-resprate" className="text-xs font-semibold">Respiratory Rate</Label>
+                    <Input
+                      id="edit-resprate"
+                      placeholder="e.g. 16"
+                      value={editState.resp_rate}
+                      onChange={(e) => setEditState({ ...editState, resp_rate: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-spo2" className="text-xs font-semibold">SpO2 (%)</Label>
+                    <Input
+                      id="edit-spo2"
+                      placeholder="e.g. 98"
+                      value={editState.spo2}
+                      onChange={(e) => setEditState({ ...editState, spo2: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-emerg" className="text-xs font-semibold">Emergency Contact No.</Label>
+                    <Input
+                      id="edit-emerg"
+                      placeholder="e.g. 9876543200"
+                      value={editState.emergency_contact}
+                      maxLength={10}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        setEditState({ ...editState, emergency_contact: val });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-allergies" className="text-xs font-semibold">Known Allergies</Label>
+                    <Input
+                      id="edit-allergies"
+                      placeholder="e.g. Penicillin, Dust"
+                      value={editState.allergies}
+                      onChange={(e) => setEditState({ ...editState, allergies: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="edit-history" className="text-xs font-semibold">Vitals / Medical Background Notes</Label>
+                  <Label htmlFor="edit-history" className="text-xs font-semibold">Additional Medical History Notes</Label>
                   <textarea
                     id="edit-history"
-                    className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950"
+                    className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950"
                     value={editState.medical_history}
                     onChange={(e) => setEditState({ ...editState, medical_history: e.target.value })}
                   />
@@ -342,42 +430,110 @@ export default function PatientProfilePage() {
                       <span>{patient.email}</span>
                     </div>
                   )}
+                  {patient.emergency_contact && (
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>ICE Contact: {patient.emergency_contact}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Vitals Badges Grid */}
-              <CardContent className="pt-6 pb-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 flex items-center gap-3 shadow-xs">
-                    <div className="w-9 h-9 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-                      <Droplet className="w-5 h-5 fill-rose-500 text-rose-500" />
+              <CardContent className="pt-6 pb-6 space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-rose-50/40 border border-rose-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                      <Droplet className="w-4.5 h-4.5 fill-rose-500 text-rose-500" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Blood Group</p>
-                      <h4 className="text-lg font-bold text-slate-800 mt-0.5">{patient.blood_group || "N/A"}</h4>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Blood Group</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.blood_group || "N/A"}</h4>
                     </div>
                   </div>
 
-                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex items-center gap-3 shadow-xs">
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                      <Ruler className="w-5 h-5 text-blue-600" />
+                  <div className="bg-blue-50/40 border border-blue-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                      <Ruler className="w-4.5 h-4.5 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Height</p>
-                      <h4 className="text-lg font-bold text-slate-800 mt-0.5">{patient.height || "N/A"}</h4>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Height</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.height || "N/A"}</h4>
                     </div>
                   </div>
 
-                  <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3 shadow-xs">
-                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                      <Scale className="w-5 h-5 text-emerald-600" />
+                  <div className="bg-emerald-50/40 border border-emerald-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Scale className="w-4.5 h-4.5 text-emerald-600" />
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Weight</p>
-                      <h4 className="text-lg font-bold text-slate-800 mt-0.5">{patient.weight || "N/A"}</h4>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Weight</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.weight || "N/A"}</h4>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50/40 border border-amber-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                      <Thermometer className="w-4.5 h-4.5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Temperature</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.temperature ? `${patient.temperature}°F` : "N/A"}</h4>
                     </div>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-indigo-50/40 border border-indigo-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                      <Activity className="w-4.5 h-4.5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Blood Pressure</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.bp || "N/A"}</h4>
+                    </div>
+                  </div>
+
+                  <div className="bg-teal-50/40 border border-teal-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 shrink-0">
+                      <HeartPulse className="w-4.5 h-4.5 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Pulse Rate</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.pulse ? `${patient.pulse} bpm` : "N/A"}</h4>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-50/40 border border-purple-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                      <Wind className="w-4.5 h-4.5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Resp Rate</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.resp_rate || "N/A"}</h4>
+                    </div>
+                  </div>
+
+                  <div className="bg-sky-50/40 border border-sky-100/70 rounded-xl p-3.5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                      <CheckCircle className="w-4.5 h-4.5 text-sky-600" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Oxygen (SpO2)</p>
+                      <h4 className="text-sm font-bold text-slate-800 mt-0.5">{patient.spo2 ? `${patient.spo2}%` : "N/A"}</h4>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Known Allergies Callout */}
+                {patient.allergies && (
+                  <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 flex gap-3 text-xs text-rose-800">
+                    <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0" />
+                    <div>
+                      <span className="font-bold">Drug/Allergy Alerts:</span> {patient.allergies}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

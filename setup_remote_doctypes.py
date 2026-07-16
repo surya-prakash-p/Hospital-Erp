@@ -73,6 +73,13 @@ doctypes = [
             {"fieldname": "height", "fieldtype": "Data", "label": "Height"},
             {"fieldname": "weight", "fieldtype": "Data", "label": "Weight"},
             {"fieldname": "blood_group", "fieldtype": "Select", "label": "Blood Group", "options": "A+\nA-\nB+\nB-\nAB+\nAB-\nO+\nO-"},
+            {"fieldname": "temperature", "fieldtype": "Data", "label": "Temperature"},
+            {"fieldname": "bp", "fieldtype": "Data", "label": "Blood Pressure"},
+            {"fieldname": "pulse", "fieldtype": "Data", "label": "Pulse Rate"},
+            {"fieldname": "resp_rate", "fieldtype": "Data", "label": "Respiratory Rate"},
+            {"fieldname": "spo2", "fieldtype": "Data", "label": "SpO2"},
+            {"fieldname": "allergies", "fieldtype": "Text", "label": "Allergies"},
+            {"fieldname": "emergency_contact", "fieldtype": "Data", "label": "Emergency Contact"},
             {"fieldname": "medical_history", "fieldtype": "Text", "label": "Medical History"}
         ],
         "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]

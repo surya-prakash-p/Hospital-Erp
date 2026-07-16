@@ -4,8 +4,32 @@
 @config "../tailwind.config.mjs";
 
 @theme {
-  --font-sans: var(--font-montserrat, ui-sans-serif, system-ui, sans-serif);
-  --font-serif: var(--font-playfair, ui-serif, Georgia, serif);
+  --font-sans:  var(--font-jakarta, ui-sans-serif, system-ui, sans-serif);
+  --font-serif: var(--font-jakarta, ui-sans-serif, system-ui, sans-serif);
+  --font-mono:  ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+/* ── Global Typography — Plus Jakarta Sans everywhere ── */
+*, *::before, *::after {
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+input, select, textarea, button, label {
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

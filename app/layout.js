@@ -1,10 +1,14 @@
 import './globals.css';
-import { Playfair_Display, Montserrat } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import { AppSidebar } from "@/components/app-sidebar"
 import { Header } from "@/components/header"
 
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
-const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat' });
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-jakarta',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700', '800'],
+});
 
 export const metadata = {
   title: 'Thangam Hospital - Hospital ERP',
@@ -14,7 +18,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${playfair.variable} ${montserrat.variable} font-sans antialiased`}>
+      <body className={`${jakarta.variable} font-sans antialiased`}>
         <div className="flex min-h-screen bg-slate-50">
           <AppSidebar />
           <main className="flex-1 min-w-0 flex flex-col">
