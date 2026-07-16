@@ -15,7 +15,11 @@ try {
 
 async function handle(req) {
   const { pathname, search } = new URL(req.url);
-  const targetUrl = `http://127.0.0.1:8000${pathname}${search}`;
+  
+  // Use environment variable, config file site_url, or fallback to localhost
+  const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'http://127.0.0.1:8000';
+  const cleanSiteUrl = siteUrl.replace(/\/$/, '');
+  const targetUrl = `${cleanSiteUrl}${pathname}${search}`;
   
   try {
     const headers = {};
