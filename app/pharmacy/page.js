@@ -15,6 +15,11 @@ export default function PharmacyPage() {
   const [activeTab, setActiveTab] = useState("queue"); // "queue" or "inventory"
   const [toasts, setToasts] = useState([]);
 
+  // Editable prescription and custom quantities
+  const [editPrescription, setEditPrescription] = useState("");
+  const [dispenseItems, setDispenseItems] = useState([]);
+  const [selectedAddMed, setSelectedAddMed] = useState("");
+
   // New medicine form state
   const [medName, setMedName] = useState("");
   const [medStock, setMedStock] = useState("");
@@ -48,6 +53,36 @@ export default function PharmacyPage() {
 
   const handleSelectWalkIn = (item) => {
     setSelectedWalkIn(item);
+    setEditPrescription(item.prescription || "");
+    
+    // Auto-detect matching inventory medicines from doctor's typed prescription
+    const text = (item.prescription || "").toLowerCase();
+    const items = [];
+    medicines.forEach(med => {
+      if (text.includes(med.medicine_name.toLowerCase())) {
+        items.push({
+          medicine_name: med.medicine_name,
+          qty: 10, // default tablets count
+          stock: med.stock
+        });
+      }
+    });
+    setDispenseItems(items);
+  };
+
+  const handleUpdateItemQty = (index, delta) => {
+    setDispenseItems(prev => 
+      prev.map((item, idx) => {
+        if (idx === index) {
+          return { ...item, qty: Math.max(1, item.qty + delta) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleRemoveDispenseItem = (index) => {
+    setDispenseItems(prev => prev.filter((_, idx) => idx !== index));
   };
 
   // Dispense medications & decrement matching stocks optimistically
@@ -65,11 +100,12 @@ export default function PharmacyPage() {
     // Optimistically update local states
     setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
     
-    const prescriptionText = (selectedWalkIn.prescription || "").toLowerCase();
+    // Deduct stock levels in UI by exact quantities
     setMedicines(prev => 
       prev.map(med => {
-        if (prescriptionText.includes(med.medicine_name.toLowerCase())) {
-          return { ...med, stock: Math.max(0, med.stock - 10) };
+        const itemToDeduct = dispenseItems.find(i => i.medicine_name === med.medicine_name);
+        if (itemToDeduct) {
+          return { ...med, stock: Math.max(0, med.stock - itemToDeduct.qty) };
         }
         return med;
       })
@@ -79,22 +115,21 @@ export default function PharmacyPage() {
     setSelectedWalkIn(null);
 
     try {
-      // Update visit status in Frappe
+      // Update visit status and save edited prescription text in Frappe
       await updateWalkIn(targetWalkInName, {
+        prescription: editPrescription,
         pharmacy_status: "Completed",
         appointment_status: "Billing"
       });
 
-      // Deduct stock for matching medicines found in the prescription
+      // Deduct stock for matching medicines by their selected quantities
       let deductedCount = 0;
-      for (const med of originalMeds) {
-        if (prescriptionText.includes(med.medicine_name.toLowerCase())) {
-          try {
-            await updateMedicineStock(med.medicine_name, -10);
-            deductedCount++;
-          } catch (stockErr) {
-            console.error(`Failed to deduct stock for ${med.medicine_name}:`, stockErr);
-          }
+      for (const item of dispenseItems) {
+        try {
+          await updateMedicineStock(item.medicine_name, -item.qty);
+          deductedCount++;
+        } catch (stockErr) {
+          console.error(`Failed to deduct stock for ${item.medicine_name}:`, stockErr);
         }
       }
 
@@ -303,10 +338,90 @@ export default function PharmacyPage() {
 
                     {/* Prescription */}
                     <div className="space-y-2">
-                      <Label className="font-semibold text-pink-700">Prescribed Medications</Label>
-                      <pre className="p-4 bg-pink-50/20 border border-pink-100 rounded text-sm text-slate-800 font-mono whitespace-pre-wrap min-h-[100px]">
-                        {selectedWalkIn.prescription || "No detailed medications typed. Standard OTC packages may apply."}
-                      </pre>
+                      <Label htmlFor="edit-prescription" className="font-semibold text-pink-700">Prescription Details (Editable)</Label>
+                      <textarea
+                        id="edit-prescription"
+                        className="flex min-h-[90px] w-full rounded-md border border-pink-200 bg-white px-3 py-2 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
+                        value={editPrescription}
+                        onChange={(e) => setEditPrescription(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Interactive Dispense List */}
+                    <div className="space-y-3 bg-slate-50 p-4 border border-slate-200 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">
+                          Deduct Stock Quantities
+                        </span>
+                        
+                        <select
+                          value={selectedAddMed}
+                          onChange={(e) => {
+                            const medName = e.target.value;
+                            if (!medName) return;
+                            const med = medicines.find(m => m.medicine_name === medName);
+                            if (med) {
+                              if (!dispenseItems.some(i => i.medicine_name === medName)) {
+                                setDispenseItems(prev => [...prev, { medicine_name: medName, qty: 10, stock: med.stock }]);
+                              }
+                            }
+                            setSelectedAddMed("");
+                          }}
+                          className="h-6 text-[10px] bg-white border border-slate-200 rounded px-1 cursor-pointer font-medium"
+                        >
+                          <option value="">+ Add Medicine</option>
+                          {medicines.map(med => (
+                            <option key={med.medicine_name} value={med.medicine_name}>
+                              {med.medicine_name} ({med.stock} left)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {dispenseItems.length > 0 ? (
+                        <div className="space-y-2">
+                          {dispenseItems.map((item, idx) => (
+                            <div key={item.medicine_name} className="flex items-center justify-between bg-white p-2 border border-slate-200 rounded shadow-sm text-xs">
+                              <div>
+                                <span className="font-semibold text-slate-800">{item.medicine_name}</span>
+                                <div className="text-[10px] text-slate-400 mt-0.5">Current Stock: {item.stock} units</div>
+                              </div>
+                              
+                              <div className="flex items-center gap-3">
+                                {/* Qty Adjust Buttons */}
+                                <div className="flex items-center border border-slate-200 rounded overflow-hidden select-none">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQty(idx, -1)}
+                                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 font-bold border-r border-slate-200 h-6 flex items-center justify-center text-slate-600"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="px-2.5 font-semibold text-slate-800 text-xs">{item.qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateItemQty(idx, 1)}
+                                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 font-bold border-l border-slate-200 h-6 flex items-center justify-center text-slate-600"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDispenseItem(idx)}
+                                  className="text-rose-500 hover:text-rose-700 font-bold text-lg h-6 flex items-center justify-center w-4"
+                                  title="Remove item"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic">No matching pharmacy inventory items found. Use "+ Add Medicine" to select.</p>
+                      )}
                     </div>
 
                     {/* Stock Alert Warning */}
