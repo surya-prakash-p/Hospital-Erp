@@ -11,10 +11,12 @@ import {
   Receipt,
   PanelLeft,
   ChevronLeft,
+  UserRound,
 } from "lucide-react"
 
 const navigation = [
   { name: "Reception Desk", href: "/", icon: LayoutDashboard },
+  { name: "Doctors Catalog", href: "/doctors", icon: UserRound },
   { name: "Consultation", href: "/consultation", icon: Stethoscope },
   { name: "Lab Station", href: "/lab", icon: FlaskConical },
   { name: "Pharmacy", href: "/pharmacy", icon: Pill },

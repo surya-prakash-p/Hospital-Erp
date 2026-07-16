@@ -83,7 +83,18 @@ doctypes = [
         "fields": [
             {"fieldname": "doctor_name", "fieldtype": "Data", "label": "Doctor Name", "reqd": 1, "unique": 1, "in_list_view": 1},
             {"fieldname": "specialization", "fieldtype": "Data", "label": "Specialization", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "consultation_fee", "fieldtype": "Currency", "label": "Consultation Fee", "reqd": 1}
+            {"fieldname": "consultation_fee", "fieldtype": "Currency", "label": "Consultation Fee", "reqd": 1},
+            {"fieldname": "doctor_image", "fieldtype": "Long Text", "label": "Doctor Image"},
+            {"fieldname": "location", "fieldtype": "Data", "label": "Location"},
+            {"fieldname": "experience", "fieldtype": "Data", "label": "Experience"},
+            {"fieldname": "qualifications", "fieldtype": "Data", "label": "Qualifications"},
+            {"fieldname": "rating", "fieldtype": "Float", "label": "Rating"},
+            {"fieldname": "patients", "fieldtype": "Data", "label": "Patients"},
+            {"fieldname": "success_rate", "fieldtype": "Data", "label": "Success Rate"},
+            {"fieldname": "email", "fieldtype": "Data", "label": "Doctor Email"},
+            {"fieldname": "password", "fieldtype": "Data", "label": "Doctor Password"},
+            {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Available\nUnavailable"},
+            {"fieldname": "about", "fieldtype": "Text", "label": "About Doctor"}
         ],
         "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
     },
