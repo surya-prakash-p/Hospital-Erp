@@ -19,7 +19,10 @@ async function handle(req) {
   // Use environment variable, config file site_url, or fallback to localhost
   const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'http://127.0.0.1:8000';
   const cleanSiteUrl = siteUrl.replace(/\/$/, '');
-  const targetUrl = `${cleanSiteUrl}${pathname}${search}`;
+  
+  // Safely encode pathname segments (e.g. spaces to %20) for Node fetch compatibility
+  const encodedPathname = pathname.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  const targetUrl = `${cleanSiteUrl}${encodedPathname}${search}`;
   
   try {
     const headers = {};
