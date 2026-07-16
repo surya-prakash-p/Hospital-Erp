@@ -33,8 +33,10 @@ async function handle(req) {
       }
     });
 
-    if (frappeConfig && frappeConfig.api_key && frappeConfig.api_secret) {
-      headers['Authorization'] = `token ${frappeConfig.api_key}:${frappeConfig.api_secret}`;
+    const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
+    const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
+    if (apiKey && apiSecret) {
+      headers['Authorization'] = `token ${apiKey}:${apiSecret}`;
     }
 
     const options = {
