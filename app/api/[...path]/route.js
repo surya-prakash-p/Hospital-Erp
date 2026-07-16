@@ -20,8 +20,9 @@ async function handle(req) {
   const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'http://127.0.0.1:8000';
   const cleanSiteUrl = siteUrl.replace(/\/$/, '');
   
-  // Safely encode pathname segments (e.g. spaces to %20) for Node fetch compatibility
-  const encodedPathname = pathname.split('/').map(segment => encodeURIComponent(segment)).join('/');
+  // Decode pathname first to prevent double-encoding, then safely encode path segments for Node fetch compatibility
+  const decodedPathname = decodeURIComponent(pathname);
+  const encodedPathname = decodedPathname.split('/').map(segment => encodeURIComponent(segment)).join('/');
   const targetUrl = `${cleanSiteUrl}${encodedPathname}${search}`;
   
   try {
