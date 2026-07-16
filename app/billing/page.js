@@ -54,17 +54,39 @@ export default function BillingPage() {
       return;
     }
 
+    const originalQueue = [...queue];
+    const targetWalkIn = { ...selectedWalkIn };
+    const targetWalkInName = selectedWalkIn.name;
+
+    // Calculate fee breakdown
+    const docFee = DOCTOR_FEES[targetWalkIn.doctor] || 500;
+    const labFee = targetWalkIn.need_lab_test === 1 ? 450 : 0;
+    const pharmFee = targetWalkIn.need_medicines === 1 ? 250 : 0;
+    const grandTotal = docFee + labFee + pharmFee;
+
+    // Optimistically update states instantly
+    setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
+    showToast("Processing payment & invoice...", "info");
+
+    // Instantly trigger receipt modal view
+    setSettledInvoice({
+      ...targetWalkIn,
+      grandTotal,
+      paymentMethod,
+      date: new Date().toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      })
+    });
+    setSelectedWalkIn(null);
+
     try {
-      showToast("Recording payment and compiling visit report...", "info");
-
-      // Calculate fee breakdown
-      const docFee = DOCTOR_FEES[selectedWalkIn.doctor] || 500;
-      const labFee = selectedWalkIn.need_lab_test === 1 ? 450 : 0;
-      const pharmFee = selectedWalkIn.need_medicines === 1 ? 250 : 0;
-      const grandTotal = docFee + labFee + pharmFee;
-
       // 1. Update walk-in record to Completed
-      await updateWalkIn(selectedWalkIn.name, {
+      await updateWalkIn(targetWalkInName, {
         bill_amount: grandTotal,
         payment_received: 1,
         payment_method: paymentMethod,
@@ -72,46 +94,33 @@ export default function BillingPage() {
       });
 
       // 2. Fetch current patient profile and compile history entry
-      const patientProfile = await getPatient(selectedWalkIn.mobile_number);
+      const patientProfile = await getPatient(targetWalkIn.mobile_number);
       if (patientProfile) {
         const todayStr = new Date().toISOString().split("T")[0];
         const newHistoryLog = `
 Visit Date: ${todayStr}
-Doctor: ${selectedWalkIn.doctor}
-Diagnosis: ${selectedWalkIn.diagnosis || "General Consultation Checkup"}
-Prescription: ${selectedWalkIn.prescription || "None"}
-Lab Test: ${selectedWalkIn.need_lab_test === 1 ? `${selectedWalkIn.lab_test_name} (Results: ${selectedWalkIn.lab_result || "normal"})` : "None"}
+Doctor: ${targetWalkIn.doctor}
+Diagnosis: ${targetWalkIn.diagnosis || "General Consultation Checkup"}
+Prescription: ${targetWalkIn.prescription || "None"}
+Lab Test: ${targetWalkIn.need_lab_test === 1 ? `${targetWalkIn.lab_test_name} (Results: ${targetWalkIn.lab_result || "normal"})` : "None"}
 Bill Total: ₹${grandTotal} (${paymentMethod})
 Status: Completed.
 `;
         
         const currentHistory = patientProfile.medical_history || "";
         const updatedHistory = currentHistory + "\n" + newHistoryLog;
-        await updatePatientHistory(selectedWalkIn.mobile_number, updatedHistory);
+        await updatePatientHistory(targetWalkIn.mobile_number, updatedHistory);
       }
 
       showToast(`Payment of ₹${grandTotal} settled successfully! Visit history logged.`, "success");
 
-      // Trigger settled invoice view before clearing state
-      setSettledInvoice({
-        ...selectedWalkIn,
-        grandTotal,
-        paymentMethod,
-        date: new Date().toLocaleDateString("en-IN", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true
-        })
-      });
-
-      // Reload queue and clear select state
+      // Reload queue in background
       const updatedQueue = await getQueue();
       setQueue(updatedQueue);
-      setSelectedWalkIn(null);
     } catch (err) {
+      // Rollback on failure
+      setQueue(originalQueue);
+      setSettledInvoice(null);
       showToast(err.message || "Failed to settle payment", "error");
       console.error(err);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, UserPlus, Activity, Users, CheckCircle, AlertCircle, Plus, Info } from "lucide-react";
+import { Search, UserPlus, Activity, Users, CheckCircle, AlertCircle, Plus, Info, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export default function ReceptionPage() {
 
   // Form States
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [formState, setFormState] = useState({
     patient_name: "",
     mobile_number: "",
@@ -76,8 +77,8 @@ export default function ReceptionPage() {
       showToast("Please enter a name or mobile number", "info");
       return;
     }
-    showToast(`Searching for "${searchQuery}"...`, "info");
     
+    setIsSearching(true);
     try {
       const patient = await searchPatient(searchQuery.trim());
       if (patient) {
@@ -108,10 +109,12 @@ export default function ReceptionPage() {
     } catch (err) {
       showToast("Search failed", "error");
       console.error(err);
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  // Submit Registration & Walk-In
+  // Submit Registration & Walk-In with Optimistic UI updates
   const handleRegister = async (e) => {
     e?.preventDefault();
     const { patient_name, mobile_number, age, gender, email, doctor, is_existing, medical_history } = formState;
@@ -126,9 +129,37 @@ export default function ReceptionPage() {
       return;
     }
 
+    const originalQueue = [...queue];
+    const originalPatientsCount = patientsCount;
+
+    // Optimistically update states instantly
+    const mockWalkIn = {
+      name: `HOSP-WALK-TEMP-${Date.now().toString().slice(-4)}`,
+      patient_name,
+      mobile_number,
+      is_existing: is_existing ? 1 : 0,
+      doctor,
+      appointment_status: "Doctor Consultation"
+    };
+
+    setQueue(prev => [mockWalkIn, ...prev]);
+    setPatientsCount(prev => prev + (is_existing ? 0 : 1));
+    showToast("Registering patient visit (updating)...", "info");
+
+    // Reset form immediately for instant feel
+    setFormState({
+      patient_name: "",
+      mobile_number: "",
+      age: "",
+      gender: "Male",
+      email: "",
+      doctor: doctors.length > 0 ? doctors[0].name : "",
+      is_existing: false,
+      medical_history: ""
+    });
+    setSearchQuery("");
+
     try {
-      showToast("Registering patient visit...", "info");
-      
       // 1. Create/Retrieve Patient
       await createPatient({
         patient_name,
@@ -150,26 +181,15 @@ export default function ReceptionPage() {
 
       showToast(`Registered successfully! ID: ${walkIn.name}`, "success");
 
-      // 3. Reload queue and count
+      // Reload actual database states in background
       const updatedQueue = await getQueue();
       setQueue(updatedQueue);
-
       const updatedPatients = await getPatients();
       setPatientsCount(Object.keys(updatedPatients).length);
-
-      // Reset form
-      setFormState({
-        patient_name: "",
-        mobile_number: "",
-        age: "",
-        gender: "Male",
-        email: "",
-        doctor: doctors.length > 0 ? doctors[0].name : "",
-        is_existing: false,
-        medical_history: ""
-      });
-      setSearchQuery("");
     } catch (err) {
+      // Rollback on failure
+      setQueue(originalQueue);
+      setPatientsCount(originalPatientsCount);
       showToast(err.message || "Failed to register patient", "error");
       console.error(err);
     }
@@ -244,8 +264,13 @@ export default function ReceptionPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1 h-9 text-sm"
                 />
-                <Button type="submit" className="h-9 text-sm bg-slate-900 hover:bg-slate-800 text-white">
-                  Check Record
+                 <Button 
+                  type="submit" 
+                  disabled={isSearching}
+                  className="h-9 text-sm bg-slate-900 hover:bg-slate-800 text-white flex items-center gap-1.5"
+                >
+                  {isSearching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isSearching ? "Searching..." : "Check Record"}
                 </Button>
               </form>
               <p className="text-[11px] text-muted-foreground mt-2 italic">

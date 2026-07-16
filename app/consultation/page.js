@@ -99,18 +99,32 @@ export default function ConsultationPage() {
       return;
     }
 
-    try {
-      showToast("Saving consultation notes...", "info");
-      
-      // Determine next queue status
-      let nextStatus = "Billing";
-      if (needLabTest) {
-        nextStatus = "Lab Test";
-      } else if (needMedicines) {
-        nextStatus = "Pharmacy";
-      }
+    const originalQueue = [...queue];
+    const targetWalkInName = selectedWalkIn.name;
 
-      await updateWalkIn(selectedWalkIn.name, {
+    // Determine next queue status
+    let nextStatus = "Billing";
+    if (needLabTest) {
+      nextStatus = "Lab Test";
+    } else if (needMedicines) {
+      nextStatus = "Pharmacy";
+    }
+
+    // Optimistically update states instantly
+    setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
+    showToast(`Saving consultation (Routing to ${nextStatus})...`, "info");
+
+    // Reset UI selections immediately
+    setSelectedWalkIn(null);
+    setSelectedPatientHistory("");
+    setSymptoms("");
+    setDiagnosis("");
+    setPrescription("");
+    setNeedLabTest(false);
+    setNeedMedicines(false);
+
+    try {
+      await updateWalkIn(targetWalkInName, {
         diagnosis: diagnosis.trim(),
         prescription: prescription.trim(),
         need_lab_test: needLabTest ? 1 : 0,
@@ -121,17 +135,12 @@ export default function ConsultationPage() {
 
       showToast(`Consultation saved! Patient routed to ${nextStatus}`, "success");
 
-      // Reload queue and clear selections
+      // Reload database states in background
       const updatedQueue = await getQueue();
       setQueue(updatedQueue);
-      setSelectedWalkIn(null);
-      setSelectedPatientHistory("");
-      setSymptoms("");
-      setDiagnosis("");
-      setPrescription("");
-      setNeedLabTest(false);
-      setNeedMedicines(false);
     } catch (err) {
+      // Rollback on failure
+      setQueue(originalQueue);
       showToast(err.message || "Failed to update consultation", "error");
       console.error(err);
     }
