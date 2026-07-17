@@ -194,8 +194,26 @@ doctypes = [
         "autoname": "field:medicine_name",
         "fields": [
             {"fieldname": "medicine_name", "fieldtype": "Data", "label": "Medicine Name", "reqd": 1, "unique": 1, "in_list_view": 1},
-            {"fieldname": "stock", "fieldtype": "Int", "label": "Stock Qty", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "price", "fieldtype": "Currency", "label": "Unit Price", "reqd": 1, "in_list_view": 1}
+            {"fieldname": "generic_name", "fieldtype": "Data", "label": "Generic Name"},
+            {"fieldname": "batch_number", "fieldtype": "Data", "label": "Batch Number"},
+            {"fieldname": "mfg_date", "fieldtype": "Date", "label": "MFG Date"},
+            {"fieldname": "exp_date", "fieldtype": "Date", "label": "EXP Date"},
+            {"fieldname": "shelf_life", "fieldtype": "Data", "label": "Shelf Life"},
+            {"fieldname": "manufacturer", "fieldtype": "Data", "label": "Manufacturer"},
+            {"fieldname": "supplier", "fieldtype": "Data", "label": "Supplier"},
+            {"fieldname": "category", "fieldtype": "Select", "label": "Category", "options": "Tablet\nCapsule\nSyrup\nInjection\nOintment\nDrops\nPowder\nOther"},
+            {"fieldname": "strength", "fieldtype": "Data", "label": "Strength"},
+            {"fieldname": "pack_size", "fieldtype": "Data", "label": "Pack Size"},
+            {"fieldname": "purchase_price", "fieldtype": "Currency", "label": "Purchase Price"},
+            {"fieldname": "mrp", "fieldtype": "Currency", "label": "MRP"},
+            {"fieldname": "price", "fieldtype": "Currency", "label": "Selling Price", "reqd": 1, "in_list_view": 1},
+            {"fieldname": "opening_stock", "fieldtype": "Int", "label": "Opening Stock"},
+            {"fieldname": "stock", "fieldtype": "Int", "label": "Current Stock", "reqd": 1, "in_list_view": 1},
+            {"fieldname": "reorder_level", "fieldtype": "Int", "label": "Reorder Level"},
+            {"fieldname": "rack_location", "fieldtype": "Data", "label": "Rack Location"},
+            {"fieldname": "storage", "fieldtype": "Data", "label": "Storage"},
+            {"fieldname": "barcode", "fieldtype": "Data", "label": "Barcode"},
+            {"fieldname": "is_recalled", "fieldtype": "Check", "label": "Batch Recalled"}
         ],
         "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
     }

@@ -9,7 +9,7 @@ frappe.connect()
 # Create Doctor, Patient, Walk-in DocTypes
 # First delete them if they exist to avoid duplication and get a clean state
 for dt in ["Hospital Patient", "Hospital Doctor", "Hospital Patient Walk In",
-           "Hospital Lab Test", "Hospital Appointment", "Hospital Audit Log"]:
+           "Hospital Lab Test", "Hospital Appointment", "Hospital Audit Log", "Hospital Medicine"]:
     if frappe.db.exists("DocType", dt):
         frappe.delete_doc("DocType", dt)
         print(f"Deleted existing DocType: {dt}")
@@ -189,6 +189,57 @@ for p in sample_patients:
             **p
         }).insert()
         print(f"Added sample Patient: {p['patient_name']}")
+
+# Create Hospital Medicine DocType
+medicine_dt = frappe.get_doc({
+    "doctype": "DocType",
+    "name": "Hospital Medicine",
+    "module": "Hospital ERP",
+    "custom": 1,
+    "autoname": "field:medicine_name",
+    "fields": [
+        {"fieldname": "medicine_name", "fieldtype": "Data", "label": "Medicine Name", "reqd": 1, "unique": 1, "in_list_view": 1},
+        {"fieldname": "generic_name", "fieldtype": "Data", "label": "Generic Name"},
+        {"fieldname": "batch_number", "fieldtype": "Data", "label": "Batch Number"},
+        {"fieldname": "mfg_date", "fieldtype": "Date", "label": "MFG Date"},
+        {"fieldname": "exp_date", "fieldtype": "Date", "label": "EXP Date"},
+        {"fieldname": "shelf_life", "fieldtype": "Data", "label": "Shelf Life"},
+        {"fieldname": "manufacturer", "fieldtype": "Data", "label": "Manufacturer"},
+        {"fieldname": "supplier", "fieldtype": "Data", "label": "Supplier"},
+        {"fieldname": "category", "fieldtype": "Select", "label": "Category", "options": "Tablet\nCapsule\nSyrup\nInjection\nOintment\nDrops\nPowder\nOther"},
+        {"fieldname": "strength", "fieldtype": "Data", "label": "Strength"},
+        {"fieldname": "pack_size", "fieldtype": "Data", "label": "Pack Size"},
+        {"fieldname": "purchase_price", "fieldtype": "Currency", "label": "Purchase Price"},
+        {"fieldname": "mrp", "fieldtype": "Currency", "label": "MRP"},
+        {"fieldname": "price", "fieldtype": "Currency", "label": "Selling Price", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "opening_stock", "fieldtype": "Int", "label": "Opening Stock"},
+        {"fieldname": "stock", "fieldtype": "Int", "label": "Current Stock", "reqd": 1, "in_list_view": 1},
+        {"fieldname": "reorder_level", "fieldtype": "Int", "label": "Reorder Level"},
+        {"fieldname": "rack_location", "fieldtype": "Data", "label": "Rack Location"},
+        {"fieldname": "storage", "fieldtype": "Data", "label": "Storage"},
+        {"fieldname": "barcode", "fieldtype": "Data", "label": "Barcode"},
+        {"fieldname": "is_recalled", "fieldtype": "Check", "label": "Batch Recalled"}
+    ],
+    "permissions": [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+})
+medicine_dt.insert()
+print("Created DocType: Hospital Medicine")
+
+# Add sample Medicines
+medicines = [
+    {"medicine_name": "Paracetamol 650mg", "generic_name": "Paracetamol", "batch_number": "BATCH001", "exp_date": "2026-12-31", "reorder_level": 50, "stock": 100, "price": 20},
+    {"medicine_name": "Pantocid 40mg", "generic_name": "Pantoprazole", "batch_number": "BATCH002", "exp_date": "2027-05-20", "reorder_level": 30, "stock": 150, "price": 120},
+    {"medicine_name": "Amoxicillin 500mg", "generic_name": "Amoxicillin", "batch_number": "BATCH003", "exp_date": "2026-08-15", "reorder_level": 100, "stock": 80, "price": 95},
+    {"medicine_name": "Cetirizine 10mg", "generic_name": "Cetirizine", "batch_number": "BATCH004", "exp_date": "2026-07-25", "reorder_level": 50, "stock": 200, "price": 15},
+    {"medicine_name": "Expired Med", "generic_name": "Old Pill", "batch_number": "BATCH005", "exp_date": "2026-01-01", "reorder_level": 10, "stock": 20, "price": 5}
+]
+for med in medicines:
+    if not frappe.db.exists("Hospital Medicine", med["medicine_name"]):
+        frappe.get_doc({
+            "doctype": "Hospital Medicine",
+            **med
+        }).insert()
+        print(f"Added sample Medicine: {med['medicine_name']}")
 
 frappe.db.commit()
 print("All set up successfully!")
