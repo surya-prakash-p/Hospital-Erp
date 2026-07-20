@@ -302,6 +302,15 @@ export default function PatientProfilePage() {
                   <p className="font-semibold text-slate-800">{registeredDate}</p>
                 </div>
               </div>
+
+              {/* Next Walkin Date Display */}
+              <div className="flex items-center gap-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-indigo-600 uppercase font-bold tracking-wider">Next Walkin Date</p>
+                  <p className="font-bold text-indigo-900 text-sm">{nextAppointment ? nextAppointment : "Not Scheduled"}</p>
+                </div>
+              </div>
               {/* View Full Profile removed as per request */}
             </div>
           </Card>
@@ -637,7 +646,13 @@ export default function PatientProfilePage() {
                                     {w.diagnosis && <p><strong>Diagnosis:</strong> {w.diagnosis}</p>}
                                     {w.prescription && <p><strong>Prescription:</strong> {w.prescription}</p>}
                                     {w.lab_result && <p><strong>Lab Result:</strong> {w.lab_result}</p>}
-                                    {(!w.diagnosis && !w.prescription && !w.lab_result) && <p className="italic text-slate-500">Consultation details pending or not provided.</p>}
+                                    {w.next_checkup_date && (
+                                      <div className="mt-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 p-2 rounded-lg flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-indigo-600" /> Next Allocated Walk-In Date:</span>
+                                        <span className="font-extrabold">{w.next_checkup_date}</span>
+                                      </div>
+                                    )}
+                                    {(!w.diagnosis && !w.prescription && !w.lab_result && !w.next_checkup_date) && <p className="italic text-slate-500">Consultation details pending or not provided.</p>}
                                   </div>
                                 </div>
                               </div>
@@ -650,6 +665,50 @@ export default function PatientProfilePage() {
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* Table View of Walk-In History with Next Walkin Date Column */}
+                    {patientWalkins.length > 0 && (
+                      <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                        <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800">
+                            <Calendar className="w-4 h-4 text-indigo-500" />
+                            Walk-In Appointments & Next Checkup Dates
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 overflow-x-auto">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-100/70 text-slate-700 font-bold uppercase tracking-wider border-b">
+                              <tr>
+                                <th className="px-4 py-2.5">Visit Date</th>
+                                <th className="px-4 py-2.5">Doctor</th>
+                                <th className="px-4 py-2.5">Diagnosis</th>
+                                <th className="px-4 py-2.5 text-indigo-700 bg-indigo-50/50">Next Walkin Date</th>
+                                <th className="px-4 py-2.5">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {patientWalkins.map((w, i) => (
+                                <tr key={i} className="hover:bg-slate-50">
+                                  <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                                    {w.creation ? new Date(w.creation).toLocaleDateString('en-GB') : registeredDate}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{w.doctor}</td>
+                                  <td className="px-4 py-3 text-slate-600 max-w-[150px] truncate">{w.diagnosis || "Checkup"}</td>
+                                  <td className="px-4 py-3 font-bold text-indigo-700 bg-indigo-50/30 whitespace-nowrap">
+                                    {w.next_checkup_date ? w.next_checkup_date : "Not Allocated"}
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                      {w.appointment_status || "Completed"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
 
                   {/* Right Column: Widgets */}
