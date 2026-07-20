@@ -53,16 +53,13 @@ export default function DashboardPage() {
   const emergencyCases = 2;
 
   const dashboardStats = [
-    { title: "Total Patients", value: patientsCount, icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100", trend: "+8% this week", isTrendUp: true },
-    { title: "Today's Appointments", value: todaysAppointments, icon: Calendar, color: "text-indigo-600 bg-indigo-50 border-indigo-100", trend: "+3 pending", isTrendUp: true },
-    { title: "OP Patients (OPD)", value: opCount, icon: Activity, color: "text-emerald-600 bg-emerald-50 border-emerald-100", trend: "Active queue", isTrendUp: true },
-    { title: "IP Patients (IPD)", value: ipCount, icon: Heart, color: "text-pink-600 bg-pink-50 border-pink-100", trend: "Ward admitted", isTrendUp: true },
-    { title: "Doctors Available", value: `${doctorsAvailable}/${doctorsList.length}`, icon: UserRound, color: "text-purple-600 bg-purple-50 border-purple-100", trend: "On-duty logs", isTrendUp: true },
-    { title: "Bed Availability", value: bedAvailability, icon: BedDouble, color: "text-teal-600 bg-teal-50 border-teal-100", trend: "14 Occupied", isTrendUp: false },
-    { title: "Today's Revenue", value: todaysRevenue, icon: DollarSign, color: "text-amber-600 bg-amber-50 border-amber-100", trend: "Settle completed", isTrendUp: true },
-    { title: "Pending Bills", value: pendingBillsCount, icon: Receipt, color: "text-slate-600 bg-slate-50 border-slate-100", trend: "Needs checkout", isTrendUp: false },
-    { title: "Emergency Cases", value: emergencyCases, icon: AlertCircle, color: "text-rose-600 bg-rose-50 border-rose-100", trend: "Active in ER", isTrendUp: false },
-    { title: "Lab Reports Pending", value: labReportsPending, icon: FlaskConical, color: "text-violet-600 bg-violet-50 border-violet-100", trend: "Diagnostic panel", isTrendUp: true },
+    { title: "Total Patients", value: patientsCount, icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100", trend: "+8% this week", isTrendUp: true, href: "/reception" },
+    { title: "Today's Appointments", value: todaysAppointments, icon: Calendar, color: "text-indigo-600 bg-indigo-50 border-indigo-100", trend: "+3 pending", isTrendUp: true, href: "/consultation" },
+    { title: "OP Patients (OPD)", value: opCount, icon: Activity, color: "text-emerald-600 bg-emerald-50 border-emerald-100", trend: "Active queue", isTrendUp: true, href: "/consultation" },
+    { title: "Doctors Available", value: `${doctorsAvailable}/${doctorsList.length}`, icon: UserRound, color: "text-purple-600 bg-purple-50 border-purple-100", trend: "On-duty logs", isTrendUp: true, href: "/doctors" },
+    { title: "Today's Revenue", value: todaysRevenue, icon: DollarSign, color: "text-amber-600 bg-amber-50 border-amber-100", trend: "Settle completed", isTrendUp: true, href: "/billing" },
+    { title: "Pending Bills", value: pendingBillsCount, icon: Receipt, color: "text-slate-600 bg-slate-50 border-slate-100", trend: "Needs checkout", isTrendUp: false, href: "/billing" },
+    { title: "Lab Reports Pending", value: labReportsPending, icon: FlaskConical, color: "text-violet-600 bg-violet-50 border-violet-100", trend: "Diagnostic panel", isTrendUp: true, href: "/lab" },
   ];
 
   if (loading) {
@@ -100,7 +97,11 @@ export default function DashboardPage() {
         {dashboardStats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="hover:shadow-md transition-all duration-300 border border-slate-200/60 flex flex-col justify-between">
+            <Card 
+              key={stat.title} 
+              onClick={() => stat.href && router.push(stat.href)}
+              className={`hover:shadow-md transition-all duration-300 border border-slate-200/60 flex flex-col justify-between ${stat.href ? 'cursor-pointer hover:border-indigo-200' : ''}`}
+            >
               <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.title}</span>
                 <div className={`p-1.5 rounded-lg border ${stat.color} shrink-0`}>

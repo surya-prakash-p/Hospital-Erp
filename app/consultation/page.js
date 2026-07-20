@@ -7,13 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors } from "@/lib/hospital-service";
 
 export default function ConsultationPage() {
   const [queue, setQueue] = useState([]);
+  const [doctorsList, setDoctorsList] = useState([
+    { name: "Dr. Rajesh", doctor_name: "Dr. Rajesh", specialization: "General Physician" },
+    { name: "Dr. Priya", doctor_name: "Dr. Priya", specialization: "Cardiologist" },
+    { name: "Dr. Vignesh", doctor_name: "Dr. Vignesh", specialization: "Pediatrician" }
+  ]);
   const [labTestsList, setLabTestsList] = useState([]);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [selectedPatientHistory, setSelectedPatientHistory] = useState("");
+  const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
 
   // Form States
@@ -23,6 +29,7 @@ export default function ConsultationPage() {
   const [needLabTest, setNeedLabTest] = useState(false);
   const [labTestName, setLabTestName] = useState("");
   const [needMedicines, setNeedMedicines] = useState(false);
+  const [nextCheckupDate, setNextCheckupDate] = useState("");
   
   // Autocomplete Inventory Medicine States
   const [searchMedQuery, setSearchMedQuery] = useState("");
@@ -44,6 +51,11 @@ export default function ConsultationPage() {
         const q = await getQueue();
         setQueue(q);
 
+        const docs = await getDoctors();
+        if (docs && docs.length > 0) {
+          setDoctorsList(docs);
+        }
+
         const tests = await getLabTests();
         setLabTestsList(tests);
         if (tests.length > 0) {
@@ -56,6 +68,8 @@ export default function ConsultationPage() {
       } catch (err) {
         showToast("Error loading consultation data", "error");
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
@@ -94,6 +108,7 @@ export default function ConsultationPage() {
       setLabTestName(labTestsList[0].test_name);
     }
     setNeedMedicines(item.need_medicines === 1);
+    setNextCheckupDate(item.next_checkup_date || "");
     setSearchMedQuery("");
     setMatchingMeds([]);
   };
@@ -115,7 +130,6 @@ export default function ConsultationPage() {
     setPrescription(prev => prev ? `${prev}\n${newLine}` : newLine);
     setSearchMedQuery("");
     setMatchingMeds([]);
-    setNeedMedicines(true); // Auto route to pharmacy
     showToast(`Added ${med.medicine_name} to prescription list!`, "success");
   };
 
@@ -154,6 +168,7 @@ export default function ConsultationPage() {
     setPrescription("");
     setNeedLabTest(false);
     setNeedMedicines(false);
+    setNextCheckupDate("");
 
     try {
       await updateWalkIn(targetWalkInName, {
@@ -162,7 +177,8 @@ export default function ConsultationPage() {
         need_lab_test: needLabTest ? 1 : 0,
         lab_test_name: needLabTest ? labTestName : "",
         need_medicines: needMedicines ? 1 : 0,
-        appointment_status: nextStatus
+        appointment_status: nextStatus,
+        next_checkup_date: nextCheckupDate
       });
 
       showToast(`Consultation saved! Patient routed to ${nextStatus}`, "success");
@@ -181,6 +197,18 @@ export default function ConsultationPage() {
   const activeConsultations = queue.filter(
     (q) => q.appointment_status === "Doctor Consultation"
   );
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-pulse p-6">
+        <div className="h-10 w-48 bg-slate-200/80 rounded mb-4" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 h-[500px] bg-slate-200/60 rounded-xl" />
+          <div className="lg:col-span-2 h-[500px] bg-slate-200/60 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
@@ -209,53 +237,66 @@ export default function ConsultationPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live queue list */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="flex flex-col h-[500px]">
-            <CardHeader className="bg-slate-50 border-b">
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span>Active Queue</span>
-                <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-                  {activeConsultations.length} Pending
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 overflow-y-auto flex-1">
-              <div className="divide-y">
-                {activeConsultations.map((item) => {
-                  const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
-                  return (
-                    <div
-                      key={item.name}
-                      onClick={() => handleSelectWalkIn(item)}
-                      className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 
-                        ${isActive ? "border-l-indigo-600 bg-indigo-50/30" : "border-l-transparent bg-white"}`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-semibold text-slate-950 text-sm">{item.patient_name}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {item.mobile_number} | Assigned: {item.doctor}
-                          </p>
+      {/* 3 Doctor Columns Queue */}
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+          <Stethoscope className="w-5 h-5 text-indigo-600" />
+          Doctor Consultation Queues ({activeConsultations.length} Pending Total)
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {doctorsList.map((doc) => {
+            const docName = doc.name || doc.doctor_name;
+            const docQueue = activeConsultations.filter(
+              (q) => (q.doctor || "").toLowerCase().includes(docName.toLowerCase()) || 
+                     docName.toLowerCase().includes((q.doctor || "").toLowerCase())
+            );
+            return (
+              <Card key={docName} className="flex flex-col h-[280px] border-slate-200 shadow-sm rounded-xl overflow-hidden">
+                <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-900">{docName}</CardTitle>
+                    <CardDescription className="text-[10px] text-slate-500">{doc.specialization || "Doctor"}</CardDescription>
+                  </div>
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${docQueue.length > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400"}`}>
+                    {docQueue.length} Patient{docQueue.length !== 1 ? "s" : ""}
+                  </span>
+                </CardHeader>
+                
+                <CardContent className="p-0 overflow-y-auto flex-1 divide-y divide-slate-100">
+                  {docQueue.map((item, index) => {
+                    const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
+                    return (
+                      <div
+                        key={item.name}
+                        onClick={() => handleSelectWalkIn(item)}
+                        className={`p-3 hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex gap-3 items-center
+                          ${isActive ? "border-l-indigo-600 bg-indigo-50/40" : "border-l-transparent bg-white"}`}
+                      >
+                        <div className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${isActive ? "bg-indigo-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"}`}>
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-slate-900 text-xs truncate">{item.patient_name}</h4>
+                          <p className="text-[10px] text-muted-foreground truncate">{item.mobile_number} | ID: {item.name}</p>
                         </div>
                       </div>
+                    );
+                  })}
+                  {docQueue.length === 0 && (
+                    <div className="text-center text-slate-400 py-16 text-xs italic">
+                      No patients for {docName}
                     </div>
-                  );
-                })}
-
-                {activeConsultations.length === 0 && (
-                  <div className="text-center text-muted-foreground py-20 text-sm">
-                    No pending patients in consultation queue.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
+      </div>
 
         {/* Diagnosis & Prescription Panel */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6">
           <Card>
             <CardHeader className="bg-slate-50 border-b">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -416,6 +457,17 @@ export default function ConsultationPage() {
                         Routes the patient directly to the pharmacy stage before billing.
                       </p>
                     </div>
+
+                    <div className="space-y-3">
+                      <Label htmlFor="next-checkup" className="font-semibold text-slate-700">Next Checkup Date (Optional)</Label>
+                      <Input
+                        type="date"
+                        id="next-checkup"
+                        value={nextCheckupDate}
+                        onChange={(e) => setNextCheckupDate(e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                    </div>
                   </div>
 
                   {/* Inline history report display */}
@@ -451,6 +503,5 @@ export default function ConsultationPage() {
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

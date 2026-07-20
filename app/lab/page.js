@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import { FlaskConical, CheckCircle, AlertCircle, Info, Activity, Save, Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getQueue, updateWalkIn } from "@/lib/hospital-service";
 
 export default function LabPage() {
   const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [labResult, setLabResult] = useState("");
   const [labImage, setLabImage] = useState("");
@@ -32,6 +34,8 @@ export default function LabPage() {
       } catch (err) {
         showToast("Error loading lab queue", "error");
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
@@ -99,7 +103,9 @@ export default function LabPage() {
     }
   };
 
-  const pendingTests = queue.filter((q) => q.appointment_status === "Lab Test");
+  const pendingTests = queue
+    .filter((q) => q.appointment_status === "Lab Test")
+    .sort((a, b) => new Date(a.creation || 0) - new Date(b.creation || 0));
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
@@ -128,8 +134,21 @@ export default function LabPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Queue panel */}
+      {loading ? (
+        <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
+          <div className="flex gap-4 w-full">
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+            <div className="h-96 lg:col-span-1 bg-slate-200/60 rounded-xl" />
+            <div className="h-96 lg:col-span-2 bg-slate-200/60 rounded-xl" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Queue panel */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="flex flex-col h-[500px]">
             <CardHeader className="bg-slate-50 border-b">
@@ -142,21 +161,27 @@ export default function LabPage() {
             </CardHeader>
             <CardContent className="p-0 overflow-y-auto flex-1">
               <div className="divide-y">
-                {pendingTests.map((item) => {
+                {pendingTests.map((item, index) => {
                   const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
                   return (
                     <div
                       key={item.name}
                       onClick={() => handleSelectWalkIn(item)}
-                      className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 
+                      className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex items-center gap-3
                         ${isActive ? "border-l-purple-600 bg-purple-50/30" : "border-l-transparent bg-white"}`}
                     >
-                      <div>
-                        <h4 className="font-semibold text-slate-950 text-sm">{item.patient_name}</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {item.mobile_number} | Assigned: {item.doctor}
+                      <div className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${isActive ? "bg-purple-600 text-white shadow-sm" : "bg-purple-100 text-purple-700"}`}>
+                        #{index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-slate-950 text-sm truncate">{item.patient_name}</h4>
+                          <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">Token #{index + 1}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {item.mobile_number} | Doctor: {item.doctor}
                         </p>
-                        <div className="mt-2 text-xs font-semibold text-purple-700 bg-purple-50/80 border border-purple-100 px-2 py-0.5 rounded w-fit">
+                        <div className="mt-1.5 text-xs font-semibold text-purple-700 bg-purple-50/80 border border-purple-100 px-2 py-0.5 rounded w-fit">
                           Test: {item.lab_test_name || "Diagnostic Panel"}
                         </div>
                       </div>
@@ -244,11 +269,19 @@ export default function LabPage() {
                       </div>
                     ) : (
                       <div className="relative group border border-slate-200 rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center p-2 min-h-[120px]">
-                        <img
-                          src={labImage}
-                          alt="Lab Test Preview"
-                          className="max-h-[140px] rounded-lg shadow-sm object-contain bg-white"
-                        />
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <img
+                              src={labImage}
+                              alt="Lab Test Preview"
+                              className="max-h-[140px] rounded-lg shadow-sm object-contain bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                            />
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
+                            <DialogTitle className="sr-only">Image Preview</DialogTitle>
+                            <img src={labImage} alt="Full Size Lab Test" className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
+                          </DialogContent>
+                        </Dialog>
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             type="button"
@@ -296,8 +329,9 @@ export default function LabPage() {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -70,8 +70,10 @@ export default function ReceptionPage() {
     try {
       const q   = await getQueue();    setQueue(q);
       const pts = await getPatients(); setPatientsCount(Object.keys(pts).length);
-      const doc = await getDoctors();  setDoctors(doc);
-      if (doc.length > 0) setFormState(p => ({ ...p, doctor: doc[0].name }));
+      const allDocs = await getDoctors();
+      setDoctors(allDocs);
+      const availableDocs = allDocs.filter(d => d.status !== "Unavailable");
+      if (availableDocs.length > 0) setFormState(p => ({ ...p, doctor: availableDocs[0].name }));
     } catch { toast("Failed to load data", "error"); }
     finally  { setLoading(false); }
   }
@@ -85,7 +87,7 @@ export default function ReceptionPage() {
 
   const handleExistSearch = async e => {
     e?.preventDefault();
-    if (!existQuery.trim()) { toast("Enter name or mobile number", "info"); return; }
+    if (existQuery.length !== 10) { toast("Enter exactly 10-digit mobile number", "info"); return; }
     setExistSearching(true);
     try {
       const patient = await searchPatient(existQuery.trim());
@@ -118,8 +120,10 @@ export default function ReceptionPage() {
     toast(type === "IPD" ? "Admitting patient…" : "Booking appointment…", "info");
 
     try {
-      await createPatient({ ...formState, age: formState.age ? parseInt(formState.age) : null });
-      await createWalkIn({ patient_name, mobile_number, is_existing: 0, doctor, appointment_status: type });
+      if (!formState.is_existing) {
+        await createPatient({ ...formState, age: formState.age ? parseInt(formState.age) : null });
+      }
+      await createWalkIn({ patient_name, mobile_number, is_existing: formState.is_existing ? 1 : 0, doctor, appointment_status: type });
       toast(type === "IPD" ? "Admitted successfully!" : "Appointment booked!", "success");
       router.push(`/patient/${mobile_number}`);
       const uq = await getQueue(); setQueue(uq);
@@ -137,6 +141,19 @@ export default function ReceptionPage() {
 
   const filtered = stageFilter === "All" ? queue : queue.filter(p => p.appointment_status === stageFilter);
   const stageCounts = WORKFLOW.reduce((acc, w) => ({ ...acc, [w.key]: queue.filter(p => p.appointment_status === w.key).length }), {});
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5 max-w-6xl mx-auto animate-pulse p-6">
+        <div className="flex gap-4">
+          <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+          <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+        </div>
+        <div className="h-64 w-full bg-slate-200/60 rounded-xl mt-6" />
+        <div className="h-64 w-full bg-slate-200/60 rounded-xl mt-4" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5 max-w-6xl mx-auto">
@@ -206,12 +223,12 @@ export default function ReceptionPage() {
               </div>
             ) : (
               <div className="p-5 space-y-3">
-                <p className="text-[11px] text-slate-400">Enter the patient's name or mobile number.</p>
+                <p className="text-[11px] text-slate-400">Enter the patient's mobile number (10 digits).</p>
                 <form onSubmit={handleExistSearch} className="space-y-2.5">
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <Input autoFocus placeholder="Name or mobile number…" value={existQuery}
-                      onChange={e => setExistQuery(e.target.value)} className="pl-9 h-10 text-sm border-slate-200" />
+                    <Input autoFocus placeholder="Mobile number..." value={existQuery} maxLength={10}
+                      onChange={e => setExistQuery(e.target.value.replace(/\D/g, ''))} className="pl-9 h-10 text-sm border-slate-200" />
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" onClick={() => { setExistStep(false); setExistQuery(""); }}
@@ -281,7 +298,7 @@ export default function ReceptionPage() {
                     <select value={formState.doctor} onChange={e => setFormState({...formState, doctor: e.target.value})} required
                       className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400">
                       <option value="">Select doctor…</option>
-                      {doctors.map(d => <option key={d.name} value={d.name}>{d.doctor_name} ({d.specialization})</option>)}
+                      {doctors.map(d => <option key={d.name} value={d.name} disabled={d.status === "Unavailable"}>{d.doctor_name} ({d.specialization}) {d.status === "Unavailable" ? "- Unavailable" : ""}</option>)}
                     </select>
                   </Field>
                 </div>
@@ -487,7 +504,7 @@ export default function ReceptionPage() {
           const isDone     = status === "Done";
 
           return (
-            <div key={pat.name}
+            <div key={`${pat.name}-${idx}`}
               className="grid grid-cols-12 px-5 py-3.5 border-b border-slate-50 items-center hover:bg-slate-50/60 transition-colors">
 
               {/* Index */}

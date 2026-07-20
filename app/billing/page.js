@@ -16,6 +16,7 @@ const DOCTOR_FEES = {
 
 export default function BillingPage() {
   const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [toasts, setToasts] = useState([]);
@@ -38,6 +39,8 @@ export default function BillingPage() {
       } catch (err) {
         showToast("Error loading billing queue", "error");
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
@@ -61,7 +64,7 @@ export default function BillingPage() {
     // Calculate fee breakdown
     const docFee = DOCTOR_FEES[targetWalkIn.doctor] || 500;
     const labFee = targetWalkIn.need_lab_test === 1 ? 450 : 0;
-    const pharmFee = targetWalkIn.need_medicines === 1 ? 250 : 0;
+    const pharmFee = targetWalkIn.need_medicines === 1 ? (targetWalkIn.pharmacy_bill_amount || 0) : 0;
     const grandTotal = docFee + labFee + pharmFee;
 
     // Optimistically update states instantly
@@ -126,12 +129,14 @@ Status: Completed.
     }
   };
 
-  const pendingBilling = queue.filter((q) => q.appointment_status === "Billing");
+  const pendingBilling = queue
+    .filter((q) => q.appointment_status === "Billing")
+    .sort((a, b) => new Date(a.creation || 0) - new Date(b.creation || 0));
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      {/* Toast notifications container - adjusted to be medium size */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+      {/* Toast notifications container */}
+      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -236,10 +241,22 @@ Status: Completed.
                     </div>
                   )}
                   {settledInvoice.need_medicines === 1 && (
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-600">Pharmacy Medication Package</span>
-                      <span className="font-medium">₹250</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-600">Pharmacy Medication Package</span>
+                        <span className="font-medium">₹{settledInvoice.pharmacy_bill_amount || 0}</span>
+                      </div>
+                      {settledInvoice.dispensed_medicines && settledInvoice.dispensed_medicines.length > 0 && (
+                        <div className="pl-3 pr-1 space-y-1 py-1 text-[11px] text-slate-500">
+                          {settledInvoice.dispensed_medicines.map((med, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</span>
+                              <span>₹{(med.qty * (med.price || 0)).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="flex justify-between font-bold text-sm text-slate-900 pt-3">
                     <span>Total Paid</span>
@@ -285,8 +302,21 @@ Status: Completed.
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Queue panel */}
+      {loading ? (
+        <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
+          <div className="flex gap-4 w-full">
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+            <div className="h-96 lg:col-span-1 bg-slate-200/60 rounded-xl" />
+            <div className="h-96 lg:col-span-2 bg-slate-200/60 rounded-xl" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Queue panel */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="flex flex-col h-[500px]">
             <CardHeader className="bg-slate-50 border-b">
@@ -299,18 +329,24 @@ Status: Completed.
             </CardHeader>
             <CardContent className="p-0 overflow-y-auto flex-1">
               <div className="divide-y">
-                {pendingBilling.map((item) => {
+                {pendingBilling.map((item, index) => {
                   const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
                   return (
                     <div
                       key={item.name}
                       onClick={() => handleSelectWalkIn(item)}
-                      className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 
+                      className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex items-center gap-3
                         ${isActive ? "border-l-teal-600 bg-teal-50/30" : "border-l-transparent bg-white"}`}
                     >
-                      <div>
-                        <h4 className="font-semibold text-slate-955 text-sm">{item.patient_name}</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
+                      <div className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${isActive ? "bg-teal-600 text-white shadow-sm" : "bg-teal-100 text-teal-700"}`}>
+                        #{index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-slate-950 text-sm truncate">{item.patient_name}</h4>
+                          <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">Token #{index + 1}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {item.mobile_number} | Doctor: {item.doctor}
                         </p>
                       </div>
@@ -408,10 +444,22 @@ Status: Completed.
                       )}
 
                       {selectedWalkIn.need_medicines === 1 && (
-                        <div className="flex justify-between text-slate-600">
-                          <span>Pharmacy Dispensed Package</span>
-                          <span>₹250</span>
-                        </div>
+                        <>
+                          <div className="flex justify-between text-slate-600 font-semibold">
+                            <span>Pharmacy Dispensed Package</span>
+                            <span>₹{selectedWalkIn.pharmacy_bill_amount || 0}</span>
+                          </div>
+                          {selectedWalkIn.dispensed_medicines && selectedWalkIn.dispensed_medicines.length > 0 && (
+                            <div className="pl-4 pr-1 space-y-1.5 pt-1 pb-1">
+                              {selectedWalkIn.dispensed_medicines.map((med, idx) => (
+                                <div key={idx} className="flex justify-between text-xs text-slate-500">
+                                  <span>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</span>
+                                  <span>₹{(med.qty * (med.price || 0)).toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
 
                       <div className="flex justify-between font-bold text-base text-slate-900 pt-3 border-t border-slate-100">
@@ -419,7 +467,7 @@ Status: Completed.
                         <span>
                           ₹{(DOCTOR_FEES[selectedWalkIn.doctor] || 500) + 
                             (selectedWalkIn.need_lab_test === 1 ? 450 : 0) + 
-                            (selectedWalkIn.need_medicines === 1 ? 250 : 0)}
+                            (selectedWalkIn.need_medicines === 1 ? (selectedWalkIn.pharmacy_bill_amount || 0) : 0)}
                         </span>
                       </div>
                     </div>
@@ -458,8 +506,9 @@ Status: Completed.
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

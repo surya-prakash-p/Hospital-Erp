@@ -17,6 +17,7 @@ export default function PharmacyPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Editable prescription and custom quantities
   const [editPrescription, setEditPrescription] = useState("");
@@ -54,6 +55,8 @@ export default function PharmacyPage() {
     } catch (err) {
       showToast("Error loading data from server", "error");
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -73,7 +76,8 @@ export default function PharmacyPage() {
         items.push({
           medicine_name: med.medicine_name,
           qty: 10, // default tablets count
-          stock: med.stock
+          stock: med.stock,
+          price: med.price || 0
         });
       }
     });
@@ -96,54 +100,58 @@ export default function PharmacyPage() {
   };
 
   // Dispense medications & decrement matching stocks optimistically
-  const handleDispense = async (e) => {
-    e?.preventDefault();
-    if (!selectedWalkIn) {
-      showToast("Please select a patient from the queue", "error");
-      return;
-    }
-
-    const originalQueue = [...queue];
-    const originalMeds = [...medicines];
+  const handleDispense = async (isOutsidePurchase = false) => {
+    if (!selectedWalkIn) return;
     const targetWalkInName = selectedWalkIn.name;
+    const originalQueue = [...queue];
 
     // Optimistically update local states
     setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
     
-    // Deduct stock levels in UI by exact quantities
-    setMedicines(prev => 
-      prev.map(med => {
-        const itemToDeduct = dispenseItems.find(i => i.medicine_name === med.medicine_name);
-        if (itemToDeduct) {
-          return { ...med, stock: Math.max(0, med.stock - itemToDeduct.qty) };
-        }
-        return med;
-      })
-    );
+    // Deduct stock levels in UI by exact quantities (skip if outside purchase)
+    if (!isOutsidePurchase) {
+      setMedicines(prev => 
+        prev.map(med => {
+          const itemToDeduct = dispenseItems.find(i => i.medicine_name === med.medicine_name);
+          if (itemToDeduct) {
+            return { ...med, stock: Math.max(0, med.stock - itemToDeduct.qty) };
+          }
+          return med;
+        })
+      );
+    }
 
-    showToast("Dispensing medications (updating)...", "info");
+    showToast(isOutsidePurchase ? "Marking as Outside Purchase..." : "Dispensing medications (updating)...", "info");
     setSelectedWalkIn(null);
 
     try {
-      // Update visit status and save edited prescription text in Frappe
+      const pharmacyBillAmount = isOutsidePurchase ? 0 : dispenseItems.reduce((acc, item) => acc + (item.qty * item.price), 0);
+
+      // Update visit status and save edited prescription text and exact bill amount in Frappe
       await updateWalkIn(targetWalkInName, {
         prescription: editPrescription,
-        pharmacy_status: "Completed",
-        appointment_status: "Billing"
+        pharmacy_status: isOutsidePurchase ? "Completed (Outside Purchase)" : "Completed",
+        appointment_status: "Billing",
+        pharmacy_bill_amount: pharmacyBillAmount,
+        dispensed_medicines: isOutsidePurchase ? [] : dispenseItems
       });
 
-      // Deduct stock for matching medicines by their selected quantities
+      // Deduct stock for matching medicines by their selected quantities (skip if outside purchase)
       let deductedCount = 0;
-      for (const item of dispenseItems) {
-        try {
-          await updateMedicineStock(item.medicine_name, -item.qty);
-          deductedCount++;
-        } catch (stockErr) {
-          console.error(`Failed to deduct stock for ${item.medicine_name}:`, stockErr);
+      if (!isOutsidePurchase) {
+        for (const item of dispenseItems) {
+          try {
+            await updateMedicineStock(item.medicine_name, -item.qty);
+            deductedCount++;
+          } catch (stockErr) {
+            console.error(`Failed to deduct stock for ${item.medicine_name}:`, stockErr);
+          }
         }
       }
 
-      if (deductedCount > 0) {
+      if (isOutsidePurchase) {
+        showToast(`Marked as Outside Purchase. Routed to Billing.`, "success");
+      } else if (deductedCount > 0) {
         showToast(`Medication dispensed! Fulfill logs complete.`, "success");
       } else {
         showToast("Medications dispensed! Routed to Billing.", "success");
@@ -154,9 +162,7 @@ export default function PharmacyPage() {
     } catch (err) {
       // Rollback on server failure
       setQueue(originalQueue);
-      setMedicines(originalMeds);
-      showToast(err.message || "Failed to dispense medicines", "error");
-      console.error(err);
+      showToast("Failed to process transaction. Server error.", "error");
     }
   };
 
@@ -232,7 +238,9 @@ export default function PharmacyPage() {
     }
   };
 
-  const pendingPharmacy = queue.filter((q) => q.appointment_status === "Pharmacy");
+  const pendingPharmacy = queue
+    .filter((q) => q.appointment_status === "Pharmacy")
+    .sort((a, b) => new Date(a.creation || 0) - new Date(b.creation || 0));
 
   const filteredMedicines = medicines.filter(med => 
     med.medicine_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -287,7 +295,19 @@ export default function PharmacyPage() {
         </div>
       </div>
 
-      {activeTab === "queue" ? (
+      {loading ? (
+        <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
+          <div className="flex gap-4 w-full">
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+            <div className="h-24 flex-1 bg-slate-200/80 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+            <div className="h-96 lg:col-span-1 bg-slate-200/60 rounded-xl" />
+            <div className="h-96 lg:col-span-2 bg-slate-200/60 rounded-xl" />
+          </div>
+        </div>
+      ) : activeTab === "queue" ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Queue panel */}
           <div className="lg:col-span-1 space-y-6">
@@ -302,19 +322,25 @@ export default function PharmacyPage() {
               </CardHeader>
               <CardContent className="p-0 overflow-y-auto flex-1">
                 <div className="divide-y">
-                  {pendingPharmacy.map((item) => {
+                  {pendingPharmacy.map((item, index) => {
                     const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
                     return (
                       <div
                         key={item.name}
                         onClick={() => handleSelectWalkIn(item)}
-                        className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 
+                        className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex items-center gap-3
                           ${isActive ? "border-l-pink-600 bg-pink-50/30" : "border-l-transparent bg-white"}`}
                       >
-                        <div>
-                          <h4 className="font-semibold text-slate-950 text-sm">{item.patient_name}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {item.mobile_number} | Assigned: {item.doctor}
+                        <div className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${isActive ? "bg-pink-600 text-white shadow-sm" : "bg-pink-100 text-pink-700"}`}>
+                          #{index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-slate-950 text-sm truncate">{item.patient_name}</h4>
+                            <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-100">Token #{index + 1}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {item.mobile_number} | Doctor: {item.doctor}
                           </p>
                         </div>
                       </div>
@@ -388,7 +414,7 @@ export default function PharmacyPage() {
                             const med = medicines.find(m => m.medicine_name === medName);
                             if (med) {
                               if (!dispenseItems.some(i => i.medicine_name === medName)) {
-                                setDispenseItems(prev => [...prev, { medicine_name: medName, qty: 10, stock: med.stock }]);
+                                setDispenseItems(prev => [...prev, { medicine_name: medName, qty: 10, stock: med.stock, price: med.price || 0 }]);
                               }
                             }
                             setSelectedAddMed("");
@@ -411,6 +437,11 @@ export default function PharmacyPage() {
                               <div>
                                 <span className="font-semibold text-slate-800">{item.medicine_name}</span>
                                 <div className="text-[10px] text-slate-400 mt-0.5">Current Stock: {item.stock} units</div>
+                              </div>
+                              
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-[10px] text-slate-500 font-medium">Rate: ₹{item.price}</span>
+                                <span className="text-xs font-bold text-slate-700">₹{(item.qty * (item.price || 0)).toFixed(2)}</span>
                               </div>
                               
                               <div className="flex items-center gap-3">
@@ -448,6 +479,14 @@ export default function PharmacyPage() {
                       ) : (
                         <p className="text-[10px] text-slate-400 italic">No matching pharmacy inventory items found. Use "+ Add Medicine" to select.</p>
                       )}
+                      {dispenseItems.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center px-1">
+                          <span className="text-sm font-semibold text-slate-600">Total Medicines Bill:</span>
+                          <span className="text-base font-bold text-emerald-600">
+                            ₹{dispenseItems.reduce((acc, item) => acc + (item.qty * (item.price || 0)), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Stock Alert Warning */}
@@ -460,8 +499,16 @@ export default function PharmacyPage() {
 
                     <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
                       <Button
-                        onClick={handleDispense}
+                        onClick={() => handleDispense(true)}
+                        variant="outline"
+                        className="text-slate-700 h-9 text-sm"
+                      >
+                        Outside Purchase (Bill ₹0)
+                      </Button>
+                      <Button
+                        onClick={() => handleDispense(false)}
                         className="bg-pink-600 hover:bg-pink-700 text-white gap-1.5 h-9 text-sm"
+                        disabled={dispenseItems.length === 0}
                       >
                         <PackageCheck className="w-4 h-4" />
                         Dispense & Send to Checkout

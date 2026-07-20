@@ -30,7 +30,7 @@ import {
 const mainNavigation = [
   { name: "Overview Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Reception Desk", href: "/reception", icon: ClipboardList },
-  { name: "Room Management", href: "/rooms", icon: DoorOpen },
+  // { name: "Room Management", href: "/rooms", icon: DoorOpen },
   { name: "Consultation", href: "/consultation", icon: Stethoscope },
   { name: "Lab Station", href: "/lab", icon: FlaskConical },
   { name: "Pharmacy", href: "/pharmacy", icon: Pill },
@@ -128,6 +128,7 @@ export function AppSidebar() {
           </div>
 
           {/* Extended Operations Menu */}
+          {/*
           <div>
             {!collapsed && (
               <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
@@ -159,6 +160,7 @@ export function AppSidebar() {
               })}
             </ul>
           </div>
+          */}
         </div>
 
         {/* Collapse toggle */}
