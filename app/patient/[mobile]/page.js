@@ -303,11 +303,11 @@ export default function PatientProfilePage() {
                 </div>
               </div>
 
-              {/* Next Walkin Date Display */}
+              {/* Next Check-up Date Display */}
               <div className="flex items-center gap-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
                 <Calendar className="w-4 h-4 text-indigo-600 shrink-0" />
                 <div>
-                  <p className="text-[10px] text-indigo-600 uppercase font-bold tracking-wider">Next Walkin Date</p>
+                  <p className="text-[10px] text-indigo-600 uppercase font-bold tracking-wider">Next Check-up Date</p>
                   <p className="font-bold text-indigo-900 text-sm">{nextAppointment ? nextAppointment : "Not Scheduled"}</p>
                 </div>
               </div>
@@ -648,7 +648,7 @@ export default function PatientProfilePage() {
                                     {w.lab_result && <p><strong>Lab Result:</strong> {w.lab_result}</p>}
                                     {w.next_checkup_date && (
                                       <div className="mt-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 p-2 rounded-lg flex items-center justify-between">
-                                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-indigo-600" /> Next Allocated Walk-In Date:</span>
+                                        <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-indigo-600" /> Next Check-up Date:</span>
                                         <span className="font-extrabold">{w.next_checkup_date}</span>
                                       </div>
                                     )}
@@ -682,7 +682,7 @@ export default function PatientProfilePage() {
                                 <th className="px-4 py-2.5">Visit Date</th>
                                 <th className="px-4 py-2.5">Doctor</th>
                                 <th className="px-4 py-2.5">Diagnosis</th>
-                                <th className="px-4 py-2.5 text-indigo-700 bg-indigo-50/50">Next Walkin Date</th>
+                                <th className="px-4 py-2.5 text-indigo-700 bg-indigo-50/50">Next Check-up Date</th>
                                 <th className="px-4 py-2.5">Status</th>
                               </tr>
                             </thead>

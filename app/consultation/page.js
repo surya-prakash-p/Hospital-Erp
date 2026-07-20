@@ -156,6 +156,10 @@ export default function ConsultationPage() {
       nextStatus = "Pharmacy";
     }
 
+    const savedDiagnosis = diagnosis.trim();
+    const savedPrescription = prescription.trim();
+    const savedNextCheckupDate = nextCheckupDate;
+
     // Optimistically update states instantly
     setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
     showToast(`Saving consultation (Routing to ${nextStatus})...`, "info");
@@ -172,13 +176,13 @@ export default function ConsultationPage() {
 
     try {
       await updateWalkIn(targetWalkInName, {
-        diagnosis: diagnosis.trim(),
-        prescription: prescription.trim(),
+        diagnosis: savedDiagnosis,
+        prescription: savedPrescription,
         need_lab_test: needLabTest ? 1 : 0,
         lab_test_name: needLabTest ? labTestName : "",
         need_medicines: needMedicines ? 1 : 0,
         appointment_status: nextStatus,
-        next_checkup_date: nextCheckupDate
+        next_checkup_date: savedNextCheckupDate
       });
 
       showToast(`Consultation saved! Patient routed to ${nextStatus}`, "success");
