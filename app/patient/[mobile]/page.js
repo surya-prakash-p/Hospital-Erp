@@ -77,7 +77,13 @@ export default function PatientProfilePage() {
       if (availableDocs.length > 0) setSelectedDoctor(availableDocs[0].name);
 
       const q = await getQueue();
-      const myWalkins = q.filter(w => w.mobile_number === mobile).sort((a, b) => new Date(b.creation || 0) - new Date(a.creation || 0));
+      const myWalkins = q.filter(w => 
+        w.mobile_number === mobile || 
+        w.patient === mobile || 
+        w.name === mobile ||
+        (p && w.mobile_number === p.mobile_number) ||
+        (p && w.patient_name === p.patient_name)
+      ).sort((a, b) => new Date(b.creation || 0) - new Date(a.creation || 0));
       setPatientWalkins(myWalkins);
       
       const latestWalkin = myWalkins.find(w => w.next_checkup_date);
@@ -187,7 +193,7 @@ export default function PatientProfilePage() {
     return (
       <div className="text-center py-20 text-muted-foreground">
         <AlertCircle className="w-10 h-10 mx-auto text-rose-300 mb-2" />
-        <p>No patient record found for mobile: {mobile}</p>
+        <p>No patient record found for identifier: {mobile}</p>
         <Button onClick={() => router.push('/reception')} variant="outline" className="mt-4 gap-1">
           <ArrowLeft className="w-4 h-4" /> Go Back
         </Button>

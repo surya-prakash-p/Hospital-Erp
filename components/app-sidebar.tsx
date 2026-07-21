@@ -23,7 +23,8 @@ import {
   Users,
   Box,
   Calendar,
-  DoorOpen
+  DoorOpen,
+  Bot
 } from "lucide-react"
 
 // Core main menu items (with Dashboard first)
@@ -36,6 +37,7 @@ const mainNavigation = [
   { name: "Pharmacy", href: "/pharmacy", icon: Pill },
   { name: "Billing & Pay", href: "/billing", icon: Receipt },
   { name: "Doctors Catalog", href: "/doctors", icon: UserRound },
+  { name: "AI Copilot", href: "/ai-assistant", icon: Bot },
 ]
 
 // Extended hospital operations modules
