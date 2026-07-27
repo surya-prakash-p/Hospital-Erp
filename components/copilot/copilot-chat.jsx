@@ -60,11 +60,56 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
             setAutocompleteItems(data.suggestions);
             setShowAutocomplete(true);
           } else {
+            // Local client-side fallback matching
+            const patientsRaw = localStorage.getItem('hospital_patients');
+            if (patientsRaw) {
+              const patients = JSON.parse(patientsRaw);
+              const matches = Object.values(patients).filter(p => 
+                (p.patient_name || '').toLowerCase().includes(q.toLowerCase()) ||
+                (p.mobile_number || '').includes(q) ||
+                (p.name || '').toLowerCase().includes(q.toLowerCase()) ||
+                (p.patient_id || '').toLowerCase().includes(q.toLowerCase())
+              ).slice(0, 5).map(p => ({
+                title: p.patient_name,
+                subtitle: `ID: ${p.name || p.patient_id || 'N/A'} • Mobile: ${p.mobile_number || 'N/A'}`,
+                query: p.patient_name,
+                type: "Patient"
+              }));
+              if (matches.length > 0) {
+                setAutocompleteItems(matches);
+                setShowAutocomplete(true);
+                return;
+              }
+            }
             setAutocompleteItems([]);
             setShowAutocomplete(false);
           }
         })
-        .catch(() => setShowAutocomplete(false));
+        .catch(() => {
+          // Local client-side fallback matching on error
+          const patientsRaw = localStorage.getItem('hospital_patients');
+          if (patientsRaw) {
+            const patients = JSON.parse(patientsRaw);
+            const matches = Object.values(patients).filter(p => 
+              (p.patient_name || '').toLowerCase().includes(q.toLowerCase()) ||
+              (p.mobile_number || '').includes(q) ||
+              (p.name || '').toLowerCase().includes(q.toLowerCase()) ||
+              (p.patient_id || '').toLowerCase().includes(q.toLowerCase())
+            ).slice(0, 5).map(p => ({
+              title: p.patient_name,
+              subtitle: `ID: ${p.name || p.patient_id || 'N/A'} • Mobile: ${p.mobile_number || 'N/A'}`,
+              query: p.patient_name,
+              type: "Patient"
+            }));
+            if (matches.length > 0) {
+              setAutocompleteItems(matches);
+              setShowAutocomplete(true);
+              return;
+            }
+          }
+          setAutocompleteItems([]);
+          setShowAutocomplete(false);
+        });
     } else {
       setAutocompleteItems([]);
       setShowAutocomplete(false);
@@ -179,10 +224,19 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
     abortControllerRef.current = new AbortController();
 
     try {
+      const localPatientsRaw = typeof window !== 'undefined' ? localStorage.getItem('hospital_patients') : null;
+      const localQueueRaw = typeof window !== 'undefined' ? localStorage.getItem('hospital_queue') : null;
+      const localMedsRaw = typeof window !== 'undefined' ? localStorage.getItem('hospital_medicines') : null;
+
       const res = await fetch("/api/copilot/live", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify({ 
+          query: q,
+          localPatients: localPatientsRaw ? JSON.parse(localPatientsRaw) : null,
+          localQueue: localQueueRaw ? JSON.parse(localQueueRaw) : null,
+          localMedicines: localMedsRaw ? JSON.parse(localMedsRaw) : null
+        }),
         signal: abortControllerRef.current.signal
       });
 

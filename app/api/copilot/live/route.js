@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { query, action, payload } = await request.json();
+    const { query, action, payload, localPatients, localQueue, localMedicines } = await request.json();
     const qRaw = (query || "").trim();
     const qLower = qRaw.toLowerCase();
 
@@ -91,20 +91,23 @@ export async function POST(request) {
 
       // If Frappe DB has no results, check local patient records fallback
       if (matchedPatients.length === 0) {
-        const localPatients = [
-          { name: "PAT-9876543210", patient_name: "Surya Prakash", mobile_number: "9876543210", gender: "Male", age: 24, blood_group: "O+ Positive", medical_history: "Mild Seasonal Influenza" },
-          { name: "PAT-9876501234", patient_name: "Yokesh Raj", mobile_number: "9876501234", gender: "Male", age: 28, blood_group: "B+ Positive", medical_history: "Acute Gastritis" },
-          { name: "PAT-8545858472", patient_name: "TAAHA", mobile_number: "8545858472", gender: "Male", age: 34, blood_group: "O+ Positive" },
-          { name: "PAT-9876543211", patient_name: "Ravi Kumar", mobile_number: "9876543211", gender: "Male", age: 42, blood_group: "A+ Positive" },
-          { name: "PAT-9876543210", patient_name: "Saranya", mobile_number: "9876543210", gender: "Female", age: 28, blood_group: "O+ Positive" },
-          { name: "PAT-9876543212", patient_name: "Siddharth", mobile_number: "9876543212", gender: "Male", age: 31, blood_group: "AB+ Positive" },
-          { name: "PAT-9876543213", patient_name: "Sahil", mobile_number: "9876543213", gender: "Male", age: 29, blood_group: "A- Negative" }
-        ];
+        const localPatientsArray = localPatients 
+          ? Object.values(localPatients)
+          : [
+              { name: "PAT-9876543210", patient_name: "Surya Prakash", mobile_number: "9876543210", gender: "Male", age: 24, blood_group: "O+ Positive", medical_history: "Mild Seasonal Influenza" },
+              { name: "PAT-9876501234", patient_name: "Yokesh Raj", mobile_number: "9876501234", gender: "Male", age: 28, blood_group: "B+ Positive", medical_history: "Acute Gastritis" },
+              { name: "PAT-8545858472", patient_name: "TAAHA", mobile_number: "8545858472", gender: "Male", age: 34, blood_group: "O+ Positive" },
+              { name: "PAT-9876543211", patient_name: "Ravi Kumar", mobile_number: "9876543211", gender: "Male", age: 42, blood_group: "A+ Positive" },
+              { name: "PAT-9876543210", patient_name: "Saranya", mobile_number: "9876543210", gender: "Female", age: 28, blood_group: "O+ Positive" },
+              { name: "PAT-9876543212", patient_name: "Siddharth", mobile_number: "9876543212", gender: "Male", age: 31, blood_group: "AB+ Positive" },
+              { name: "PAT-9876543213", patient_name: "Sahil", mobile_number: "9876543213", gender: "Male", age: 29, blood_group: "A- Negative" }
+            ];
 
-        matchedPatients = localPatients.filter(p =>
-          p.patient_name.toLowerCase().includes(qLower) ||
-          p.mobile_number.includes(qRaw) ||
-          p.name.toLowerCase().includes(qLower)
+        matchedPatients = localPatientsArray.filter(p =>
+          (p.patient_name || '').toLowerCase().includes(qLower) ||
+          (p.mobile_number || '').includes(qRaw) ||
+          (p.name || '').toLowerCase().includes(qLower) ||
+          (p.patient_id || '').toLowerCase().includes(qLower)
         );
       }
 
@@ -127,6 +130,14 @@ export async function POST(request) {
             walkinHistory = wData.filter(w => w.mobile_number === selectedDoc.mobile_number || w.patient_name?.toLowerCase().includes(qLower));
           }
         } catch (e) {}
+
+        if (walkinHistory.length === 0 && localQueue) {
+          walkinHistory = localQueue.filter(w => 
+            w.mobile_number === selectedDoc.mobile_number || 
+            (w.patient_name || '').toLowerCase().includes(qLower)
+          );
+          walkinHistory.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+        }
 
         const latestWalkin = walkinHistory[0] || {};
 
@@ -257,27 +268,91 @@ export async function POST(request) {
     if (isOperationsQuery) {
       const targetDoctor = qLower.includes("rajesh") ? "Dr. Rajesh" : (qLower.includes("priya") ? "Dr. Priya" : "Dr. Vignesh");
 
-      return NextResponse.json({
-        type: "operations_dashboard",
-        kpis: [
-          { title: "Patients Waiting", value: "12", color: "text-rose-600", bg: "bg-rose-50" },
-          { title: "Appointments Today", value: "46", color: "text-indigo-600", bg: "bg-indigo-50" },
-          { title: "Consultations Today", value: "38", color: "text-purple-600", bg: "bg-purple-50" },
-          { title: "Walk-ins Today", value: "17", color: "text-emerald-600", bg: "bg-emerald-50" },
-          { title: "Revenue Today", value: "₹48,500", color: "text-blue-600", bg: "bg-blue-50" },
+      let waitingPatients = [
+        { token: 1, name: "TAAHA", doctor: targetDoctor, mobile: "8545858472", status: "Doctor Consultation" },
+        { token: 2, name: "Yokesh Raj", doctor: targetDoctor, mobile: "9876501234", status: "Doctor Consultation" },
+        { token: 3, name: "Surya Prakash", doctor: targetDoctor, mobile: "9876543210", status: "Doctor Consultation" }
+      ];
+      let kpis = [
+        { title: "Patients Waiting", value: "12", color: "text-rose-600", bg: "bg-rose-50" },
+        { title: "Appointments Today", value: "46", color: "text-indigo-600", bg: "bg-indigo-50" },
+        { title: "Consultations Today", value: "38", color: "text-purple-600", bg: "bg-purple-50" },
+        { title: "Walk-ins Today", value: "17", color: "text-emerald-600", bg: "bg-emerald-50" },
+        { title: "Revenue Today", value: "₹48,500", color: "text-blue-600", bg: "bg-blue-50" },
+        { title: "Admissions", value: "9", color: "text-amber-600", bg: "bg-amber-50" },
+        { title: "Discharges", value: "7", color: "text-teal-600", bg: "bg-teal-50" }
+      ];
+      let doctorQueues = [
+        { doctor: "Dr. Rajesh", waiting: 8, completed: 15, remaining: 4, specialization: "General Physician" },
+        { doctor: "Dr. Priya", waiting: 3, completed: 12, remaining: 2, specialization: "Cardiologist" },
+        { doctor: "Dr. Vignesh", waiting: 5, completed: 11, remaining: 3, specialization: "Pediatrician" }
+      ];
+
+      if (localQueue) {
+        const waitingList = localQueue.filter(w => w.appointment_status === "Doctor Consultation");
+        waitingPatients = waitingList.map((w, idx) => ({
+          token: idx + 1,
+          name: w.patient_name,
+          doctor: w.doctor,
+          mobile: w.mobile_number,
+          status: w.appointment_status
+        }));
+
+        const totalWaiting = waitingList.length;
+        const totalToday = localQueue.length;
+        const completedConsultations = localQueue.filter(w => w.appointment_status === "Completed" || w.appointment_status === "Billing / Settle" || w.appointment_status === "Pharmacy / Dispense").length;
+        const totalWalkins = localQueue.filter(w => !w.is_existing).length;
+        
+        let revenueVal = 0;
+        localQueue.forEach(w => {
+          if (w.payment_received) revenueVal += parseFloat(w.payment_received) || 0;
+          if (w.pharmacy_bill_amount) revenueVal += parseFloat(w.pharmacy_bill_amount) || 0;
+        });
+
+        kpis = [
+          { title: "Patients Waiting", value: String(totalWaiting), color: "text-rose-600", bg: "bg-rose-50" },
+          { title: "Appointments Today", value: String(totalToday), color: "text-indigo-600", bg: "bg-indigo-50" },
+          { title: "Consultations Today", value: String(completedConsultations), color: "text-purple-600", bg: "bg-purple-50" },
+          { title: "Walk-ins Today", value: String(totalWalkins), color: "text-emerald-600", bg: "bg-emerald-50" },
+          { title: "Revenue Today", value: `₹${revenueVal.toLocaleString()}`, color: "text-blue-600", bg: "bg-blue-50" },
           { title: "Admissions", value: "9", color: "text-amber-600", bg: "bg-amber-50" },
           { title: "Discharges", value: "7", color: "text-teal-600", bg: "bg-teal-50" }
-        ],
-        doctor_queues: [
-          { doctor: "Dr. Rajesh", waiting: 8, completed: 15, remaining: 4, specialization: "General Physician" },
-          { doctor: "Dr. Priya", waiting: 3, completed: 12, remaining: 2, specialization: "Cardiologist" },
-          { doctor: "Dr. Vignesh", waiting: 5, completed: 11, remaining: 3, specialization: "Pediatrician" }
-        ],
-        waiting_patients: [
-          { token: 1, name: "TAAHA", doctor: targetDoctor, mobile: "8545858472", status: "Doctor Consultation" },
-          { token: 2, name: "Yokesh Raj", doctor: targetDoctor, mobile: "9876501234", status: "Doctor Consultation" },
-          { token: 3, name: "Surya Prakash", doctor: targetDoctor, mobile: "9876543210", status: "Doctor Consultation" }
-        ],
+        ];
+
+        const rajeshList = localQueue.filter(w => w.doctor === "Dr. Rajesh");
+        const priyaList = localQueue.filter(w => w.doctor === "Dr. Priya");
+        const vigneshList = localQueue.filter(w => w.doctor === "Dr. Vignesh");
+
+        doctorQueues = [
+          { 
+            doctor: "Dr. Rajesh", 
+            waiting: rajeshList.filter(w => w.appointment_status === "Doctor Consultation").length, 
+            completed: rajeshList.filter(w => w.appointment_status === "Completed").length, 
+            remaining: rajeshList.filter(w => w.appointment_status !== "Completed" && w.appointment_status !== "Cancelled").length, 
+            specialization: "General Physician" 
+          },
+          { 
+            doctor: "Dr. Priya", 
+            waiting: priyaList.filter(w => w.appointment_status === "Doctor Consultation").length, 
+            completed: priyaList.filter(w => w.appointment_status === "Completed").length, 
+            remaining: priyaList.filter(w => w.appointment_status !== "Completed" && w.appointment_status !== "Cancelled").length, 
+            specialization: "Cardiologist" 
+          },
+          { 
+            doctor: "Dr. Vignesh", 
+            waiting: vigneshList.filter(w => w.appointment_status === "Doctor Consultation").length, 
+            completed: vigneshList.filter(w => w.appointment_status === "Completed").length, 
+            remaining: vigneshList.filter(w => w.appointment_status !== "Completed" && w.appointment_status !== "Cancelled").length, 
+            specialization: "Pediatrician" 
+          }
+        ];
+      }
+
+      return NextResponse.json({
+        type: "operations_dashboard",
+        kpis: kpis,
+        doctor_queues: doctorQueues,
+        waiting_patients: waitingPatients.slice(0, 10),
         smart_buttons: [
           { label: "Open Doctor Consultation Page", url: "/consultation" },
           { label: "Open Reception Desk", url: "/reception" }
@@ -289,41 +364,70 @@ export async function POST(request) {
     // FEATURE 3: Pharmacy Stock Management
     // ----------------------------------------------------
     if (isPharmacyQuery) {
+      let medicinesList = [
+        {
+          name: "Amoxicillin 500mg",
+          current_stock: 80,
+          reorder_level: 100,
+          supplier: "Pharma Plus",
+          exp_date: "2026-08-15",
+          batch_number: "BATCH003",
+          price: 95,
+          status: "Low Stock Alert"
+        },
+        {
+          name: "Paracetamol 650mg",
+          current_stock: 100,
+          reorder_level: 150,
+          supplier: "ABC Pharma",
+          exp_date: "2026-12-31",
+          batch_number: "BATCH001",
+          price: 20,
+          status: "Normal"
+        },
+        {
+          name: "Pantocid 40mg",
+          current_stock: 150,
+          reorder_level: 50,
+          supplier: "XYZ Distributors",
+          exp_date: "2026-07-30",
+          batch_number: "BATCH002",
+          price: 120,
+          status: "Expiring Soon"
+        }
+      ];
+
+      if (localMedicines) {
+        medicinesList = Object.values(localMedicines).map(m => {
+          let status = "Normal";
+          if (m.stock <= m.reorder_level) status = "Low Stock Alert";
+          const expDate = new Date(m.exp_date);
+          const today = new Date();
+          const diffTime = expDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays <= 0) {
+            status = "Expired";
+          } else if (diffDays <= 30) {
+            status = "Expiring Soon";
+          }
+
+          return {
+            name: m.medicine_name || m.name,
+            current_stock: m.stock,
+            reorder_level: m.reorder_level,
+            supplier: m.supplier || "N/A",
+            exp_date: m.exp_date || "N/A",
+            batch_number: m.batch_number || "BATCH000",
+            price: m.price || 0,
+            status: status
+          };
+        });
+      }
+
       return NextResponse.json({
         type: "pharmacy_stock_manager",
         title: "💊 Pharmacy Inventory Stock & Expiry Alerts",
-        medicines: [
-          {
-            name: "Amoxicillin 500mg",
-            current_stock: 80,
-            reorder_level: 100,
-            supplier: "Pharma Plus",
-            exp_date: "2026-08-15",
-            batch_number: "BATCH003",
-            price: 95,
-            status: "Low Stock Alert"
-          },
-          {
-            name: "Paracetamol 650mg",
-            current_stock: 100,
-            reorder_level: 150,
-            supplier: "ABC Pharma",
-            exp_date: "2026-12-31",
-            batch_number: "BATCH001",
-            price: 20,
-            status: "Normal"
-          },
-          {
-            name: "Pantocid 40mg",
-            current_stock: 150,
-            reorder_level: 50,
-            supplier: "XYZ Distributors",
-            exp_date: "2026-07-30",
-            batch_number: "BATCH002",
-            price: 120,
-            status: "Expiring Soon"
-          }
-        ],
+        medicines: medicinesList,
         quick_actions: [
           { label: "Restock Paracetamol (+100 Strips)", action: "restock_paracetamol" },
           { label: "Open Pharmacy Dispensed Queue", url: "/pharmacy" },
@@ -339,6 +443,70 @@ export async function POST(request) {
       let timeframe = "Daily";
       if (qLower.includes("monthly")) timeframe = "Monthly";
       if (qLower.includes("yearly")) timeframe = "Yearly";
+
+      if (localQueue) {
+        let totalRevenue = 0;
+        let appointmentCount = localQueue.length;
+        let completedConsultations = localQueue.filter(w => w.appointment_status === "Completed" || w.appointment_status === "Billing / Settle" || w.appointment_status === "Pharmacy / Dispense").length;
+        let walkinCount = localQueue.filter(w => !w.is_existing).length;
+        let medicineSalesRevenue = 0;
+
+        localQueue.forEach(w => {
+          if (w.payment_received) totalRevenue += parseFloat(w.payment_received) || 0;
+          if (w.pharmacy_bill_amount) {
+            totalRevenue += parseFloat(w.pharmacy_bill_amount) || 0;
+            medicineSalesRevenue += parseFloat(w.pharmacy_bill_amount) || 0;
+          }
+        });
+
+        const docStats = {};
+        localQueue.forEach(w => {
+          if (!docStats[w.doctor]) {
+            docStats[w.doctor] = { consultations: 0, revenue: 0 };
+          }
+          if (w.appointment_status === "Completed" || w.appointment_status === "Billing / Settle" || w.appointment_status === "Pharmacy / Dispense") {
+            docStats[w.doctor].consultations += 1;
+            const DOCTOR_FEES = { "Dr. Rajesh": 500, "Dr. Priya": 1000, "Dr. Vignesh": 600 };
+            docStats[w.doctor].revenue += DOCTOR_FEES[w.doctor] || 500;
+          }
+        });
+
+        const topDoctorsList = Object.entries(docStats).map(([doc, stats]) => ({
+          doctor: doc,
+          consultations: stats.consultations,
+          revenue: `₹${stats.revenue.toLocaleString()}`
+        }));
+
+        const finalTopDoctors = topDoctorsList.length > 0 ? topDoctorsList : [
+          { doctor: "Dr. Rajesh", consultations: 15, revenue: "₹7,500" },
+          { doctor: "Dr. Priya", consultations: 12, revenue: "₹12,000" },
+          { doctor: "Dr. Vignesh", consultations: 11, revenue: "₹6,600" }
+        ];
+
+        return NextResponse.json({
+          type: "analytics_reports_dashboard",
+          timeframe: timeframe,
+          summary: {
+            total_revenue: `₹${totalRevenue.toLocaleString()}`,
+            total_appointments: appointmentCount,
+            total_consultations: completedConsultations,
+            total_walkins: walkinCount,
+            medicine_sales: `₹${medicineSalesRevenue.toLocaleString()}`,
+            outstanding_bills: "₹0.00"
+          },
+          top_doctors: finalTopDoctors,
+          chart_data: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            revenue: [12000, 18000, 15000, 22000, 28000, 34000, totalRevenue],
+            visits: [20, 25, 22, 30, 35, 40, appointmentCount]
+          },
+          actions: [
+            { label: "Download PDF Report", action: "download_pdf" },
+            { label: "Download Excel Report", action: "download_excel" },
+            { label: "Print Report", action: "print_report" }
+          ]
+        });
+      }
 
       return NextResponse.json({
         type: "analytics_reports_dashboard",

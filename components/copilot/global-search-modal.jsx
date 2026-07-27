@@ -24,11 +24,56 @@ export function GlobalSearchModal({ isOpen, onClose, onSelectSearch }) {
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (searchTerm.trim().length >= 1) {
+    const q = searchTerm.trim().toLowerCase();
+    if (q.length >= 1) {
       fetch(`/api/copilot/autocomplete?q=${encodeURIComponent(searchTerm.trim())}`)
         .then(res => res.json())
-        .then(data => setDynamicSuggestions(data.suggestions || []))
-        .catch(() => setDynamicSuggestions([]));
+        .then(data => {
+          if (data.suggestions && data.suggestions.length > 0) {
+            setDynamicSuggestions(data.suggestions);
+          } else {
+            // Local client-side fallback matching
+            const patientsRaw = localStorage.getItem('hospital_patients');
+            if (patientsRaw) {
+              const patients = JSON.parse(patientsRaw);
+              const matches = Object.values(patients).filter(p => 
+                (p.patient_name || '').toLowerCase().includes(q) ||
+                (p.mobile_number || '').includes(q) ||
+                (p.name || '').toLowerCase().includes(q) ||
+                (p.patient_id || '').toLowerCase().includes(q)
+              ).slice(0, 5).map(p => ({
+                title: p.patient_name,
+                subtitle: `ID: ${p.name || p.patient_id || 'N/A'} • Mobile: ${p.mobile_number || 'N/A'}`,
+                query: p.patient_name,
+                type: "Patient"
+              }));
+              setDynamicSuggestions(matches);
+            } else {
+              setDynamicSuggestions([]);
+            }
+          }
+        })
+        .catch(() => {
+          // Local client-side fallback matching on error
+          const patientsRaw = localStorage.getItem('hospital_patients');
+          if (patientsRaw) {
+            const patients = JSON.parse(patientsRaw);
+            const matches = Object.values(patients).filter(p => 
+              (p.patient_name || '').toLowerCase().includes(q) ||
+              (p.mobile_number || '').includes(q) ||
+              (p.name || '').toLowerCase().includes(q) ||
+              (p.patient_id || '').toLowerCase().includes(q)
+            ).slice(0, 5).map(p => ({
+              title: p.patient_name,
+              subtitle: `ID: ${p.name || p.patient_id || 'N/A'} • Mobile: ${p.mobile_number || 'N/A'}`,
+              query: p.patient_name,
+              type: "Patient"
+            }));
+            setDynamicSuggestions(matches);
+          } else {
+            setDynamicSuggestions([]);
+          }
+        });
     } else {
       setDynamicSuggestions([]);
     }
