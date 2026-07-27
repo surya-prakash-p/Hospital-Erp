@@ -609,7 +609,7 @@ export default function DoctorsCatalogPage() {
 
           {doctorsList.length === 0 && (
             <div className="col-span-full text-center text-muted-foreground py-20">
-              No doctors found in catalog.
+              No doctors found in registry.
             </div>
           )}
         </div>

@@ -14,7 +14,14 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getPatient, updatePatient, getDoctors, createWalkIn, getQueue } from "@/lib/hospital-service";
+import { getPatient, updatePatient, getDoctors, createWalkIn, getQueue, getLabTests } from "@/lib/hospital-service";
+import { jsPDF } from "jspdf";
+
+const DOCTOR_FEES = {
+  "Dr. Rajesh": 500,
+  "Dr. Priya": 1000,
+  "Dr. Vignesh": 600
+};
 
 export default function PatientProfilePage() {
   const params = useParams();
@@ -29,6 +36,8 @@ export default function PatientProfilePage() {
 
   const [showBookModal, setShowBookModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [activeReportImage, setActiveReportImage] = useState("");
   const [activeInvoice, setActiveInvoice] = useState(null);
   const [doctorsList, setDoctorsList] = useState([]);
   const [downloadedReports, setDownloadedReports] = useState([]);
@@ -37,6 +46,7 @@ export default function PatientProfilePage() {
   
   const [patientWalkins, setPatientWalkins] = useState([]);
   const [nextAppointment, setNextAppointment] = useState(null);
+  const [labTests, setLabTests] = useState([]);
 
   // Edit fields matching all vital and contact parameters
   const [editState, setEditState] = useState({
@@ -91,6 +101,16 @@ export default function PatientProfilePage() {
         setNextAppointment(latestWalkin.next_checkup_date);
       }
 
+      const labs = await getLabTests();
+      setLabTests(labs);
+
+      const storedInvoices = localStorage.getItem(`hospital_patient_invoices_${mobile}`);
+      if (storedInvoices) {
+        setDownloadedReports(JSON.parse(storedInvoices));
+      } else {
+        setDownloadedReports([]);
+      }
+
     } catch (err) {
       console.error(err);
       showToast("Error loading patient data", "error");
@@ -130,6 +150,145 @@ export default function PatientProfilePage() {
     }
   };
 
+  const printConsultationInvoice = (walkIn, docFee) => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      let posY = 20;
+
+      // Header
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
+      posY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
+      posY += 5;
+      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org", 105, posY, { align: "center" });
+      posY += 8;
+
+      // Line separator
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.5);
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("CLINICAL CONSULTATION INVOICE", 20, posY);
+      posY += 8;
+
+      // Meta Info Table
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Visit/Walk-in ID:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.name || "N/A", 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Patient Name:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.patient_name || "", 145, posY);
+      posY += 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Date & Time:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(new Date().toLocaleString(), 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Mobile Number:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.mobile_number || "", 145, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Doctor
+      doc.setFont("helvetica", "bold");
+      doc.text("Consulting Doctor:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.doctor || "", 55, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Table Headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(20, posY - 4, 170, 7, "F");
+      doc.text("Description", 22, posY);
+      doc.text("Qty", 120, posY, { align: "center" });
+      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Amount", 185, posY, { align: "right" });
+      posY += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.text(`Doctor OPD Consultation Fee (${walkIn.doctor})`, 22, posY);
+      doc.text("1", 120, posY, { align: "center" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 7;
+
+      // Totals Area
+      posY += 3;
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL (CONSULTATION):", 110, posY);
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 12;
+
+      // Stamp
+      doc.setDrawColor(79, 70, 229); // indigo-600
+      doc.setLineWidth(0.8);
+      doc.rect(75, posY, 60, 12);
+      doc.setTextColor(79, 70, 229);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("CONSULTATION INVOICED", 105, posY + 7, { align: "center" });
+      posY += 20;
+
+      // Footer
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text("Generated digitally via Thangam Hospital Reception Desk. No signature required.", 105, posY + 10, { align: "center" });
+
+      // Open PDF in new tab for viewing and printing
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Failed to print consultation invoice", err);
+    }
+  };
+
   const handleBookWalkIn = async (e) => {
     e.preventDefault();
     if (!selectedDoctor) {
@@ -138,10 +297,15 @@ export default function PatientProfilePage() {
     }
     setIsBooking(true);
     try {
-      await createWalkIn({
+      const created = await createWalkIn({
         patient_name: patient.patient_name, mobile_number: patient.mobile_number,
         is_existing: 1, doctor: selectedDoctor, appointment_status: "Doctor Consultation"
       });
+      
+      const DOCTOR_FEES = { "Dr. Rajesh": 500, "Dr. Priya": 1000, "Dr. Vignesh": 600 };
+      const docFee = DOCTOR_FEES[selectedDoctor] || 500;
+      printConsultationInvoice(created, docFee);
+
       showToast("Walk-in booked successfully!", "success");
       setShowBookModal(false);
     } catch (err) {
@@ -155,10 +319,252 @@ export default function PatientProfilePage() {
     window.print();
   };
 
+  const getLabFee = (testName) => {
+    if (!testName) return 0;
+    const names = testName.split(",").map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) return 0;
+    let total = 0;
+    names.forEach(name => {
+      const test = labTests.find(t => t.test_name === name);
+      total += test ? test.fee : 450;
+    });
+    return total;
+  };
+
+  const handlePrintActiveInvoice = () => {
+    if (!activeInvoice) return;
+    try {
+      const printContent = document.getElementById("printable-patient-invoice").innerHTML;
+      const printWindow = window.open("", "_blank", "width=850,height=900");
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice - ${activeInvoice.name}</title>
+            <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+            <style>
+              body {
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                padding: 40px;
+                background: white;
+                color: #0f172a;
+              }
+              .border-b { border-bottom-width: 1px; }
+              .border-t { border-top-width: 1px; }
+              .border-dashed { border-style: dashed; }
+              .font-mono { font-family: monospace; }
+            </style>
+          </head>
+          <body>
+            <div class="max-w-2xl mx-auto border border-slate-100 p-8 rounded-xl shadow-sm">
+              <div class="text-center pb-5 border-b border-slate-200">
+                <h2 class="text-xl font-bold tracking-tight text-slate-900 uppercase">Thangam Hospital</h2>
+                <p class="text-[11px] text-muted-foreground mt-1">123 Health City Road, Coimbatore - 641012</p>
+                <p class="text-[10px] text-muted-foreground">Phone: +91 422 2345678 | Email: billing@thangam.org</p>
+              </div>
+              ${printContent}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (printErr) {
+      showToast("Error printing invoice", "error");
+      console.error(printErr);
+    }
+  };
+
+  const handleDownloadActiveInvoicePDF = () => {
+    if (!activeInvoice) return;
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      let posY = 20;
+
+      // Header
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
+      posY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
+      posY += 5;
+      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org | GSTIN: 33AAACT1234A1Z0", 105, posY, { align: "center" });
+      posY += 8;
+
+      // Line separator
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("PATIENT BILLING INVOICE", 20, posY);
+      posY += 8;
+
+      // Meta Info Table (Grid)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("Invoice ID:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(activeInvoice.name, 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Patient Name:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(patient.patient_name, 145, posY);
+      posY += 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Date & Time:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(activeInvoice.date, 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Mobile Number:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(mobile, 145, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Doctor
+      doc.setFont("helvetica", "bold");
+      doc.text("Consulting Doctor:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(activeInvoice.walkinData?.doctor || "General Physician", 55, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Table Headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(248, 250, 252);
+      doc.rect(20, posY - 4, 170, 7, "F");
+      doc.text("Description", 22, posY);
+      doc.text("Qty", 120, posY, { align: "center" });
+      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Amount", 185, posY, { align: "right" });
+      posY += 8;
+
+      // Add rows
+      const docFee = activeInvoice.walkinData?.docFee ?? (DOCTOR_FEES[activeInvoice.walkinData?.doctor] || 500);
+      
+      // Row 1: Consultation
+      doc.setFont("helvetica", "normal");
+      doc.text(`Consultation Fee (${activeInvoice.walkinData?.doctor || "Physician"})`, 22, posY);
+      doc.text("1", 120, posY, { align: "center" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 7;
+
+      // Row 2: Lab Test
+      if (activeInvoice.walkinData?.need_lab_test === 1) {
+        const labFee = activeInvoice.walkinData?.labFee ?? getLabFee(activeInvoice.walkinData?.lab_test_name);
+        doc.text(`Lab Diagnostic Panel (${activeInvoice.walkinData?.lab_test_name})`, 22, posY);
+        doc.text("1", 120, posY, { align: "center" });
+        doc.text(`INR ${labFee.toFixed(2)}`, 145, posY, { align: "right" });
+        doc.text(`INR ${labFee.toFixed(2)}`, 185, posY, { align: "right" });
+        posY += 7;
+      }
+
+      // Row 3: Pharmacy Medications
+      if (activeInvoice.walkinData?.pharmacy_bill_amount > 0) {
+        const pharmTotal = activeInvoice.walkinData.pharmacy_bill_amount;
+        doc.text("Pharmacy Medication Package", 22, posY);
+        doc.text("-", 120, posY, { align: "center" });
+        doc.text(`INR ${pharmTotal.toFixed(2)}`, 145, posY, { align: "right" });
+        doc.text(`INR ${pharmTotal.toFixed(2)}`, 185, posY, { align: "right" });
+        posY += 6;
+
+        // Sub-items of medicines
+        if (activeInvoice.walkinData.dispensed_medicines && activeInvoice.walkinData.dispensed_medicines.length > 0) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(100, 116, 139);
+          
+          activeInvoice.walkinData.dispensed_medicines.forEach(med => {
+            const itemTotal = med.qty * (med.price || 0);
+            doc.text(`- ${med.medicine_name} (x${med.qty}) @ INR ${med.price || 0}/ea`, 26, posY);
+            doc.text(`INR ${itemTotal.toFixed(2)}`, 185, posY, { align: "right" });
+            posY += 5;
+          });
+          
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(15, 23, 42);
+          posY += 2;
+        } else {
+          posY += 1;
+        }
+      }
+
+      // Totals Area
+      posY += 3;
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      const grandTotal = docFee + (activeInvoice.walkinData?.need_lab_test === 1 ? (activeInvoice.walkinData?.labFee ?? getLabFee(activeInvoice.walkinData?.lab_test_name)) : 0) + (activeInvoice.walkinData?.pharmacy_bill_amount || 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL:", 130, posY);
+      doc.text(`INR ${grandTotal.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 12;
+
+      // Paid Stamp / Footer
+      doc.setDrawColor(16, 185, 129);
+      doc.setLineWidth(0.8);
+      doc.rect(75, posY, 60, 12);
+      
+      doc.setTextColor(16, 185, 129);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(`PAID VIA ${(activeInvoice.walkinData?.paymentMethod || "UPI").toUpperCase()}`, 105, posY + 7.5, { align: "center" });
+
+      posY += 22;
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8.5);
+      doc.text("Thank you for choosing Thangam Hospital. Get well soon!", 105, posY, { align: "center" });
+
+      doc.save(`${activeInvoice.name}`);
+      showToast("Invoice PDF downloaded successfully!", "success");
+    } catch (pdfErr) {
+      showToast("Error generating invoice PDF", "error");
+      console.error(pdfErr);
+    }
+  };
+
   const handleQuickAction = (action) => {
     if (action === "Report") {
       const latestW = patientWalkins?.[0] || {};
-      setDownloadedReports(prev => [...prev, {
+      const docFee = DOCTOR_FEES[latestW.doctor] || 500;
+      const labFee = latestW.need_lab_test === 1 ? getLabFee(latestW.lab_test_name) : 0;
+      const pharmFee = latestW.pharmacy_bill_amount || 0;
+      const grandTotal = docFee + labFee + pharmFee;
+
+      const newInvoice = {
         id: Date.now(),
         type: 'invoice',
         name: `Invoice_${patient.patient_name}_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.pdf`,
@@ -167,10 +573,22 @@ export default function PatientProfilePage() {
           doctor: latestW.doctor || "",
           lab_test_name: latestW.lab_test_name || "",
           need_lab_test: latestW.need_lab_test || 0,
-          pharmacy_bill_amount: latestW.pharmacy_bill_amount || 0,
-          dispensed_medicines: latestW.dispensed_medicines || []
+          pharmacy_bill_amount: pharmFee,
+          dispensed_medicines: latestW.dispensed_medicines || [],
+          docFee,
+          labFee,
+          grandTotal,
+          deptAlreadyPaid: 0,
+          netBalance: grandTotal,
+          paymentMethod: "UPI"
         }
-      }]);
+      };
+
+      setDownloadedReports(prev => {
+        const updated = [newInvoice, ...prev];
+        localStorage.setItem(`hospital_patient_invoices_${mobile}`, JSON.stringify(updated));
+        return updated;
+      });
       showToast(`Invoice generated and saved to Documents tab!`, "success");
     } else {
       showToast(`${action} prepared successfully!`, "success");
@@ -828,15 +1246,48 @@ export default function PatientProfilePage() {
                                 <div className="flex flex-col items-end gap-2">
                                   <span className={`px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider ${w.lab_test_status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{w.lab_test_status || "Pending"}</span>
                                   {w.lab_test_image && (
-                                    <Dialog>
-                                      <DialogTrigger asChild>
-                                        <img src={w.lab_test_image} alt="Lab Result" className="w-16 h-12 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" />
-                                      </DialogTrigger>
-                                      <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
-                                        <DialogTitle className="sr-only">Lab Result Image</DialogTitle>
-                                        <img src={w.lab_test_image} alt="Full Size Lab Test" className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
-                                      </DialogContent>
-                                    </Dialog>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                      {(() => {
+                                        let resolvedField = w.lab_test_image;
+                                        if (resolvedField === "stored_locally") {
+                                          resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${w.name}`) : "";
+                                        }
+                                        if (!resolvedField) return null;
+
+                                        if (resolvedField.startsWith("{")) {
+                                          try {
+                                            const parsed = JSON.parse(resolvedField);
+                                            return Object.entries(parsed).map(([test, src]) => (
+                                              src && (
+                                                <Dialog key={test}>
+                                                  <DialogTrigger asChild>
+                                                    <img src={src} alt={test} className="w-16 h-12 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" title={test} />
+                                                  </DialogTrigger>
+                                                  <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
+                                                    <DialogTitle className="sr-only">{test}</DialogTitle>
+                                                    <img src={src} alt={test} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
+                                                  </DialogContent>
+                                                </Dialog>
+                                              )
+                                            ));
+                                          } catch (e) {
+                                            return null;
+                                          }
+                                        } else {
+                                          return (
+                                            <Dialog>
+                                              <DialogTrigger asChild>
+                                                <img src={resolvedField} alt="Lab Result" className="w-16 h-12 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" />
+                                              </DialogTrigger>
+                                              <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
+                                                <DialogTitle className="sr-only">Lab Result Image</DialogTitle>
+                                                <img src={resolvedField} alt="Full Size Lab Test" className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
+                                              </DialogContent>
+                                            </Dialog>
+                                          );
+                                        }
+                                      })()}
+                                    </div>
                                   )}
                                 </div>
                              </div>
@@ -886,27 +1337,33 @@ export default function PatientProfilePage() {
                   </div>
                   {downloadedReports.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                      {downloadedReports.map(doc => (
-                        <div key={doc.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-md">
-                              <Download className="w-4 h-4" />
+                      {downloadedReports.map(doc => {
+                        const isReport = doc.type === 'report';
+                        return (
+                          <div key={doc.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-md ${isReport ? 'bg-purple-100 text-purple-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                {isReport ? <FileText className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-700 truncate w-48">{doc.name}</p>
+                                <p className="text-xs text-slate-500">{doc.date}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-700 truncate w-48">{doc.name}</p>
-                              <p className="text-xs text-slate-500">{doc.date}</p>
-                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => {
+                              if (doc.type === 'invoice') {
+                                setActiveInvoice(doc);
+                                setShowInvoiceModal(true);
+                              } else if (doc.type === 'report') {
+                                setActiveReportImage(doc.image);
+                                setShowReportModal(true);
+                              } else {
+                                window.open('#', '_blank');
+                              }
+                            }} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">View</Button>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            if (doc.type === 'invoice') {
-                              setActiveInvoice(doc);
-                              setShowInvoiceModal(true);
-                            } else {
-                              window.open('#', '_blank');
-                            }
-                          }} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">View</Button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-12 border border-dashed border-slate-300 rounded-xl bg-slate-50 flex flex-col items-center justify-center">
@@ -980,78 +1437,108 @@ export default function PatientProfilePage() {
             </div>
             
             <div className="p-6 bg-white space-y-6">
-              <div className="flex justify-between items-start text-sm">
-                <div>
-                  <p className="text-slate-500 font-semibold mb-1">Billed To:</p>
-                  <p className="font-bold text-slate-800 text-base">{patient?.patient_name}</p>
-                  <p className="text-slate-600">ID: {patientId}</p>
-                  <p className="text-slate-600">Ph: {mobile}</p>
+              <div id="printable-patient-invoice" className="space-y-6">
+                <div className="flex justify-between items-start text-sm">
+                  <div>
+                    <p className="text-slate-500 font-semibold mb-1">Billed To:</p>
+                    <p className="font-bold text-slate-800 text-base">{patient?.patient_name}</p>
+                    <p className="text-slate-600">ID: {patientId}</p>
+                    <p className="text-slate-600">Ph: {mobile}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-slate-500 font-semibold mb-1">Invoice Details:</p>
+                    <p className="text-slate-800 font-medium">{activeInvoice?.name}</p>
+                    <p className="text-slate-600">Date: {activeInvoice?.date}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-slate-500 font-semibold mb-1">Invoice Details:</p>
-                  <p className="text-slate-800 font-medium">{activeInvoice?.name}</p>
-                  <p className="text-slate-600">Date: {activeInvoice?.date}</p>
-                </div>
-              </div>
 
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Description</th>
-                      <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="px-4 py-3 text-slate-800">Consultation Fee {activeInvoice?.walkinData?.doctor ? `(${activeInvoice.walkinData.doctor})` : ""}</td>
-                      <td className="px-4 py-3 text-right text-slate-800 font-medium">₹ 500.00</td>
-                    </tr>
-                    
-                    {activeInvoice?.walkinData?.need_lab_test === 1 && (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                       <tr>
-                        <td className="px-4 py-3 text-slate-800">Lab Diagnostics {activeInvoice.walkinData.lab_test_name ? `(${activeInvoice.walkinData.lab_test_name})` : ""}</td>
-                        <td className="px-4 py-3 text-right text-slate-800 font-medium">₹ 450.00</td>
+                        <th className="px-4 py-3 text-left font-semibold">Description</th>
+                        <th className="px-4 py-3 text-right font-semibold">Amount</th>
                       </tr>
-                    )}
-                    
-                    {activeInvoice?.walkinData?.pharmacy_bill_amount > 0 && (
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(activeInvoice?.walkinData?.docFee > 0 || (activeInvoice?.walkinData?.docFee === undefined && activeInvoice?.walkinData?.doctor)) && (
+                        <tr>
+                          <td className="px-4 py-3 text-slate-800">Consultation Fee {activeInvoice?.walkinData?.doctor ? `(${activeInvoice.walkinData.doctor})` : ""}</td>
+                          <td className="px-4 py-3 text-right text-slate-800 font-medium">₹ {(activeInvoice?.walkinData?.docFee ?? (DOCTOR_FEES[activeInvoice?.walkinData?.doctor] || 500)).toFixed(2)}</td>
+                        </tr>
+                      )}
+                      
+                      {(activeInvoice?.walkinData?.labFee > 0 || (activeInvoice?.walkinData?.labFee === undefined && activeInvoice?.walkinData?.need_lab_test === 1)) && (
+                        <tr>
+                          <td className="px-4 py-3 text-slate-800">Lab Diagnostics {activeInvoice.walkinData.lab_test_name ? `(${activeInvoice.walkinData.lab_test_name})` : ""}</td>
+                          <td className="px-4 py-3 text-right text-slate-800 font-medium">₹ {(activeInvoice?.walkinData?.labFee ?? getLabFee(activeInvoice.walkinData.lab_test_name)).toFixed(2)}</td>
+                        </tr>
+                      )}
+                      
+                      {activeInvoice?.walkinData?.pharmacy_bill_amount > 0 && (
+                        <tr>
+                          <td className="px-4 py-3 text-slate-800">
+                            Pharmacy Dispensed Package
+                            {activeInvoice.walkinData.dispensed_medicines && activeInvoice.walkinData.dispensed_medicines.length > 0 && (
+                              <div className="text-xs text-slate-500 mt-1 space-y-1">
+                                {activeInvoice.walkinData.dispensed_medicines.map((med, idx) => (
+                                  <div key={idx}>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-800 font-medium align-top">₹ {activeInvoice.walkinData.pharmacy_bill_amount.toFixed(2)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-900">
                       <tr>
-                        <td className="px-4 py-3 text-slate-800">
-                          Pharmacy Dispensed Package
-                          {activeInvoice.walkinData.dispensed_medicines && activeInvoice.walkinData.dispensed_medicines.length > 0 && (
-                            <div className="text-xs text-slate-500 mt-1 space-y-1">
-                              {activeInvoice.walkinData.dispensed_medicines.map((med, idx) => (
-                                <div key={idx}>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</div>
-                              ))}
-                            </div>
-                          )}
+                        <td className="px-4 py-3 text-right uppercase text-xs tracking-wider">Grand Total</td>
+                        <td className="px-4 py-3 text-right text-lg text-emerald-600">
+                          ₹ {(activeInvoice?.bill_amount || 0).toFixed(2)}
                         </td>
-                        <td className="px-4 py-3 text-right text-slate-800 font-medium align-top">₹ {activeInvoice.walkinData.pharmacy_bill_amount.toFixed(2)}</td>
                       </tr>
-                    )}
-                  </tbody>
-                  <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-900">
-                    <tr>
-                      <td className="px-4 py-3 text-right uppercase text-xs tracking-wider">Grand Total</td>
-                      <td className="px-4 py-3 text-right text-lg text-emerald-600">
-                        ₹ {(
-                          500 + 
-                          (activeInvoice?.walkinData?.need_lab_test === 1 ? 450 : 0) + 
-                          (activeInvoice?.walkinData?.pharmacy_bill_amount || 0)
-                        ).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                      {activeInvoice?.walkinData?.deptAlreadyPaid > 0 && (
+                        <tr className="bg-emerald-50 text-emerald-700">
+                          <td className="px-4 py-2 text-right uppercase text-xs tracking-wider">Already Paid (Dept)</td>
+                          <td className="px-4 py-2 text-right">− ₹ {activeInvoice.walkinData.deptAlreadyPaid.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {activeInvoice?.walkinData?.deptAlreadyPaid > 0 && (
+                        <tr>
+                          <td className="px-4 py-2 text-right uppercase text-xs tracking-wider">Balance Paid at Settle</td>
+                          <td className="px-4 py-2 text-right text-emerald-600">₹ {(activeInvoice.walkinData.netBalance ?? 0).toFixed(2)}</td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => setShowInvoiceModal(false)}>Close</Button>
-                <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                <Button onClick={handleDownloadActiveInvoicePDF} className="bg-teal-600 hover:bg-teal-700 text-white gap-2">
+                  <Download className="w-4 h-4" /> Download PDF
+                </Button>
+                <Button onClick={handlePrintActiveInvoice} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
                   <Printer className="w-4 h-4" /> Print Invoice
                 </Button>
               </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Report Image View Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowReportModal(false)}>
+          <Card className="w-full max-w-3xl shadow-2xl animate-in zoom-in-95 duration-200 border-0 overflow-hidden bg-white p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center pb-2 border-b">
+              <h3 className="font-bold text-slate-800">Lab Diagnostic Scan Report</h3>
+              <button onClick={() => setShowReportModal(false)} className="text-slate-500 hover:text-slate-700 font-bold text-sm bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Close</button>
+            </div>
+            <div className="py-4 flex justify-center bg-slate-100 rounded-lg mt-2 max-h-[70vh] overflow-y-auto">
+              <img src={activeReportImage} alt="Lab Report Scan" className="max-w-full h-auto object-contain rounded" />
             </div>
           </Card>
         </div>

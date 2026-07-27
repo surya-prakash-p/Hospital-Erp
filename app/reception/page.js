@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { jsPDF } from "jspdf";
 import {
   Search, UserPlus, CheckCircle, AlertTriangle, Info, X,
   Loader2, User, Phone, Mail, Calendar, Stethoscope, Ruler,
@@ -45,6 +46,7 @@ export default function ReceptionPage() {
 
   const [queue, setQueue]               = useState([]);
   const [patientsCount, setPatientsCount] = useState(0);
+  const [patientsList, setPatientsList] = useState([]);
   const [doctors, setDoctors]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [toasts, setToasts]             = useState([]);
@@ -69,7 +71,9 @@ export default function ReceptionPage() {
     setLoading(true);
     try {
       const q   = await getQueue();    setQueue(q);
-      const pts = await getPatients(); setPatientsCount(Object.keys(pts).length);
+      const pts = await getPatients(); 
+      setPatientsList(Object.values(pts || {}));
+      setPatientsCount(Object.keys(pts || {}).length);
       const allDocs = await getDoctors();
       setDoctors(allDocs);
       const availableDocs = allDocs.filter(d => d.status !== "Unavailable");
@@ -85,20 +89,198 @@ export default function ReceptionPage() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  const handleSelectExistingPatient = (patient) => {
+    setFormState({
+      ...EMPTY_FORM,
+      patient_name: patient.patient_name,
+      mobile_number: patient.mobile_number,
+      age: patient.age || "",
+      gender: patient.gender || "Male",
+      email: patient.email || "",
+      emergency_contact: patient.emergency_contact || "",
+      medical_history: patient.medical_history || "",
+      allergies: patient.allergies || "",
+      is_existing: true,
+      doctor: doctors.length > 0 ? doctors[0].name : ""
+    });
+    setShowChoice(false);
+    setExistStep(false);
+    setExistQuery("");
+    setShowReg(true);
+    toast(`Pre-filled profile for ${patient.patient_name}`, "success");
+  };
+
   const handleExistSearch = async e => {
     e?.preventDefault();
-    if (existQuery.length !== 10) { toast("Enter exactly 10-digit mobile number", "info"); return; }
-    setExistSearching(true);
-    try {
-      const patient = await searchPatient(existQuery.trim());
-      if (patient) {
-        setShowChoice(false);
-        router.push(`/patient/${patient.mobile_number}`);
-      } else {
-        toast(`No record found for "${existQuery}"`, "error");
+    const query = existQuery.trim().toLowerCase();
+    if (!query) { toast("Please enter a name or mobile number", "info"); return; }
+    
+    // Search local list first
+    const match = patientsList.find(p => 
+      p.patient_name?.toLowerCase() === query || 
+      p.mobile_number === query
+    ) || patientsList.find(p => 
+      p.patient_name?.toLowerCase().includes(query) || 
+      p.mobile_number?.includes(query)
+    );
+    
+    if (match) {
+      handleSelectExistingPatient(match);
+    } else {
+      // Fallback: search remote Frappe API
+      setExistSearching(true);
+      try {
+        const patient = await searchPatient(query);
+        if (patient) {
+          handleSelectExistingPatient(patient);
+        } else {
+          toast(`No patient found matching "${existQuery}"`, "error");
+        }
+      } catch { 
+        toast("Search failed", "error"); 
+      } finally { 
+        setExistSearching(false); 
       }
-    } catch { toast("Search failed", "error"); }
-    finally  { setExistSearching(false); }
+    }
+  };
+
+  const printConsultationInvoice = (walkIn, docFee) => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      let posY = 20;
+
+      // Header
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
+      posY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
+      posY += 5;
+      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org", 105, posY, { align: "center" });
+      posY += 8;
+
+      // Line separator
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.5);
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("CLINICAL CONSULTATION INVOICE", 20, posY);
+      posY += 8;
+
+      // Meta Info Table
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Visit/Walk-in ID:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.name || "N/A", 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Patient Name:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.patient_name || "", 145, posY);
+      posY += 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Date & Time:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(new Date().toLocaleString(), 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Mobile Number:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.mobile_number || "", 145, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Doctor
+      doc.setFont("helvetica", "bold");
+      doc.text("Consulting Doctor:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(walkIn.doctor || "", 55, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Table Headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(20, posY - 4, 170, 7, "F");
+      doc.text("Description", 22, posY);
+      doc.text("Qty", 120, posY, { align: "center" });
+      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Amount", 185, posY, { align: "right" });
+      posY += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.text(`Doctor OPD Consultation Fee (${walkIn.doctor})`, 22, posY);
+      doc.text("1", 120, posY, { align: "center" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 7;
+
+      // Totals Area
+      posY += 3;
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL (CONSULTATION):", 110, posY);
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 12;
+
+      // Stamp
+      doc.setDrawColor(79, 70, 229); // indigo-600
+      doc.setLineWidth(0.8);
+      doc.rect(75, posY, 60, 12);
+      doc.setTextColor(79, 70, 229);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("CONSULTATION INVOICED", 105, posY + 7, { align: "center" });
+      posY += 20;
+
+      // Footer
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text("Generated digitally via Thangam Hospital Reception Desk. No signature required.", 105, posY + 10, { align: "center" });
+
+      // Open PDF in new tab for viewing and printing
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Failed to print consultation invoice", err);
+    }
   };
 
   const handleRegister = async (e, type = "Doctor Consultation") => {
@@ -123,7 +305,15 @@ export default function ReceptionPage() {
       if (!formState.is_existing) {
         await createPatient({ ...formState, age: formState.age ? parseInt(formState.age) : null });
       }
-      await createWalkIn({ patient_name, mobile_number, is_existing: formState.is_existing ? 1 : 0, doctor, appointment_status: type });
+      const created = await createWalkIn({ patient_name, mobile_number, is_existing: formState.is_existing ? 1 : 0, doctor, appointment_status: type });
+      
+      // If it is OPD consultation, print the consultation invoice!
+      if (type === "Doctor Consultation") {
+        const DOCTOR_FEES = { "Dr. Rajesh": 500, "Dr. Priya": 1000, "Dr. Vignesh": 600 };
+        const docFee = DOCTOR_FEES[doctor] || 500;
+        printConsultationInvoice(created, docFee);
+      }
+
       toast(type === "IPD" ? "Admitted successfully!" : "Appointment booked!", "success");
       router.push(`/patient/${mobile_number}`);
       const uq = await getQueue(); setQueue(uq);
@@ -176,72 +366,53 @@ export default function ReceptionPage() {
       {/* ── Choice Modal ──────────────────────────────────────────────────── */}
       {showChoice && (
         <div className="fixed inset-0 z-[90] bg-black/30 backdrop-blur-[2px] flex items-center justify-center"
-          onClick={e => { if (e.target === e.currentTarget) { setShowChoice(false); setExistStep(false); setExistQuery(""); } }}>
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-sm mx-4 animate-in zoom-in-95 duration-200 overflow-hidden">
+          onClick={e => { if (e.target === e.currentTarget) { setShowChoice(false); } }}>
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md mx-4 animate-in zoom-in-95 duration-200 overflow-hidden">
 
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-800">
-                {existStep ? "Find Existing Patient" : "Register Walk-in Patient"}
+                Register Walk-in Patient
               </h3>
-              <button onClick={() => { setShowChoice(false); setExistStep(false); setExistQuery(""); }}
+              <button onClick={() => { setShowChoice(false); }}
                 className="w-7 h-7 rounded-md hover:bg-slate-100 flex items-center justify-center transition-colors">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
-            {!existStep ? (
-              <div className="p-5 space-y-2.5">
-                <p className="text-[11px] text-slate-400 mb-3">Select the type of patient to continue.</p>
+            <div className="p-5 space-y-2.5">
+              <p className="text-[11px] text-slate-400 mb-3">Select the type of patient to continue.</p>
 
-                <button onClick={() => {
-                    setShowChoice(false);
-                    setFormState({ ...EMPTY_FORM, doctor: doctors.length > 0 ? doctors[0].name : "" });
-                    setShowReg(true);
-                  }}
-                  className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all duration-150 text-left group">
-                  <div className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-slate-400 transition-colors">
-                    <UserPlus className="w-4 h-4 text-slate-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">New Patient</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">First visit — fill registration &amp; vitals</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                </button>
+              <button onClick={() => {
+                  setShowChoice(false);
+                  setFormState({ ...EMPTY_FORM, doctor: doctors.length > 0 ? doctors[0].name : "" });
+                  setShowReg(true);
+                }}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all duration-150 text-left group">
+                <div className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-slate-400 transition-colors">
+                  <UserPlus className="w-4 h-4 text-slate-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">New Patient</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">First visit — fill registration &amp; vitals</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </button>
 
-                <button onClick={() => setExistStep(true)}
-                  className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all duration-150 text-left group">
-                  <div className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-slate-400 transition-colors">
-                    <Search className="w-4 h-4 text-slate-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">Existing Patient</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Already registered — search &amp; check-in</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                </button>
-              </div>
-            ) : (
-              <div className="p-5 space-y-3">
-                <p className="text-[11px] text-slate-400">Enter the patient's mobile number (10 digits).</p>
-                <form onSubmit={handleExistSearch} className="space-y-2.5">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                    <Input autoFocus placeholder="Mobile number..." value={existQuery} maxLength={10}
-                      onChange={e => setExistQuery(e.target.value.replace(/\D/g, ''))} className="pl-9 h-10 text-sm border-slate-200" />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => { setExistStep(false); setExistQuery(""); }}
-                      className="flex-1 h-9 text-xs border-slate-200 text-slate-600">← Back</Button>
-                    <Button type="submit" disabled={existSearching}
-                      className="flex-1 h-9 text-xs bg-slate-900 hover:bg-slate-700 text-white gap-1.5">
-                      {existSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Search className="w-3.5 h-3.5"/>}
-                      Find Patient
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            )}
+              <button onClick={() => {
+                  setShowChoice(false);
+                  router.push("/patient-registry");
+                }}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all duration-150 text-left group">
+                <div className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-slate-400 transition-colors">
+                  <Search className="w-4 h-4 text-slate-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Existing Patient</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Already registered — search &amp; check-in</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -445,7 +616,7 @@ export default function ReceptionPage() {
                 }`}>
                 <Icon className={`w-4 h-4 ${active ? "text-white" : "text-slate-400"}`} />
                 <span className={`text-[10px] font-semibold ${active ? "text-white" : "text-slate-600"}`}>{w.short}</span>
-                <span className={`text-[10px] font-bold ${active ? "text-slate-300" : "text-slate-400"}`}>{count} patients</span>
+                <span className={`text-[10px] font-bold ${active ? "text-slate-300" : "text-slate-400"}`}>{count} visitors</span>
               </button>
             );
           })}
@@ -459,9 +630,9 @@ export default function ReceptionPage() {
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              {stageFilter === "All" ? "All Patients" : stageFilter}
+              {stageFilter === "All" ? "Visitors List" : stageFilter}
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} patient{filtered.length !== 1 ? "s" : ""} {stageFilter !== "All" ? "in this stage" : "in today's queue"}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} visitor{filtered.length !== 1 ? "s" : ""} {stageFilter !== "All" ? "in this stage" : "in today's queue"}</p>
           </div>
           <div className="flex items-center gap-2">
             {stageFilter !== "All" && (
@@ -479,7 +650,7 @@ export default function ReceptionPage() {
 
         {/* Column headers */}
         <div className="grid grid-cols-12 px-5 py-2.5 border-b border-slate-100 bg-slate-50">
-          {["#", "Patient", "Stage", "Doctor", "Move to Next", ""].map((col, i) => (
+          {["#", "Visitor Name", "Stage", "Doctor", "Move to Next", ""].map((col, i) => (
             <div key={i} className={`text-[10px] font-semibold text-slate-400 uppercase tracking-wider
               ${i===0?"col-span-1":""} ${i===1?"col-span-4":""} ${i===2?"col-span-2":""} ${i===3?"col-span-2":""} ${i===4?"col-span-2":""} ${i===5?"col-span-1 text-right":""}`}>
               {col}
@@ -493,8 +664,8 @@ export default function ReceptionPage() {
             <div className="w-12 h-12 rounded-full border border-slate-200 flex items-center justify-center">
               <ClipboardSVG />
             </div>
-            <p className="text-sm font-medium text-slate-500">No patients{stageFilter !== "All" ? ` in ${stageFilter}` : " in queue"}</p>
-            <p className="text-xs text-slate-400">Patients will appear here after registration</p>
+            <p className="text-sm font-medium text-slate-500">No visitors{stageFilter !== "All" ? ` in ${stageFilter}` : " in queue"}</p>
+            <p className="text-xs text-slate-400">Visitors will appear here after registration</p>
           </div>
         ) : filtered.map((pat, idx) => {
           const status     = pat.appointment_status || "Doctor Consultation";

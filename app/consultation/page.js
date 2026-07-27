@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Stethoscope, CheckCircle, AlertCircle, Info, Activity, History, Send, FlaskConical } from "lucide-react";
+import { Stethoscope, CheckCircle, AlertCircle, Info, Activity, History, Send, FlaskConical, Printer, BadgeCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors } from "@/lib/hospital-service";
+import { jsPDF } from "jspdf";
 
 export default function ConsultationPage() {
   const [queue, setQueue] = useState([]);
@@ -104,8 +105,8 @@ export default function ConsultationPage() {
     setNeedLabTest(item.need_lab_test === 1);
     if (item.lab_test_name) {
       setLabTestName(item.lab_test_name);
-    } else if (labTestsList.length > 0) {
-      setLabTestName(labTestsList[0].test_name);
+    } else {
+      setLabTestName("");
     }
     setNeedMedicines(item.need_medicines === 1);
     setNextCheckupDate(item.next_checkup_date || "");
@@ -197,6 +198,206 @@ export default function ConsultationPage() {
       console.error(err);
     }
   };
+  
+  const handlePrintConsultationInvoice = () => {
+    if (!selectedWalkIn) return;
+    
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      let posY = 20;
+
+      // Header
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
+      posY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
+      posY += 5;
+      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org", 105, posY, { align: "center" });
+      posY += 8;
+
+      // Line separator
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.5);
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("CLINICAL CONSULTATION INVOICE", 20, posY);
+      posY += 8;
+
+      // Meta Info Table
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Visit/Walk-in ID:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(selectedWalkIn.name, 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Patient Name:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(selectedWalkIn.patient_name || "", 145, posY);
+      posY += 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Date & Time:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(new Date().toLocaleString(), 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Mobile Number:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(selectedWalkIn.mobile_number || "", 145, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Doctor & Diagnosis
+      doc.setFont("helvetica", "bold");
+      doc.text("Consulting Doctor:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(selectedWalkIn.doctor || "", 55, posY);
+      posY += 6;
+
+      if (diagnosis) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Diagnosis Details:", 20, posY);
+        doc.setFont("helvetica", "normal");
+        const diagnosisLines = doc.splitTextToSize(diagnosis, 130);
+        doc.text(diagnosisLines, 55, posY);
+        posY += (diagnosisLines.length * 4) + 2;
+      } else {
+        posY += 2;
+      }
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Table Headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(20, posY - 4, 170, 7, "F");
+      doc.text("Description", 22, posY);
+      doc.text("Qty", 120, posY, { align: "center" });
+      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Amount", 185, posY, { align: "right" });
+      posY += 8;
+
+      // Add row for consultation fee
+      const selectedDocObj = doctorsList.find(d => d.doctor_name === selectedWalkIn.doctor || d.name === selectedWalkIn.doctor);
+      const docFee = selectedDocObj?.consultation_fee || 500;
+
+      doc.setFont("helvetica", "normal");
+      doc.text(`Doctor OPD Consultation Fee (${selectedWalkIn.doctor})`, 22, posY);
+      doc.text("1", 120, posY, { align: "center" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 7;
+
+      // Totals Area
+      posY += 3;
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL (CONSULTATION):", 110, posY);
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 12;
+
+      // Stamp
+      doc.setDrawColor(79, 70, 229); // indigo-600
+      doc.setLineWidth(0.8);
+      doc.rect(75, posY, 60, 12);
+      doc.setTextColor(79, 70, 229);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("CONSULTATION INVOICED", 105, posY + 7, { align: "center" });
+      posY += 20;
+
+      // Footer
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text("Generated digitally via Thangam Hospital OPD Desk. No signature required.", 105, posY + 10, { align: "center" });
+
+      // Open PDF in new tab for viewing and printing
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+        };
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+      showToast("Consultation invoice opened for printing!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to print invoice", "error");
+    }
+  };
+
+  const handleMarkConsultationPayment = () => {
+    if (!selectedWalkIn) return;
+    const DOCTOR_FEES = { "Dr. Rajesh": 500, "Dr. Priya": 1000, "Dr. Vignesh": 600 };
+    const docFee = DOCTOR_FEES[selectedWalkIn.doctor] || 500;
+    const now = Date.now();
+
+    // Save to dept payments log
+    const storedPayments = localStorage.getItem("hospital_dept_payments");
+    const deptPayments = storedPayments ? JSON.parse(storedPayments) : [];
+    deptPayments.unshift({
+      id: `dp-consult-${now}`,
+      walkInId: selectedWalkIn.name,
+      patientName: selectedWalkIn.patient_name,
+      mobile: selectedWalkIn.mobile_number,
+      department: "Consultation",
+      description: `OPD Fee — ${selectedWalkIn.doctor}`,
+      amount: docFee,
+      method: "UPI",
+      date: new Date().toISOString().split("T")[0],
+      status: "Paid"
+    });
+    localStorage.setItem("hospital_dept_payments", JSON.stringify(deptPayments));
+
+    // Also record in finance ledger
+    const storedFinance = localStorage.getItem("hospital_custom_finance");
+    const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
+    financeEntries.unshift({
+      id: `tx-consult-${now}`,
+      title: `OPD Consultation — ${selectedWalkIn.patient_name}`,
+      type: "Income",
+      category: "Clinical Services",
+      amount: docFee,
+      method: "UPI",
+      date: new Date().toISOString().split("T")[0],
+      notes: `Payment received at Consultation desk. Doctor: ${selectedWalkIn.doctor}. Walk-in: ${selectedWalkIn.name}`
+    });
+    localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+
+    showToast(`Payment of ₹${docFee} received & recorded!`, "success");
+  };
 
   const activeConsultations = queue.filter(
     (q) => q.appointment_status === "Doctor Consultation"
@@ -272,7 +473,7 @@ export default function ConsultationPage() {
                     const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
                     return (
                       <div
-                        key={item.name}
+                        key={`${item.name}-${index}`}
                         onClick={() => handleSelectWalkIn(item)}
                         className={`p-3 hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex gap-3 items-center
                           ${isActive ? "border-l-indigo-600 bg-indigo-50/40" : "border-l-transparent bg-white"}`}
@@ -428,20 +629,36 @@ export default function ConsultationPage() {
                       </div>
 
                       {needLabTest && (
-                        <div className="space-y-1 pl-6">
-                          <Label htmlFor="lab-test" className="text-xs">Select Lab Test</Label>
-                          <Select value={labTestName} onValueChange={setLabTestName}>
-                            <SelectTrigger id="lab-test" className="h-9 text-xs">
-                              <SelectValue placeholder="Choose test..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {labTestsList.map((t) => (
-                                <SelectItem key={t.test_name} value={t.test_name} className="text-xs">
-                                  {t.test_name} (₹{t.fee})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <div className="space-y-2 pl-6">
+                          <Label className="text-xs font-semibold text-slate-700">Select Lab Tests (Multiple)</Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-lg p-3 bg-slate-50/50">
+                            {labTestsList.map((t) => {
+                              const selectedArray = labTestName ? labTestName.split(",").map(x => x.trim()).filter(Boolean) : [];
+                              const isChecked = selectedArray.includes(t.test_name);
+                              return (
+                                <label key={t.test_name} className={`flex items-start gap-2 border p-2 rounded-md cursor-pointer transition-all duration-200 ${isChecked ? 'bg-indigo-50/60 border-indigo-200 text-indigo-900 font-medium' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      let updatedArray;
+                                      if (isChecked) {
+                                        updatedArray = selectedArray.filter(name => name !== t.test_name);
+                                      } else {
+                                        updatedArray = [...selectedArray, t.test_name];
+                                      }
+                                      setLabTestName(updatedArray.join(", "));
+                                    }}
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer mt-0.5"
+                                  />
+                                  <div className="text-[11px] leading-tight">
+                                    <div>{t.test_name}</div>
+                                    <div className="text-[9px] text-muted-foreground font-normal mt-0.5">₹{t.fee}</div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -490,7 +707,7 @@ export default function ConsultationPage() {
                   <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
                     <Button
                       type="submit"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-9 text-sm"
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-9 text-sm font-semibold flex items-center justify-center"
                     >
                       <Send className="w-4 h-4" />
                       Save & Route to next station

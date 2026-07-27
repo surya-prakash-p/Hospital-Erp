@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Receipt, CheckCircle, AlertCircle, Info, Activity, CreditCard, Printer } from "lucide-react";
+import { Receipt, CheckCircle, AlertCircle, Info, Activity, CreditCard, Printer, Download, BadgeCheck, TrendingDown, Building2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getPatient, updatePatientHistory } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getPatient, updatePatientHistory, getLabTests } from "@/lib/hospital-service";
+import { jsPDF } from "jspdf";
 
 const DOCTOR_FEES = {
   "Dr. Rajesh": 500,
@@ -21,6 +22,8 @@ export default function BillingPage() {
   const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [toasts, setToasts] = useState([]);
   const [settledInvoice, setSettledInvoice] = useState(null);
+  const [deptPayments, setDeptPayments] = useState([]);
+  const [labTests, setLabTests] = useState([]);
 
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -36,6 +39,8 @@ export default function BillingPage() {
       try {
         const q = await getQueue();
         setQueue(q);
+        const labs = await getLabTests();
+        setLabTests(labs);
       } catch (err) {
         showToast("Error loading billing queue", "error");
         console.error(err);
@@ -44,6 +49,24 @@ export default function BillingPage() {
       }
     }
     loadData();
+  }, []);
+
+  const getLabFee = (testName) => {
+    if (!testName) return 0;
+    const names = testName.split(",").map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) return 0;
+    let total = 0;
+    names.forEach(name => {
+      const test = labTests.find(t => t.test_name === name);
+      total += test ? test.fee : 450;
+    });
+    return total;
+  };
+
+  // Load department-level payments from localStorage
+  useEffect(() => {
+    const raw = localStorage.getItem("hospital_dept_payments");
+    if (raw) setDeptPayments(JSON.parse(raw));
   }, []);
 
   const handleSelectWalkIn = (item) => {
@@ -63,9 +86,16 @@ export default function BillingPage() {
 
     // Calculate fee breakdown
     const docFee = DOCTOR_FEES[targetWalkIn.doctor] || 500;
-    const labFee = targetWalkIn.need_lab_test === 1 ? 450 : 0;
+    const labFee = targetWalkIn.need_lab_test === 1 ? getLabFee(targetWalkIn.lab_test_name) : 0;
     const pharmFee = targetWalkIn.need_medicines === 1 ? (targetWalkIn.pharmacy_bill_amount || 0) : 0;
     const grandTotal = docFee + labFee + pharmFee;
+
+    // Subtract payments already collected at department level
+    const currentDeptPayments = JSON.parse(localStorage.getItem("hospital_dept_payments") || "[]");
+    const deptAlreadyPaid = currentDeptPayments
+      .filter(p => p.walkInId === targetWalkInName)
+      .reduce((s, p) => s + (p.amount || 0), 0);
+    const netBalance = Math.max(0, grandTotal - deptAlreadyPaid);
 
     // Optimistically update states instantly
     setQueue(prev => prev.filter(q => q.name !== targetWalkInName));
@@ -75,6 +105,9 @@ export default function BillingPage() {
     setSettledInvoice({
       ...targetWalkIn,
       grandTotal,
+      labFee,
+      deptAlreadyPaid,
+      netBalance,
       paymentMethod,
       date: new Date().toLocaleDateString("en-IN", {
         day: "numeric",
@@ -88,7 +121,7 @@ export default function BillingPage() {
     setSelectedWalkIn(null);
 
     try {
-      // 1. Update walk-in record to Completed
+      // 1. Update walk-in record — store gross total for records but mark as completed
       await updateWalkIn(targetWalkInName, {
         bill_amount: grandTotal,
         payment_received: 1,
@@ -96,7 +129,56 @@ export default function BillingPage() {
         appointment_status: "Completed"
       });
 
-      // 2. Fetch current patient profile and compile history entry
+      // 2. Record only the net balance in finance (dept payments already recorded separately)
+      if (netBalance > 0) {
+        const storedFinance = localStorage.getItem("hospital_custom_finance");
+        const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
+        const deptPaidNote = deptAlreadyPaid > 0
+          ? ` (Gross ₹${grandTotal} − Dept Paid ₹${deptAlreadyPaid})`
+          : "";
+        financeEntries.unshift({
+          id: `tx-billing-${Date.now()}`,
+          title: `Patient Billing — ${targetWalkIn.patient_name}`,
+          type: "Income",
+          category: "Clinical Services",
+          amount: netBalance,
+          method: paymentMethod,
+          date: new Date().toISOString().split("T")[0],
+          notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Lab included: ${targetWalkIn.need_lab_test === 1 ? "Yes" : "No"}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? "Yes" : "No"}.${deptPaidNote}`
+        });
+        localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+      }
+
+      // Save persistent patient invoice to patient profile documents tab
+      const patientMobile = targetWalkIn.mobile_number;
+      if (patientMobile) {
+        const existingInvoicesRaw = localStorage.getItem(`hospital_patient_invoices_${patientMobile}`);
+        const existingInvoices = existingInvoicesRaw ? JSON.parse(existingInvoicesRaw) : [];
+        
+        const invoiceDoc = {
+          id: Date.now(),
+          type: 'invoice',
+          name: `Invoice_${targetWalkIn.patient_name}_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.pdf`,
+          date: new Date().toLocaleDateString('en-GB'),
+          walkinData: {
+            doctor: targetWalkIn.doctor || "",
+            lab_test_name: targetWalkIn.lab_test_name || "",
+            need_lab_test: targetWalkIn.need_lab_test || 0,
+            pharmacy_bill_amount: targetWalkIn.pharmacy_bill_amount || 0,
+            dispensed_medicines: targetWalkIn.dispensed_medicines || [],
+            docFee,
+            labFee,
+            grandTotal,
+            deptAlreadyPaid,
+            netBalance,
+            paymentMethod
+          }
+        };
+        existingInvoices.unshift(invoiceDoc);
+        localStorage.setItem(`hospital_patient_invoices_${patientMobile}`, JSON.stringify(existingInvoices));
+      }
+
+      // 3. Fetch current patient profile and compile history entry
       const patientProfile = await getPatient(targetWalkIn.mobile_number);
       if (patientProfile) {
         const todayStr = new Date().toISOString().split("T")[0];
@@ -106,7 +188,7 @@ Doctor: ${targetWalkIn.doctor}
 Diagnosis: ${targetWalkIn.diagnosis || "General Consultation Checkup"}
 Prescription: ${targetWalkIn.prescription || "None"}
 Lab Test: ${targetWalkIn.need_lab_test === 1 ? `${targetWalkIn.lab_test_name} (Results: ${targetWalkIn.lab_result || "normal"})` : "None"}
-Bill Total: ₹${grandTotal} (${paymentMethod})
+Bill Total: ₹${grandTotal}${deptAlreadyPaid > 0 ? ` (Dept Paid: ₹${deptAlreadyPaid} | Balance Collected: ₹${netBalance})` : ""} (${paymentMethod})
 Status: Completed.
 `;
         
@@ -115,7 +197,10 @@ Status: Completed.
         await updatePatientHistory(targetWalkIn.mobile_number, updatedHistory);
       }
 
-      showToast(`Payment of ₹${grandTotal} settled successfully! Visit history logged.`, "success");
+      const toastMsg = netBalance === 0
+        ? `Bill fully settled! All ₹${grandTotal} was collected at department level.`
+        : `Balance of ₹${netBalance} collected. Total visit: ₹${grandTotal}.`;
+      showToast(toastMsg, "success");
 
       // Reload queue in background
       const updatedQueue = await getQueue();
@@ -126,6 +211,238 @@ Status: Completed.
       setSettledInvoice(null);
       showToast(err.message || "Failed to settle payment", "error");
       console.error(err);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!settledInvoice) return;
+    
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      let posY = 20;
+
+      // Header
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
+      posY += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
+      posY += 5;
+      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org | GSTIN: 33AAACT1234A1Z0", 105, posY, { align: "center" });
+      posY += 8;
+
+      // Line separator
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.setLineWidth(0.5);
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("PATIENT BILLING INVOICE", 20, posY);
+      posY += 8;
+
+      // Meta Info Table (Grid)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("Invoice ID:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(settledInvoice.name, 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Patient Name:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(settledInvoice.patient_name, 145, posY);
+      posY += 6;
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Date & Time:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(settledInvoice.date || new Date().toLocaleString(), 50, posY);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Mobile Number:", 115, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(settledInvoice.mobile_number, 145, posY);
+      posY += 8;
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Doctor & Diagnosis
+      doc.setFont("helvetica", "bold");
+      doc.text("Consulting Doctor:", 20, posY);
+      doc.setFont("helvetica", "normal");
+      doc.text(settledInvoice.doctor, 55, posY);
+      posY += 6;
+
+      if (settledInvoice.diagnosis) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Diagnosis:", 20, posY);
+        doc.setFont("helvetica", "normal");
+        const diagnosisLines = doc.splitTextToSize(settledInvoice.diagnosis, 130);
+        doc.text(diagnosisLines, 55, posY);
+        posY += (diagnosisLines.length * 4) + 2;
+      } else {
+        posY += 2;
+      }
+
+      // Line separator
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      // Table Headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.rect(20, posY - 4, 170, 7, "F");
+      doc.text("Description", 22, posY);
+      doc.text("Qty", 120, posY, { align: "center" });
+      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Amount", 185, posY, { align: "right" });
+      posY += 8;
+
+      // Add rows
+      const docFee = DOCTOR_FEES[settledInvoice.doctor] || 500;
+      
+      // Row 1: Consultation
+      doc.setFont("helvetica", "normal");
+      doc.text(`Consultation Fee (${settledInvoice.doctor})`, 22, posY);
+      doc.text("1", 120, posY, { align: "center" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 7;
+
+      // Row 2: Lab Test
+      if (settledInvoice.need_lab_test === 1) {
+        const currentLabFee = settledInvoice.labFee || getLabFee(settledInvoice.lab_test_name);
+        doc.text(`Lab Diagnostic Panel (${settledInvoice.lab_test_name})`, 22, posY);
+        doc.text("1", 120, posY, { align: "center" });
+        doc.text(`INR ${currentLabFee.toFixed(2)}`, 145, posY, { align: "right" });
+        doc.text(`INR ${currentLabFee.toFixed(2)}`, 185, posY, { align: "right" });
+        posY += 7;
+      }
+
+      // Row 3: Pharmacy Medications
+      if (settledInvoice.need_medicines === 1) {
+        const pharmTotal = settledInvoice.pharmacy_bill_amount || 0;
+        doc.text("Pharmacy Medication Package", 22, posY);
+        doc.text("-", 120, posY, { align: "center" });
+        doc.text(`INR ${pharmTotal.toFixed(2)}`, 145, posY, { align: "right" });
+        doc.text(`INR ${pharmTotal.toFixed(2)}`, 185, posY, { align: "right" });
+        posY += 6;
+
+        // Sub-items of medicines
+        if (settledInvoice.dispensed_medicines && settledInvoice.dispensed_medicines.length > 0) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(100, 116, 139); // slate-500
+          
+          settledInvoice.dispensed_medicines.forEach(med => {
+            const itemTotal = med.qty * (med.price || 0);
+            doc.text(`- ${med.medicine_name} (x${med.qty}) @ INR ${med.price || 0}/ea`, 26, posY);
+            doc.text(`INR ${itemTotal.toFixed(2)}`, 185, posY, { align: "right" });
+            posY += 5;
+          });
+          
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(15, 23, 42);
+          posY += 2;
+        } else {
+          posY += 1;
+        }
+      }
+
+      // Totals Area
+      posY += 3;
+      doc.line(20, posY, 190, posY);
+      posY += 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL:", 130, posY);
+      doc.text(`INR ${settledInvoice.grandTotal.toFixed(2)}`, 185, posY, { align: "right" });
+      posY += 12;
+
+      // Paid Stamp / Footer
+      doc.setDrawColor(16, 185, 129); // emerald-500
+      doc.setLineWidth(0.8);
+      doc.rect(75, posY, 60, 12);
+      
+      doc.setTextColor(16, 185, 129);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(`PAID VIA ${settledInvoice.paymentMethod.toUpperCase()}`, 105, posY + 7.5, { align: "center" });
+
+      posY += 22;
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8.5);
+      doc.text("Thank you for choosing Thangam Hospital. Get well soon!", 105, posY, { align: "center" });
+
+      // Save the PDF
+      doc.save(`Invoice-${settledInvoice.name}.pdf`);
+      showToast("Invoice PDF downloaded successfully!", "success");
+    } catch (pdfErr) {
+      showToast("Error generating invoice PDF", "error");
+      console.error(pdfErr);
+    }
+  };
+
+  const handlePrintInvoice = () => {
+    if (!settledInvoice) return;
+    try {
+      const printContent = document.getElementById("printable-invoice").innerHTML;
+      const printWindow = window.open("", "_blank", "width=850,height=900");
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice - ${settledInvoice.name}</title>
+            <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+            <style>
+              body {
+                font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                padding: 40px;
+                background: white;
+                color: #0f172a;
+              }
+              .border-b { border-bottom-width: 1px; }
+              .border-t { border-top-width: 1px; }
+              .border-dashed { border-style: dashed; }
+              .font-mono { font-family: monospace; }
+            </style>
+          </head>
+          <body>
+            <div class="max-w-2xl mx-auto border border-slate-100 p-8 rounded-xl shadow-sm">
+              ${printContent}
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (printErr) {
+      showToast("Error printing invoice", "error");
+      console.error(printErr);
     }
   };
 
@@ -156,32 +473,7 @@ Status: Completed.
       {/* Proper invoice generator modal overlay */}
       {settledInvoice && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto flex flex-col p-6 border relative">
-            <style dangerouslySetInnerHTML={{ __html: `
-              @media print {
-                body * {
-                  visibility: hidden !important;
-                }
-                #printable-invoice, #printable-invoice * {
-                  visibility: visible !important;
-                }
-                #printable-invoice {
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 100% !important;
-                  max-width: 100% !important;
-                  padding: 40px !important;
-                  box-shadow: none !important;
-                  border: none !important;
-                  background: white !important;
-                  color: black !important;
-                }
-                .no-print {
-                  display: none !important;
-                }
-              }
-            `}} />
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto flex flex-col p-6 border relative animate-in zoom-in-95 duration-150">
             
             {/* Printable Invoice Container */}
             <div id="printable-invoice" className="bg-white p-4 border border-slate-100 rounded-lg">
@@ -216,12 +508,34 @@ Status: Completed.
                 )}
                 {settledInvoice.need_lab_test === 1 && settledInvoice.lab_test_image && (
                   <div className="mt-2.5 pt-2 border-t border-slate-200">
-                    <p className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Attached Lab Diagnostic Scan</p>
-                    <img
-                      src={settledInvoice.lab_test_image}
-                      alt="Lab Report"
-                      className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto"
-                    />
+                    <p className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Attached Lab Diagnostic Scan(s)</p>
+                    <div className="flex flex-col gap-2">
+                      {(() => {
+                        let resolvedField = settledInvoice.lab_test_image;
+                        if (resolvedField === "stored_locally") {
+                          resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${settledInvoice.name}`) : "";
+                        }
+                        if (!resolvedField) return null;
+                        
+                        if (resolvedField.startsWith("{")) {
+                          try {
+                            const parsed = JSON.parse(resolvedField);
+                            return Object.entries(parsed).map(([test, src]) => (
+                              src && (
+                                <div key={test} className="space-y-1">
+                                  <p className="text-[9px] font-semibold text-slate-500">{test}</p>
+                                  <img src={src} alt={test} className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto" />
+                                </div>
+                              )
+                            ));
+                          } catch (e) {
+                            return null;
+                          }
+                        } else {
+                          return <img src={resolvedField} alt="Lab Report" className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto" />;
+                        }
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>
@@ -237,7 +551,7 @@ Status: Completed.
                   {settledInvoice.need_lab_test === 1 && (
                     <div className="flex justify-between py-1 border-b border-slate-100">
                       <span className="text-slate-600">Lab Diagnostic Panel ({settledInvoice.lab_test_name})</span>
-                      <span className="font-medium">₹450</span>
+                      <span className="font-medium">₹{settledInvoice.labFee || getLabFee(settledInvoice.lab_test_name)}</span>
                     </div>
                   )}
                   {settledInvoice.need_medicines === 1 && (
@@ -258,9 +572,19 @@ Status: Completed.
                       )}
                     </>
                   )}
-                  <div className="flex justify-between font-bold text-sm text-slate-900 pt-3">
-                    <span>Total Paid</span>
-                    <span>₹{settledInvoice.grandTotal}</span>
+                  <div className="flex justify-between py-1 border-t border-slate-100 text-slate-600 mt-1">
+                    <span>Gross Total</span>
+                    <span className="font-medium">₹{settledInvoice.grandTotal}</span>
+                  </div>
+                  {settledInvoice.deptAlreadyPaid > 0 && (
+                    <div className="flex justify-between py-1 text-emerald-700 bg-emerald-50 px-1 rounded text-xs font-semibold">
+                      <span>Already Paid at Dept. Level</span>
+                      <span>− ₹{settledInvoice.deptAlreadyPaid}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-sm text-slate-900 pt-2 border-t border-slate-200">
+                    <span>{settledInvoice.netBalance === 0 ? "Balance Due (Fully Settled)" : "Balance Collected at Billing"}</span>
+                    <span>₹{settledInvoice.netBalance ?? settledInvoice.grandTotal}</span>
                   </div>
                 </div>
               </div>
@@ -284,8 +608,15 @@ Status: Completed.
                 Close & Return
               </Button>
               <Button 
-                onClick={() => window.print()}
-                className="h-9 text-sm bg-slate-900 hover:bg-slate-800 text-white gap-1.5"
+                onClick={handleDownloadPDF}
+                className="h-9 text-sm bg-teal-600 hover:bg-teal-700 text-white gap-1.5 font-semibold shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download PDF
+              </Button>
+              <Button 
+                onClick={handlePrintInvoice}
+                className="h-9 text-sm bg-slate-900 hover:bg-slate-800 text-white gap-1.5 font-semibold shadow-sm"
               >
                 <Printer className="w-4 h-4" />
                 Print Invoice
@@ -301,6 +632,75 @@ Status: Completed.
           <p className="text-muted-foreground mt-1">Manage patient invoices and payments</p>
         </div>
       </div>
+
+      {/* Department Payments Tracker */}
+      {deptPayments.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-600" />
+              Department-Level Payments Received
+            </h3>
+            <div className="flex gap-4 text-xs">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
+                Collected ₹{deptPayments.reduce((s, p) => s + (p.amount || 0), 0).toLocaleString("en-IN")}
+              </span>
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                <TrendingDown className="w-3 h-3" />
+                Due ₹{Math.max(0, pendingBilling.reduce((s, q) => {
+                  const docFee = DOCTOR_FEES[q.doctor] || 500;
+                  const labFee = q.need_lab_test === 1 ? getLabFee(q.lab_test_name) : 0;
+                  const pharmFee = q.need_medicines === 1 ? (q.pharmacy_bill_amount || 0) : 0;
+                  const gross = docFee + labFee + pharmFee;
+                  const paid = deptPayments.filter(p => p.walkInId === q.name).reduce((a, p) => a + (p.amount || 0), 0);
+                  return s + Math.max(0, gross - paid);
+                }, 0)).toLocaleString("en-IN")}
+              </span>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Department</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Method</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {deptPayments.map((pay) => (
+                  <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 text-slate-500">{pay.date}</td>
+                    <td className="px-4 py-2.5">
+                      <p className="font-semibold text-slate-800">{pay.patientName}</p>
+                      <p className="text-slate-400">{pay.mobile}</p>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
+                        pay.department === "Consultation" ? "bg-indigo-50 text-indigo-700" :
+                        pay.department === "Lab" ? "bg-purple-50 text-purple-700" :
+                        "bg-pink-50 text-pink-700"
+                      }`}>{pay.department}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600 max-w-[180px] truncate" title={pay.description}>{pay.description}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{pay.method}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-emerald-600">₹{(pay.amount || 0).toLocaleString("en-IN")}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-semibold text-[11px]">
+                        <BadgeCheck className="w-3 h-3" /> Paid
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
@@ -333,7 +733,7 @@ Status: Completed.
                   const isActive = selectedWalkIn && selectedWalkIn.name === item.name;
                   return (
                     <div
-                      key={item.name}
+                      key={`${item.name}-${index}`}
                       onClick={() => handleSelectWalkIn(item)}
                       className={`p-4 border-b hover:bg-slate-50 cursor-pointer transition-colors border-l-4 flex items-center gap-3
                         ${isActive ? "border-l-teal-600 bg-teal-50/30" : "border-l-transparent bg-white"}`}
@@ -411,12 +811,34 @@ Status: Completed.
                         </p>
                         {selectedWalkIn.lab_test_image && (
                           <div className="mt-2 pt-2 border-t border-slate-200">
-                            <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Attached Lab Report Image</span>
-                            <img
-                              src={selectedWalkIn.lab_test_image}
-                              alt="Lab Test Attachment"
-                              className="max-h-36 rounded border border-slate-200 object-contain bg-white"
-                            />
+                            <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Attached Lab Report Scan(s)</span>
+                            <div className="flex flex-wrap gap-3 mt-1">
+                              {(() => {
+                                let resolvedField = selectedWalkIn.lab_test_image;
+                                if (resolvedField === "stored_locally") {
+                                  resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${selectedWalkIn.name}`) : "";
+                                }
+                                if (!resolvedField) return null;
+                                
+                                if (resolvedField.startsWith("{")) {
+                                  try {
+                                    const parsed = JSON.parse(resolvedField);
+                                    return Object.entries(parsed).map(([test, src]) => (
+                                      src && (
+                                        <div key={test} className="space-y-1">
+                                          <p className="text-[9px] font-semibold text-slate-500">{test}</p>
+                                          <img src={src} alt={test} className="max-h-36 rounded border border-slate-200 object-contain bg-white" />
+                                        </div>
+                                      )
+                                    ));
+                                  } catch (e) {
+                                    return null;
+                                  }
+                                } else {
+                                  return <img src={resolvedField} alt="Lab Test Attachment" className="max-h-36 rounded border border-slate-200 object-contain bg-white" />;
+                                }
+                              })()}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -430,47 +852,82 @@ Status: Completed.
                       <span className="text-xs text-muted-foreground">Currency: INR (₹)</span>
                     </h3>
                     
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between text-slate-600">
-                        <span>Consultation Fee ({selectedWalkIn.doctor})</span>
-                        <span>₹{DOCTOR_FEES[selectedWalkIn.doctor] || 500}</span>
-                      </div>
+                    {(() => {
+                      const docFee = DOCTOR_FEES[selectedWalkIn.doctor] || 500;
+                      const labFee = selectedWalkIn.need_lab_test === 1 ? getLabFee(selectedWalkIn.lab_test_name) : 0;
+                      const pharmFee = selectedWalkIn.need_medicines === 1 ? (selectedWalkIn.pharmacy_bill_amount || 0) : 0;
+                      const grossTotal = docFee + labFee + pharmFee;
 
-                      {selectedWalkIn.need_lab_test === 1 && (
-                        <div className="flex justify-between text-slate-600">
-                          <span>Lab Test Fee ({selectedWalkIn.lab_test_name})</span>
-                          <span>₹450</span>
-                        </div>
-                      )}
+                      // Find dept payments already made for this walk-in
+                      const patientDeptPaid = deptPayments
+                        .filter(p => p.walkInId === selectedWalkIn.name)
+                        .reduce((s, p) => s + (p.amount || 0), 0);
+                      const patientDeptPayments = deptPayments.filter(p => p.walkInId === selectedWalkIn.name);
+                      const netDue = Math.max(0, grossTotal - patientDeptPaid);
 
-                      {selectedWalkIn.need_medicines === 1 && (
-                        <>
-                          <div className="flex justify-between text-slate-600 font-semibold">
-                            <span>Pharmacy Dispensed Package</span>
-                            <span>₹{selectedWalkIn.pharmacy_bill_amount || 0}</span>
+                      return (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between text-slate-600">
+                            <span>Consultation Fee ({selectedWalkIn.doctor})</span>
+                            <span>₹{docFee}</span>
                           </div>
-                          {selectedWalkIn.dispensed_medicines && selectedWalkIn.dispensed_medicines.length > 0 && (
-                            <div className="pl-4 pr-1 space-y-1.5 pt-1 pb-1">
-                              {selectedWalkIn.dispensed_medicines.map((med, idx) => (
-                                <div key={idx} className="flex justify-between text-xs text-slate-500">
-                                  <span>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</span>
-                                  <span>₹{(med.qty * (med.price || 0)).toFixed(2)}</span>
+
+                          {selectedWalkIn.need_lab_test === 1 && (
+                            <div className="flex justify-between text-slate-600">
+                              <span>Lab Test Fee ({selectedWalkIn.lab_test_name})</span>
+                              <span>₹{labFee}</span>
+                            </div>
+                          )}
+
+                          {selectedWalkIn.need_medicines === 1 && (
+                            <>
+                              <div className="flex justify-between text-slate-600 font-semibold">
+                                <span>Pharmacy Dispensed Package</span>
+                                <span>₹{pharmFee}</span>
+                              </div>
+                              {selectedWalkIn.dispensed_medicines && selectedWalkIn.dispensed_medicines.length > 0 && (
+                                <div className="pl-4 pr-1 space-y-1.5 pt-1 pb-1">
+                                  {selectedWalkIn.dispensed_medicines.map((med, idx) => (
+                                    <div key={idx} className="flex justify-between text-xs text-slate-500">
+                                      <span>- {med.medicine_name} (x{med.qty}) @ ₹{med.price || 0}/ea</span>
+                                      <span>₹{(med.qty * (med.price || 0)).toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          <div className="flex justify-between text-slate-500 pt-2 border-t border-slate-100">
+                            <span>Gross Total</span>
+                            <span>₹{grossTotal}</span>
+                          </div>
+
+                          {patientDeptPaid > 0 && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50 px-2 py-1.5 rounded border border-emerald-100">
+                                <span className="flex items-center gap-1.5">
+                                  <BadgeCheck className="w-3.5 h-3.5" />
+                                  Already Paid at Dept. Level
+                                </span>
+                                <span>− ₹{patientDeptPaid.toLocaleString("en-IN")}</span>
+                              </div>
+                              {patientDeptPayments.map((p) => (
+                                <div key={p.id} className="flex justify-between text-xs text-emerald-600 pl-6">
+                                  <span>{p.department}: {p.description}</span>
+                                  <span>− ₹{p.amount.toLocaleString("en-IN")}</span>
                                 </div>
                               ))}
                             </div>
                           )}
-                        </>
-                      )}
 
-                      <div className="flex justify-between font-bold text-base text-slate-900 pt-3 border-t border-slate-100">
-                        <span>Grand Total Due</span>
-                        <span>
-                          ₹{(DOCTOR_FEES[selectedWalkIn.doctor] || 500) + 
-                            (selectedWalkIn.need_lab_test === 1 ? 450 : 0) + 
-                            (selectedWalkIn.need_medicines === 1 ? (selectedWalkIn.pharmacy_bill_amount || 0) : 0)}
-                        </span>
-                      </div>
-                    </div>
+                          <div className={`flex justify-between font-bold text-base pt-3 border-t border-slate-200 ${netDue === 0 ? "text-emerald-600" : "text-slate-900"}`}>
+                            <span>{netDue === 0 ? "✓ Fully Paid — Balance Due" : "Balance Due"}</span>
+                            <span>₹{netDue.toLocaleString("en-IN")}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Payment selector */}

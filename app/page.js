@@ -129,11 +129,11 @@ export default function DashboardPage() {
             <CardDescription className="text-xs">Access primary clinic modules immediately.</CardDescription>
           </CardHeader>
           <CardContent className="p-5 space-y-2">
-            <Button onClick={() => router.push('/reception')} className="w-full justify-start gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs font-semibold">
+            <Button onClick={() => router.push('/patient-registry')} className="w-full justify-start gap-2 bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs font-semibold">
               <PlusCircle className="w-4 h-4" /> Register Patient Walk-In
             </Button>
             <Button onClick={() => router.push('/doctors')} variant="outline" className="w-full justify-start gap-2 h-9 text-xs border-slate-200">
-              <UserRound className="w-4 h-4 text-indigo-500" /> Manage Doctors Catalog
+              <UserRound className="w-4 h-4 text-indigo-500" /> Manage Doctors Registry
             </Button>
             <Button onClick={() => router.push('/pharmacy')} variant="outline" className="w-full justify-start gap-2 h-9 text-xs border-slate-200">
               <Pill className="w-4 h-4 text-pink-500" /> Pharmacy & Stock Levels
@@ -204,11 +204,11 @@ export default function DashboardPage() {
               <div className="text-center">Lab test</div>
               <div className="text-right">Action State</div>
             </div>
-            {queue.map((item) => {
+            {queue.map((item, index) => {
               const activeStatus = item.appointment_status;
               const hasLab = item.need_lab_test === 1;
               return (
-                <div key={item.name} className="grid grid-cols-5 px-6 py-3 items-center hover:bg-slate-50/40 transition-colors">
+                <div key={`${item.name}-${index}`} className="grid grid-cols-5 px-6 py-3 items-center hover:bg-slate-50/40 transition-colors">
                   <div className="font-semibold text-slate-800">{item.patient_name} <span className="text-[10px] text-slate-400 block font-normal">{item.mobile_number}</span></div>
                   <div className="text-slate-600 font-medium">{item.doctor}</div>
                   <div className="text-center font-medium">

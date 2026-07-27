@@ -24,19 +24,22 @@ import {
   Box,
   Calendar,
   DoorOpen,
-  Bot
+  Bot,
+  Wallet
 } from "lucide-react"
 
 // Core main menu items (with Dashboard first)
 const mainNavigation = [
   { name: "Overview Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Reception Desk", href: "/reception", icon: ClipboardList },
+  { name: "Patient Registry", href: "/patient-registry", icon: Users },
   // { name: "Room Management", href: "/rooms", icon: DoorOpen },
   { name: "Consultation", href: "/consultation", icon: Stethoscope },
   { name: "Lab Station", href: "/lab", icon: FlaskConical },
   { name: "Pharmacy", href: "/pharmacy", icon: Pill },
   { name: "Billing & Pay", href: "/billing", icon: Receipt },
-  { name: "Doctors Catalog", href: "/doctors", icon: UserRound },
+  { name: "Finance Ledger", href: "/finance", icon: Wallet },
+  { name: "Doctors Registry", href: "/doctors", icon: UserRound },
   { name: "AI Copilot", href: "/ai-assistant", icon: Bot },
 ]
 
