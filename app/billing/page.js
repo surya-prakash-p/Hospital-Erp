@@ -633,74 +633,6 @@ Status: Completed.
         </div>
       </div>
 
-      {/* Department Payments Tracker */}
-      {deptPayments.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-emerald-600" />
-              Department-Level Payments Received
-            </h3>
-            <div className="flex gap-4 text-xs">
-              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
-                Collected ₹{deptPayments.reduce((s, p) => s + (p.amount || 0), 0).toLocaleString("en-IN")}
-              </span>
-              <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                <TrendingDown className="w-3 h-3" />
-                Due ₹{Math.max(0, pendingBilling.reduce((s, q) => {
-                  const docFee = DOCTOR_FEES[q.doctor] || 500;
-                  const labFee = q.need_lab_test === 1 ? getLabFee(q.lab_test_name) : 0;
-                  const pharmFee = q.need_medicines === 1 ? (q.pharmacy_bill_amount || 0) : 0;
-                  const gross = docFee + labFee + pharmFee;
-                  const paid = deptPayments.filter(p => p.walkInId === q.name).reduce((a, p) => a + (p.amount || 0), 0);
-                  return s + Math.max(0, gross - paid);
-                }, 0)).toLocaleString("en-IN")}
-              </span>
-            </div>
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Department</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Method</th>
-                  <th className="text-right px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                  <th className="text-center px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deptPayments.map((pay) => (
-                  <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-2.5 text-slate-500">{pay.date}</td>
-                    <td className="px-4 py-2.5">
-                      <p className="font-semibold text-slate-800">{pay.patientName}</p>
-                      <p className="text-slate-400">{pay.mobile}</p>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
-                        pay.department === "Consultation" ? "bg-indigo-50 text-indigo-700" :
-                        pay.department === "Lab" ? "bg-purple-50 text-purple-700" :
-                        "bg-pink-50 text-pink-700"
-                      }`}>{pay.department}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600 max-w-[180px] truncate" title={pay.description}>{pay.description}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{pay.method}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-emerald-600">₹{(pay.amount || 0).toLocaleString("en-IN")}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-semibold text-[11px]">
-                        <BadgeCheck className="w-3 h-3" /> Paid
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
@@ -963,6 +895,75 @@ Status: Completed.
               )}
             </CardContent>
           </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Department Payments Tracker */}
+      {deptPayments.length > 0 && (
+        <div className="space-y-3 mt-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-emerald-600" />
+              Department-Level Payments Received
+            </h3>
+            <div className="flex gap-4 text-xs">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-semibold">
+                Collected ₹{deptPayments.reduce((s, p) => s + (p.amount || 0), 0).toLocaleString("en-IN")}
+              </span>
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                <TrendingDown className="w-3 h-3" />
+                Due ₹{Math.max(0, pendingBilling.reduce((s, q) => {
+                  const docFee = DOCTOR_FEES[q.doctor] || 500;
+                  const labFee = q.need_lab_test === 1 ? getLabFee(q.lab_test_name) : 0;
+                  const pharmFee = q.need_medicines === 1 ? (q.pharmacy_bill_amount || 0) : 0;
+                  const gross = docFee + labFee + pharmFee;
+                  const paid = deptPayments.filter(p => p.walkInId === q.name).reduce((a, p) => a + (p.amount || 0), 0);
+                  return s + Math.max(0, gross - paid);
+                }, 0)).toLocaleString("en-IN")}
+              </span>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Patient</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Department</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                  <th className="text-left px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Method</th>
+                  <th className="text-right px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
+                  <th className="text-center px-4 py-2.5 font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {deptPayments.map((pay) => (
+                  <tr key={pay.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 text-slate-500">{pay.date}</td>
+                    <td className="px-4 py-2.5">
+                      <p className="font-semibold text-slate-800">{pay.patientName}</p>
+                      <p className="text-slate-400">{pay.mobile}</p>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
+                        pay.department === "Consultation" ? "bg-indigo-50 text-indigo-700" :
+                        pay.department === "Lab" ? "bg-purple-50 text-purple-700" :
+                        "bg-pink-50 text-pink-700"
+                      }`}>{pay.department}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600 max-w-[180px] truncate" title={pay.description}>{pay.description}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{pay.method}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-emerald-600">₹{(pay.amount || 0).toLocaleString("en-IN")}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-semibold text-[11px]">
+                        <BadgeCheck className="w-3 h-3" /> Paid
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -288,6 +288,7 @@ export default function ReceptionPage() {
     const { patient_name, mobile_number, doctor } = formState;
     if (!patient_name.trim())     { toast("Patient name is required", "error"); return; }
     if (mobile_number.length < 10){ toast("Enter a valid 10-digit mobile number", "error"); return; }
+    if (!formState.age && !formState.is_existing) { toast("Age is required for new patients", "error"); return; }
     if (!doctor)                  { toast("Please assign a doctor", "error"); return; }
 
     setIsSubmitting(true);
@@ -451,8 +452,8 @@ export default function ReceptionPage() {
                     {formState.mobile_number.length > 0 && formState.mobile_number.length < 10 &&
                       <p className="text-[10px] text-red-500 mt-1">{10-formState.mobile_number.length} more digits needed</p>}
                   </Field>
-                  <Field label="Age" icon={<Calendar className="w-3 h-3"/>}>
-                    <Input placeholder="Age in years" type="number" value={formState.age} className="h-9 text-sm border-slate-200"
+                  <Field label="Age *" icon={<Calendar className="w-3 h-3"/>}>
+                    <Input placeholder="Age in years" type="number" value={formState.age} required={!formState.is_existing} className="h-9 text-sm border-slate-200"
                       onChange={e => setFormState({...formState, age: e.target.value})}/>
                   </Field>
                   <Field label="Gender">
