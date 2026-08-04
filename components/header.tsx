@@ -14,7 +14,8 @@ import {
   CreditCard,
   ChevronDown,
   Activity,
-  PhoneCall
+  PhoneCall,
+  Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -41,6 +42,7 @@ export function Header() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNo, setMobileNo] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [qualification, setQualification] = useState("");
   const [roomNo, setRoomNo] = useState("");
@@ -62,6 +64,7 @@ export function Header() {
       setFullName(user.full_name || user.name || "");
       setEmail(user.email || "");
       setMobileNo(user.mobile_no || "");
+      setAvatarUrl(user.avatar || user.doctor_image || "");
       setBio(user.bio || "");
 
       if (isDoctorRole) {
@@ -92,6 +95,31 @@ export function Header() {
     }
   }, [user, isProfileModalOpen]);
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      setToastMessage("Image file must be under 3MB");
+      setTimeout(() => setToastMessage(""), 3500);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        setAvatarUrl(reader.result as string);
+        setToastMessage("Photo loaded! Click Save Profile to apply.");
+        setTimeout(() => setToastMessage(""), 3500);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatarUrl("");
+    setToastMessage("Photo removed. Click Save Profile to apply.");
+    setTimeout(() => setToastMessage(""), 3500);
+  };
+
   // Don't render header on login page or when user is not logged in
   if (pathname === '/login' || !user) {
     return null;
@@ -117,6 +145,8 @@ export function Header() {
           name: fullName,
           email: email,
           mobile_no: mobileNo,
+          avatar: avatarUrl,
+          doctor_image: avatarUrl,
           specialization: specialization,
           qualification: qualification,
           room_no: roomNo,
@@ -197,19 +227,23 @@ export function Header() {
                 className="flex items-center gap-3 px-3 py-1 bg-white hover:bg-slate-50 transition-colors rounded-xl border border-slate-200 text-xs cursor-pointer outline-none group shadow-2xs"
                 title="Open user account menu"
               >
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
-                  <img
-                    src={user?.doctor_image || "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"}
-                    alt={fullName || "Doctor Profile"}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
+                  {(avatarUrl || user?.avatar || user?.doctor_image) ? (
+                    <img
+                      src={avatarUrl || user?.avatar || user?.doctor_image}
+                      alt={fullName || "User Profile"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{(fullName || user?.full_name || user?.name || user?.email || "U").charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
                 <div className="hidden sm:block text-left">
                   <div className="font-bold text-slate-900 text-[12px] leading-tight group-hover:text-blue-600 transition-colors">
-                    {fullName || user?.full_name || user?.name || "Dr. Rajesh Kumar"}
+                    {fullName || user?.full_name || user?.name || user?.email || "User Profile"}
                   </div>
                   <div className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-                    {user?.roles?.length ? user.roles[0] : "Doctor"}
+                    {user?.roles?.length ? user.roles[0] : "Staff Member"}
                   </div>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors ml-1" />
@@ -262,8 +296,16 @@ export function Header() {
             {/* Modal Header */}
             <div className="bg-slate-900 text-white px-6 py-5 flex items-center justify-between relative">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0">
-                  {fullName ? fullName.charAt(0).toUpperCase() : 'D'}
+                <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/20 bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">
+                  {(avatarUrl || user?.avatar || user?.doctor_image) ? (
+                    <img
+                      src={avatarUrl || user?.avatar || user?.doctor_image}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{(fullName || user?.full_name || user?.name || "U").charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white tracking-wide">
@@ -284,6 +326,46 @@ export function Header() {
 
             {/* Form Body */}
             <form onSubmit={handleSaveProfile} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              
+              {/* Profile Photo Upload Card */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-600/30 bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-base font-bold shadow-xs shrink-0">
+                    {(avatarUrl || user?.avatar || user?.doctor_image) ? (
+                      <img src={avatarUrl || user?.avatar || user?.doctor_image} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{(fullName || user?.full_name || "U").charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">Profile Display Photo</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Upload a custom profile photo (Max 3MB)</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors shadow-2xs flex items-center gap-1.5 select-none">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Upload Photo</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handlePhotoUpload} 
+                      className="hidden" 
+                    />
+                  </label>
+
+                  {(avatarUrl || user?.avatar || user?.doctor_image) && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 font-semibold rounded-lg transition-colors border border-rose-200 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
               
               {user?.roles?.includes('Doctor') && !user?.roles?.includes('Hospital Admin') ? (
                 <>
