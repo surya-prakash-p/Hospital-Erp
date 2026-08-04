@@ -186,6 +186,7 @@ export default function FinancePage() {
         </head>
         <body>
           <div class="text-center pb-6 border-b">
+            <img src="/thangam_logo.png" alt="Thangam Hospital Logo" class="h-12 object-contain mx-auto mb-2" />
             <h1 class="text-2xl font-bold text-slate-800">THANGAM HOSPITAL</h1>
             <p class="text-xs text-slate-500">Financial Ledger Summary Statement</p>
             <p class="text-[10px] text-slate-400">Date: ${new Date().toLocaleDateString()}</p>

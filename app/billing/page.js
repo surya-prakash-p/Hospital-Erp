@@ -479,6 +479,7 @@ Status: Completed.
             <div id="printable-invoice" className="bg-white p-4 border border-slate-100 rounded-lg">
               {/* Invoice Header */}
               <div className="text-center pb-5 border-b border-slate-200">
+                <img src="/thangam_logo.png" alt="Thangam Hospital Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
                 <h2 className="text-xl font-bold tracking-tight text-slate-900 uppercase">Thangam Hospital</h2>
                 <p className="text-[11px] text-muted-foreground mt-1">123 Health City Road, Coimbatore - 641012</p>
                 <p className="text-[10px] text-muted-foreground">Phone: +91 422 2345678 | Email: billing@thangam.org</p>

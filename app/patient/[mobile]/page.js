@@ -357,6 +357,7 @@ export default function PatientProfilePage() {
           <body>
             <div class="max-w-2xl mx-auto border border-slate-100 p-8 rounded-xl shadow-sm">
               <div class="text-center pb-5 border-b border-slate-200">
+                <img src="/thangam_logo.png" alt="Thangam Hospital Logo" class="w-12 h-12 object-contain mx-auto mb-2" />
                 <h2 class="text-xl font-bold tracking-tight text-slate-900 uppercase">Thangam Hospital</h2>
                 <p class="text-[11px] text-muted-foreground mt-1">123 Health City Road, Coimbatore - 641012</p>
                 <p class="text-[10px] text-muted-foreground">Phone: +91 422 2345678 | Email: billing@thangam.org</p>
@@ -1428,12 +1429,15 @@ export default function PatientProfilePage() {
       {showInvoiceModal && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <Card className="w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 border-0 overflow-hidden">
-            <div className="bg-slate-900 text-white p-6 relative">
+            <div className="bg-slate-900 text-white p-6 relative flex items-center gap-3">
+              <img src="/thangam_logo.png" alt="Thangam Hospital Logo" className="w-10 h-10 object-contain bg-white/10 rounded-lg p-1 shrink-0" />
+              <div>
+                <h2 className="text-xl font-bold font-serif mb-0.5">Tax Invoice / Receipt</h2>
+                <p className="text-xs text-slate-300">Thangam Hospital ERP System</p>
+              </div>
               <button onClick={() => setShowInvoiceModal(false)} className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/10 transition">
                 <AlertCircle className="w-5 h-5 rotate-45 text-white/70" />
               </button>
-              <h2 className="text-xl font-bold font-serif mb-1">Tax Invoice / Receipt</h2>
-              <p className="text-sm text-slate-300">Thangam Hospital ERP System</p>
             </div>
             
             <div className="p-6 bg-white space-y-6">

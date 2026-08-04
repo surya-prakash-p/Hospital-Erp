@@ -26,9 +26,7 @@ export default function RAGAIAssistantPage() {
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="flex items-center gap-4 z-10">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-inner">
-            <Bot className="w-6 h-6 animate-pulse" />
-          </div>
+          <img src="/thangam_logo.png" alt="Thangam Hospital Logo" className="w-11 h-11 object-contain bg-white/10 rounded-2xl p-1 border border-white/20 shadow-inner shrink-0" />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold tracking-tight font-serif text-white">Thangam Hospital AI Copilot</h2>

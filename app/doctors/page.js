@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getDoctors, createDoctor, updateDoctor } from "@/lib/hospital-service";
 
+import { useAuth } from "@/lib/auth-context";
+
 export default function DoctorsCatalogPage() {
+  const { user } = useAuth();
   const [doctorsList, setDoctorsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -46,6 +49,21 @@ export default function DoctorsCatalogPage() {
     try {
       const docs = await getDoctors();
       setDoctorsList(docs);
+
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const shouldEdit = urlParams ? urlParams.get('edit') : null;
+
+      if (shouldEdit && docs && docs.length > 0) {
+        const myDoc = docs.find(d => 
+          (user?.full_name && d.doctor_name?.toLowerCase().includes(user.full_name.toLowerCase())) ||
+          (user?.email && d.email?.toLowerCase() === user.email.toLowerCase()) ||
+          d.doctor_name?.toLowerCase().includes('rajesh')
+        ) || docs[0];
+
+        if (myDoc) {
+          handleEditClick(myDoc);
+        }
+      }
     } catch (e) {
       showToast("Error loading doctors", "error");
     } finally {
@@ -55,7 +73,7 @@ export default function DoctorsCatalogPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];

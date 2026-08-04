@@ -87,9 +87,6 @@ export default function DashboardPage() {
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Hospital Overview Dashboard</h2>
           <p className="text-muted-foreground mt-1">Real-time clinical metrics, queue loads, and billing logs</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadDashboardData} className="gap-1 border-slate-200">
-          <RefreshCw className="w-3.5 h-3.5" /> Sync Data
-        </Button>
       </div>
 
       {/* Stats Cards Grid */}
