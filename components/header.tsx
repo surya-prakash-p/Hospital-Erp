@@ -197,13 +197,7 @@ export function Header() {
               </DropdownMenuLabel>
 
               <DropdownMenuItem 
-                onClick={() => {
-                  if (user?.roles?.includes('Doctor') && !user?.roles?.includes('Hospital Admin')) {
-                    router.push('/doctors?edit=me');
-                  } else {
-                    setIsProfileModalOpen(true);
-                  }
-                }}
+                onClick={() => setIsProfileModalOpen(true)}
                 className="flex items-center justify-between px-3 py-2.5 text-xs text-slate-900 font-semibold hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-2.5">
@@ -215,7 +209,7 @@ export function Header() {
                   availabilityStatus.includes('Busy') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                   availabilityStatus.includes('Surgery') ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
                 }`}>
-                  {user?.roles?.includes('Doctor') ? availabilityStatus.split(' ')[0] : 'Active'}
+                  {availabilityStatus.split(' ')[0] || 'Active'}
                 </span>
               </DropdownMenuItem>
 
