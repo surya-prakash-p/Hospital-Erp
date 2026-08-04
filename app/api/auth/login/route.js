@@ -56,12 +56,15 @@ export async function POST(req) {
 
     if (!loginRes.ok) {
       // Fallback for demo users if Frappe instance credentials are not available / offline
-      if (password === 'AdminPassword123!' || password === 'DoctorPassword123!' || password === 'PharmaPassword123!' || password === 'ReceptPassword123!') {
+      if (password === 'AdminPassword123!' || password === 'DoctorPassword123!' || password === 'PharmaPassword123!' || password === 'ReceptPassword123!' || password === 'LabPassword123!') {
         let fallbackRole = 'Hospital Admin';
         let full_name = 'Hospital Admin';
         if (targetEmail.includes('doctor') || targetEmail === '9900000002') {
           fallbackRole = 'Doctor';
           full_name = 'Dr. Rajesh Kumar';
+        } else if (targetEmail.includes('lab') || targetEmail === '9900000005') {
+          fallbackRole = 'Lab Technician';
+          full_name = 'Rajan (Lab Tech)';
         } else if (targetEmail.includes('pharmacy') || targetEmail === '9900000003') {
           fallbackRole = 'Pharmacist';
           full_name = 'Rahul Sharma';

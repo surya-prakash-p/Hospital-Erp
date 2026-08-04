@@ -32,8 +32,7 @@ export default function LoginPage() {
     'Doctor': { email: 'doctor@thangamhospital.com', mobile: '9900000002', pass: 'DoctorPassword123!' },
     'Pharmacist': { email: 'pharmacy@thangamhospital.com', mobile: '9900000003', pass: 'PharmaPassword123!' },
     'Receptionist': { email: 'reception@thangamhospital.com', mobile: '9900000004', pass: 'ReceptPassword123!' },
-    'Lab Technician': { email: 'doctor@thangamhospital.com', mobile: '9900000002', pass: 'DoctorPassword123!' },
-    'Billing Clerk': { email: 'admin@thangamhospital.com', mobile: '9900000001', pass: 'AdminPassword123!' }
+    'Lab Technician': { email: 'lab@thangamhospital.com', mobile: '9900000005', pass: 'LabPassword123!' }
   };
 
   const handleRoleSelect = (roleName) => {
@@ -243,7 +242,6 @@ export default function LoginPage() {
                   <option value="Pharmacist">Pharmacist</option>
                   <option value="Receptionist">Receptionist</option>
                   <option value="Lab Technician">Lab Technician</option>
-                  <option value="Billing Clerk">Billing Clerk</option>
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
                   <ChevronDown className="w-4 h-4" />
