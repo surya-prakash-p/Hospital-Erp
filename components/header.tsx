@@ -197,7 +197,13 @@ export function Header() {
               </DropdownMenuLabel>
 
               <DropdownMenuItem 
-                onClick={() => router.push('/doctors?edit=me')}
+                onClick={() => {
+                  if (user?.roles?.includes('Doctor') && !user?.roles?.includes('Hospital Admin')) {
+                    router.push('/doctors?edit=me');
+                  } else {
+                    setIsProfileModalOpen(true);
+                  }
+                }}
                 className="flex items-center justify-between px-3 py-2.5 text-xs text-slate-900 font-semibold hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-2.5">
@@ -209,7 +215,7 @@ export function Header() {
                   availabilityStatus.includes('Busy') ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                   availabilityStatus.includes('Surgery') ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'
                 }`}>
-                  {availabilityStatus.split(' ')[0]}
+                  {user?.roles?.includes('Doctor') ? availabilityStatus.split(' ')[0] : 'Active'}
                 </span>
               </DropdownMenuItem>
 
@@ -240,8 +246,12 @@ export function Header() {
                   {fullName ? fullName.charAt(0).toUpperCase() : 'D'}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white tracking-wide">Doctor Profile & Availability</h3>
-                  <p className="text-xs text-slate-300">View and update clinical profile and duty availability</p>
+                  <h3 className="text-base font-bold text-white tracking-wide">
+                    {user?.roles?.includes('Doctor') ? "Doctor Profile & Availability" : "Account & Profile Details"}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    {user?.roles?.includes('Doctor') ? "View and update clinical profile and duty availability" : "View and update your account details & contact information"}
+                  </p>
                 </div>
               </div>
               <button 
