@@ -256,6 +256,16 @@ export function Header() {
                 <div className="text-[11px] font-normal text-slate-500 mt-0.5 truncate">{user?.email}</div>
               </DropdownMenuLabel>
 
+              {(user?.roles?.includes('Hospital Admin') || user?.roles?.includes('System Manager')) && (
+                <DropdownMenuItem 
+                  onClick={() => router.push('/admin-dashboard')}
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-indigo-900 font-bold hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer transition-colors"
+                >
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Admin Dashboard</span>
+                </DropdownMenuItem>
+              )}
+
               <DropdownMenuItem 
                 onClick={() => setIsProfileModalOpen(true)}
                 className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-slate-900 font-semibold hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition-colors"

@@ -43,8 +43,37 @@ export async function GET(req) {
             if (info.mobile_no) user.mobile_no = info.mobile_no;
           }
         }
+
+        // Also check if user is in Hospital Doctor Doctype
+        const filterStr = JSON.stringify([["email", "=", user.email]]);
+        const docRes = await fetch(`${siteUrl}/api/resource/Hospital Doctor?filters=${encodeURIComponent(filterStr)}&fields=["*"]`, {
+          headers: { 'Authorization': `token ${apiKey}:${apiSecret}` },
+          cache: 'no-store'
+        });
+        if (docRes.ok) {
+          const docData = await docRes.json();
+          if (docData.data && docData.data.length > 0) {
+            const doctorProfile = docData.data[0];
+            if (!user.roles.includes('Doctor')) {
+              user.roles.push('Doctor');
+            }
+            user.full_name = doctorProfile.doctor_name || user.full_name;
+            user.doctor_name = doctorProfile.doctor_name;
+            user.specialization = doctorProfile.specialization || user.specialization;
+            user.qualification = doctorProfile.qualifications || user.qualification;
+            user.qualifications = doctorProfile.qualifications || user.qualifications;
+            user.fee = doctorProfile.consultation_fee || user.fee;
+            user.consultation_fee = doctorProfile.consultation_fee || user.consultation_fee;
+            user.location = doctorProfile.location || user.location;
+            user.room_no = doctorProfile.location || user.room_no;
+            user.doctor_image = doctorProfile.doctor_image || user.doctor_image;
+            user.avatar = doctorProfile.doctor_image || user.avatar;
+            user.experience = doctorProfile.experience || user.experience;
+            user.about = doctorProfile.about || user.about;
+          }
+        }
       } catch (e) {
-        console.warn('Could not refresh live roles from Frappe:', e.message);
+        console.warn('Could not refresh live roles/doctor info from Frappe:', e.message);
       }
     }
 

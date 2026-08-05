@@ -16,26 +16,28 @@ import {
   LayoutDashboard,
   Users,
   Bot,
-  Wallet
+  Wallet,
+  ShieldCheck,
+  UserPlus
 } from "lucide-react"
 
-// Core main menu items with role requirements
+// Core main menu items with role & granular permission requirements
 const mainNavigation = [
-  { name: "Overview Dashboard", href: "/", icon: LayoutDashboard, role: "Hospital Admin" },
-  { name: "Reception Desk", href: "/reception", icon: ClipboardList, role: "Receptionist" },
-  { name: "Patient Registry", href: "/patient-registry", icon: Users, role: "Receptionist" },
-  { name: "Consultation", href: "/consultation", icon: Stethoscope, role: "Doctor" },
-  { name: "Lab Station", href: "/lab", icon: FlaskConical, role: "Lab Technician" },
-  { name: "Pharmacy", href: "/pharmacy", icon: Pill, role: "Pharmacist" },
-  { name: "Billing & Pay", href: "/billing", icon: Receipt, role: "Billing Clerk" },
-  { name: "Finance Ledger", href: "/finance", icon: Wallet, role: "Billing Clerk" },
-  { name: "Doctors Registry", href: "/doctors", icon: UserRound, role: "Doctor" },
-  { name: "AI Copilot", href: "/ai-assistant", icon: Bot, role: "Doctor" },
+  { name: "Overview Dashboard", href: "/", icon: LayoutDashboard, role: "Hospital Admin", permission: "Overview" },
+  { name: "Reception Desk", href: "/reception", icon: ClipboardList, role: "Receptionist", permission: "Patient Registration" },
+  { name: "Patient Registry", href: "/patient-registry", icon: Users, role: "Receptionist", permission: "Patient Registration" },
+  { name: "Consultation", href: "/consultation", icon: Stethoscope, role: "Doctor", permission: "Doctor Consultations" },
+  { name: "Lab Station", href: "/lab", icon: FlaskConical, role: "Lab Technician", permission: "Lab Diagnostic" },
+  { name: "Pharmacy", href: "/pharmacy", icon: Pill, role: "Pharmacist", permission: "Pharmacy Dispensing" },
+  { name: "Billing & Pay", href: "/billing", icon: Receipt, role: "Billing Clerk", permission: "Billing & Invoicing" },
+  { name: "Finance Ledger", href: "/finance", icon: Wallet, role: "Billing Clerk", permission: "Billing & Invoicing" },
+  { name: "Doctors Registry", href: "/doctors", icon: UserRound, role: "Doctor", permission: "Doctor Consultations" },
+  { name: "AI Copilot", href: "/ai-assistant", icon: Bot, role: "Doctor", permission: "Doctor Consultations" },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { user, hasRole } = useAuth()
+  const { user, hasRole, hasPermission } = useAuth()
   const [collapsed, setCollapsed] = React.useState(false)
 
   // Don't render sidebar on login page or when user is not logged in
@@ -43,13 +45,23 @@ export function AppSidebar() {
     return null
   }
 
-  // Filter navigation links based on logged in user's roles
+  // Filter navigation links based on logged in user's roles & granted permissions
   const allowedNav = mainNavigation.filter((item) => {
     // Admin / System Manager gets everything
     if (!item.role || hasRole("Hospital Admin") || hasRole("System Manager")) {
       return true
     }
-    return hasRole(item.role)
+
+    // Check if user has explicit role OR granted granular permission
+    if (hasRole(item.role)) {
+      return true
+    }
+
+    if (item.permission && hasPermission(item.permission)) {
+      return true
+    }
+
+    return false
   })
 
   const sidebarWidth = collapsed ? 64 : 220

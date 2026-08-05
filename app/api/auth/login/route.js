@@ -16,6 +16,8 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
+import { findServerUser, saveServerUser } from '@/lib/server-user-store';
+
 export async function POST(req) {
   try {
     const { identifier, password } = await req.json();
@@ -25,6 +27,30 @@ export async function POST(req) {
     }
 
     let targetEmail = identifier.trim();
+
+    // 1. Check server-side persistent credentials store first (for instant, reliable login by email or mobile)
+    const localMatchedUser = findServerUser(targetEmail, password);
+    if (localMatchedUser) {
+      const userObj = {
+        email: localMatchedUser.email,
+        full_name: localMatchedUser.full_name,
+        name: localMatchedUser.full_name,
+        mobile_no: localMatchedUser.mobile_no,
+        roles: localMatchedUser.roles || ['Staff Member'],
+        permissions: localMatchedUser.permissions || [],
+        department: localMatchedUser.department || '',
+        designation: localMatchedUser.designation || ''
+      };
+
+      const response = NextResponse.json({ success: true, user: userObj });
+      response.cookies.set('hospital_erp_user', JSON.stringify(userObj), {
+        httpOnly: false,
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      });
+      return response;
+    }
+
     const isMobileNumber = /^[0-9+-\s()]{7,15}$/.test(targetEmail);
 
     // If identifier is a mobile number, lookup corresponding User in Frappe
@@ -112,6 +138,33 @@ export async function POST(req) {
       }
     }
 
+    // 3. Lookup Doctor Profile by email in Frappe Hospital Doctor
+    let doctorProfile = null;
+    if (apiKey && apiSecret) {
+      try {
+        const filterStr = JSON.stringify([["email", "=", targetEmail]]);
+        const docRes = await fetch(`${siteUrl}/api/resource/Hospital Doctor?filters=${encodeURIComponent(filterStr)}&fields=["*"]`, {
+          headers: { 'Authorization': `token ${apiKey}:${apiSecret}` },
+          cache: 'no-store'
+        });
+        if (docRes.ok) {
+          const docData = await docRes.json();
+          if (docData.data && docData.data.length > 0) {
+            doctorProfile = docData.data[0];
+          }
+        }
+      } catch (docErr) {
+        console.warn('Doctor profile lookup failed during login:', docErr.message);
+      }
+    }
+
+    if (doctorProfile) {
+      if (!roles.includes('Doctor')) {
+        roles.push('Doctor');
+      }
+      fullName = doctorProfile.doctor_name || fullName;
+    }
+
     if (roles.length === 0) {
       roles = ['Hospital Admin']; // Default fallback role
     }
@@ -119,9 +172,32 @@ export async function POST(req) {
     const userObj = {
       email: targetEmail,
       full_name: fullName,
+      name: fullName,
+      mobile_no: userMobile,
+      roles: roles,
+      ...(doctorProfile ? {
+        doctor_name: doctorProfile.doctor_name,
+        specialization: doctorProfile.specialization || "General Medicine",
+        qualification: doctorProfile.qualifications || "MBBS, MD",
+        qualifications: doctorProfile.qualifications || "MBBS, MD",
+        fee: doctorProfile.consultation_fee || 500,
+        consultation_fee: doctorProfile.consultation_fee || 500,
+        location: doctorProfile.location || "OPD Room 102",
+        room_no: doctorProfile.location || "OPD Room 102",
+        doctor_image: doctorProfile.doctor_image || "",
+        avatar: doctorProfile.doctor_image || "",
+        experience: doctorProfile.experience || "",
+        about: doctorProfile.about || ""
+      } : {})
+    };
+
+    saveServerUser({
+      email: targetEmail,
+      password: password,
+      full_name: fullName,
       mobile_no: userMobile,
       roles: roles
-    };
+    });
 
     const response = NextResponse.json({ success: true, user: userObj });
     response.cookies.set('hospital_erp_user', JSON.stringify(userObj), {

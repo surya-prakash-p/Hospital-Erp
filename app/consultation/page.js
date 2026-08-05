@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors } from "@/lib/hospital-service";
+import { useAuth } from "@/lib/auth-context";
 import { jsPDF } from "jspdf";
 
 export default function ConsultationPage() {
+  const { user, hasRole } = useAuth();
   const [queue, setQueue] = useState([]);
   const [doctorsList, setDoctorsList] = useState([
     { name: "Dr. Rajesh", doctor_name: "Dr. Rajesh", specialization: "General Physician" },
@@ -399,9 +401,39 @@ export default function ConsultationPage() {
     showToast(`Payment of ₹${docFee} received & recorded!`, "success");
   };
 
+  const isDoctorUser = hasRole("Doctor") && !hasRole("Hospital Admin") && !hasRole("System Manager");
+  const currentDoctorName = user ? (user.doctor_name || user.full_name || user.name || "") : "";
+  const currentDoctorClean = currentDoctorName.toLowerCase().replace(/dr\.?\s*/i, "").trim();
+
+  // Helper to test if a walk-in is assigned to the current user (if user is a doctor)
+  const isAssignedToCurrentDoctor = (walkIn) => {
+    if (!isDoctorUser || !currentDoctorClean) return true;
+    if (!walkIn.doctor) return true;
+    const walkInDoc = (walkIn.doctor || "").toLowerCase().replace(/dr\.?\s*/i, "").trim();
+    const emailPrefix = (user?.email || "").split('@')[0].toLowerCase();
+    
+    return walkInDoc.includes(currentDoctorClean) || 
+           currentDoctorClean.includes(walkInDoc) ||
+           (walkInDoc.length > 2 && emailPrefix.includes(walkInDoc)) ||
+           (currentDoctorClean.length > 2 && walkInDoc.includes(currentDoctorClean));
+  };
+
   const activeConsultations = queue.filter(
-    (q) => q.appointment_status === "Doctor Consultation"
+    (q) => q.appointment_status === "Doctor Consultation" && isAssignedToCurrentDoctor(q)
   );
+
+  // If logged in as Doctor, filter doctorsList to only show columns assigned to current doctor
+  const effectiveDoctorsList = isDoctorUser
+    ? doctorsList.filter(doc => {
+        const docName = (doc.name || doc.doctor_name || "").toLowerCase().replace(/dr\.?\s*/i, "").trim();
+        return docName.includes(currentDoctorClean) || currentDoctorClean.includes(docName);
+      })
+    : doctorsList;
+
+  // Fallback: If logged in as Doctor but not matched in doctorsList yet, show 1 focused card for currentDoctorName
+  const renderingDoctors = (isDoctorUser && effectiveDoctorsList.length === 0)
+    ? [{ name: currentDoctorName || "My Patients", doctor_name: currentDoctorName || "My Patients", specialization: user?.specialization || user?.department || "Consultation" }]
+    : (effectiveDoctorsList.length > 0 ? effectiveDoctorsList : doctorsList);
 
   if (loading) {
     return (
@@ -438,19 +470,27 @@ export default function ConsultationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Consultation</h2>
-          <p className="text-muted-foreground mt-1">Doctor's diagnosis and prescription</p>
+          <p className="text-muted-foreground mt-1">
+            {isDoctorUser 
+              ? `Patient queue & clinical desk for ${currentDoctorName || "Doctor"}`
+              : "Doctor's diagnosis and prescription queue"
+            }
+          </p>
         </div>
       </div>
 
-      {/* 3 Doctor Columns Queue */}
+      {/* Doctor Columns Queue */}
       <div className="space-y-3">
         <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
           <Stethoscope className="w-5 h-5 text-indigo-600" />
-          Doctor Consultation Queues ({activeConsultations.length} Pending Total)
+          {isDoctorUser 
+            ? `My Assigned Patient Queue (${activeConsultations.length} Pending)`
+            : `Doctor Consultation Queues (${activeConsultations.length} Pending Total)`
+          }
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {doctorsList.map((doc) => {
+        <div className={`grid grid-cols-1 ${renderingDoctors.length > 1 ? "md:grid-cols-3" : "md:grid-cols-1 max-w-xl"} gap-4`}>
+          {renderingDoctors.map((doc) => {
             const docName = doc.name || doc.doctor_name;
             const docQueue = activeConsultations.filter(
               (q) => (q.doctor || "").toLowerCase().includes(docName.toLowerCase()) || 
