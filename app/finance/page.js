@@ -27,14 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getQueue } from "@/lib/hospital-service";
 
-const MOCK_FINANCE_ENTRIES = [
-  { id: "tx-1", title: "Staff Nurse Salaries (July)", type: "Expense", category: "Salary", amount: 65000, method: "Bank Transfer", date: "2026-07-25", notes: "Monthly salary disbursement for 3 nurses" },
-  { id: "tx-2", title: "Ambulance Fuel & Service", type: "Expense", category: "Ambulance", amount: 4800, method: "Cash", date: "2026-07-24", notes: "Fuel refill and minor engine tuning" },
-  { id: "tx-3", title: "ECG Machine Maintenance", type: "Expense", category: "Maintenance", amount: 8500, method: "Card", date: "2026-07-22", notes: "Biomedical engineer routine check & calibration" },
-  { id: "tx-4", title: "Electricity & Power Utilities", type: "Expense", category: "Utilities", amount: 12400, method: "Bank Transfer", date: "2026-07-20", notes: "TNEB monthly power utility bill" },
-  { id: "tx-5", title: "Pharmacy Drug Re-stocking", type: "Expense", category: "Medical Supplies", amount: 22000, method: "Bank Transfer", date: "2026-07-18", notes: "Bulk purchase of paracetamol, pantocid and amoxicillin" },
-  { id: "tx-6", title: "In-house Cafeteria Lease Rent", type: "Income", category: "Rent", amount: 15000, method: "UPI", date: "2026-07-15", notes: "Monthly lease rent received from vendor" }
-];
+const MOCK_FINANCE_ENTRIES = [];
 
 export default function FinancePage() {
   const [queue, setQueue] = useState([]);

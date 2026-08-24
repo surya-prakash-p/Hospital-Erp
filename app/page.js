@@ -44,13 +44,13 @@ export default function DashboardPage() {
   const pendingBillsCount = queue.filter(q => q.appointment_status === "Billing").length;
   const labReportsPending = queue.filter(q => q.need_lab_test === 1 && q.lab_test_status !== "Completed").length;
 
-  // Mock static counts for non-db modules for high fidelity
-  const todaysAppointments = queue.length + 3;
-  const occupiedBeds = 14;
+  // Compute metrics dynamically from state
+  const todaysAppointments = queue.length;
+  const occupiedBeds = 0;
   const totalBeds = 45;
   const bedAvailability = `${totalBeds - occupiedBeds} Available`;
-  const todaysRevenue = `₹${(queue.filter(q => q.payment_received === 1).reduce((acc, q) => acc + (q.bill_amount || 0), 0) + 3400).toLocaleString()}`;
-  const emergencyCases = 2;
+  const todaysRevenue = `₹${(queue.filter(q => q.payment_received === 1).reduce((acc, q) => acc + (q.bill_amount || 0), 0)).toLocaleString()}`;
+  const emergencyCases = 0;
 
   const dashboardStats = [
     { title: "Total Patients", value: patientsCount, icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100", trend: "+8% this week", isTrendUp: true, href: "/reception" },
