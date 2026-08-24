@@ -89,7 +89,39 @@ export async function GET(req) {
   }
 }
 
-import { saveServerUser } from '@/lib/server-user-store';
+import { saveServerUser, deleteServerUser } from '@/lib/server-user-store';
+
+// DELETE: Remove User from Backend Credentials & Frappe
+export async function DELETE(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const identifier = searchParams.get('identifier') || searchParams.get('email') || searchParams.get('mobile_no');
+
+    if (!identifier) {
+      return NextResponse.json({ error: 'Identifier (email or mobile) is required for deletion' }, { status: 400 });
+    }
+
+    const cleanIdentifier = identifier.trim();
+
+    // 1. Delete from server-side credentials store
+    deleteServerUser(cleanIdentifier);
+
+    // 2. Delete from Frappe Cloud if enabled
+    if (apiKey && apiSecret) {
+      try {
+        await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanIdentifier)}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.warn("Frappe user deletion warning:", err.message);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: `Staff user ${cleanIdentifier} deleted successfully` });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
 
 // POST: Create or Update User with Role & Password in Backend
 export async function POST(req) {

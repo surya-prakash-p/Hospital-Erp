@@ -32,14 +32,16 @@ import {
   Settings, 
   Plus, 
   ChevronRight,
-  Filter
+  Filter,
+  AlertTriangle,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
-import { getStaffUsers, createStaffUser, updateUserRolesAndPermissions } from "@/lib/hospital-service";
+import { getStaffUsers, createStaffUser, updateUserRolesAndPermissions, deleteStaffUser } from "@/lib/hospital-service";
 
 const ALL_ROLES = [
   "Hospital Admin",
@@ -138,6 +140,11 @@ export default function AdminDashboardPage() {
   const [qualifications, setQualifications] = useState("");
   const [consultationFee, setConsultationFee] = useState("500");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Delete Staff State (Admin Only)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Edit Roles & Permissions Form State
   const [editRoles, setEditRoles] = useState([]);
@@ -405,6 +412,27 @@ export default function AdminDashboardPage() {
       showToast(err.message || "Failed to update roles", "error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleConfirmDeleteStaff = async () => {
+    if (!staffToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteStaffUser(staffToDelete.email || staffToDelete.mobile_no);
+      addSystemActivityLog(
+        "Staff Member Deleted",
+        `${staffToDelete.full_name} (${staffToDelete.roles?.[0] || 'Staff'}) was permanently deleted by Admin`,
+        "profile"
+      );
+      showToast(`Staff member ${staffToDelete.full_name} deleted successfully!`, "success");
+      setIsDeleteModalOpen(false);
+      setStaffToDelete(null);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to delete staff member", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -939,6 +967,18 @@ export default function AdminDashboardPage() {
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
+                            {(isHospitalAdmin || user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*')) && (
+                              <button
+                                onClick={() => {
+                                  setStaffToDelete(staff);
+                                  setIsDeleteModalOpen(true);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Staff Member (Admin Only)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1646,6 +1686,66 @@ export default function AdminDashboardPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Staff Confirmation Modal (Admin Only) */}
+      {isDeleteModalOpen && staffToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-200/80 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete Staff Member</h3>
+                <p className="text-xs text-red-600 font-semibold">Admin Confirmation Required</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50/70 border border-red-200/80 rounded-xl p-4 mb-5">
+              <p className="text-xs text-slate-800 leading-relaxed font-semibold mb-2">
+                Are you sure you want to delete <strong className="text-red-900 font-bold underline">{staffToDelete.full_name}</strong> ({staffToDelete.email || staffToDelete.mobile_no})?
+              </p>
+              <ul className="text-[11px] text-red-700 space-y-1.5 list-disc pl-4 font-medium">
+                <li>All login credentials and mobile/email login access will be permanently deleted.</li>
+                <li>All system roles and module permissions will be revoked immediately.</li>
+                <li>This action cannot be undone.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setStaffToDelete(null);
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteStaff}
+                disabled={isDeleting}
+                className="px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {isDeleting ? (
+                  <span>Deleting...</span>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Staff Member</span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
