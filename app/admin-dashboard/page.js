@@ -73,6 +73,7 @@ const INITIAL_SYSTEM_ACTIVITIES = [
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
+  const isHospitalAdmin = Boolean(user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*') || user?.roles?.includes('Admin'));
   const [staffUsers, setStaffUsers] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
