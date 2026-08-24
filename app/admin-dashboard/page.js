@@ -194,30 +194,6 @@ export default function AdminDashboardPage() {
       const data = await getStaffUsers();
       setStaffUsers(data);
 
-      // Background sync all local staff users to server credentials store
-      if (Array.isArray(data) && data.length > 0) {
-        data.forEach(async (staffMember) => {
-          if (staffMember.email) {
-            try {
-              await fetch('/api/users/manage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: staffMember.email,
-                  password: staffMember.password,
-                  full_name: staffMember.full_name,
-                  mobile_no: staffMember.mobile_no || staffMember.phone,
-                  roles: staffMember.roles || [staffMember.role || 'Staff Member'],
-                  permissions: staffMember.permissions || [],
-                  department: staffMember.department || '',
-                  designation: staffMember.designation || staffMember.role || 'Staff'
-                })
-              });
-            } catch (e) {}
-          }
-        });
-      }
-
       if (typeof window !== 'undefined') {
         const savedActivities = localStorage.getItem('hospital_system_activities');
         if (savedActivities) {
