@@ -40,6 +40,8 @@ export async function POST(req) {
       const foundInLocal = localStaff.find(s => {
         const sEmail = (s.email || '').trim().toLowerCase();
         const sMobileDigits = (s.mobile_no || s.phone || s.mobile || '').replace(/\D/g, '');
+        const sPassword = (s.password || '').trim();
+        const inputPwd = (password || '').trim();
 
         const emailMatch = Boolean(sEmail && sEmail === cleanInput);
         const mobileMatch = Boolean(isDigits && sMobileDigits.length >= 7 && (
@@ -48,13 +50,15 @@ export async function POST(req) {
           cleanInputDigits.endsWith(sMobileDigits)
         ));
 
-        return emailMatch || mobileMatch;
+        const passwordMatch = Boolean(sPassword && inputPwd && sPassword === inputPwd);
+
+        return (emailMatch || mobileMatch) && passwordMatch;
       });
 
       if (foundInLocal) {
         localMatchedUser = saveServerUser({
           email: foundInLocal.email,
-          password: password || foundInLocal.password,
+          password: password,
           full_name: foundInLocal.full_name,
           mobile_no: foundInLocal.mobile_no || foundInLocal.phone,
           roles: foundInLocal.roles || [foundInLocal.role || 'Staff Member'],
@@ -116,41 +120,7 @@ export async function POST(req) {
     });
 
     if (!loginRes.ok) {
-      // Fallback for demo users if Frappe instance credentials are not available / offline
-      if (password === 'AdminPassword123!' || password === 'DoctorPassword123!' || password === 'PharmaPassword123!' || password === 'ReceptPassword123!' || password === 'LabPassword123!') {
-        let fallbackRole = 'Hospital Admin';
-        let full_name = 'Hospital Admin';
-        if (targetEmail.includes('doctor') || targetEmail === '9900000002') {
-          fallbackRole = 'Doctor';
-          full_name = 'Dr. Rajesh Kumar';
-        } else if (targetEmail.includes('lab') || targetEmail === '9900000005') {
-          fallbackRole = 'Lab Technician';
-          full_name = 'Rajan (Lab Tech)';
-        } else if (targetEmail.includes('pharmacy') || targetEmail === '9900000003') {
-          fallbackRole = 'Pharmacist';
-          full_name = 'Rahul Sharma';
-        } else if (targetEmail.includes('reception') || targetEmail === '9900000004') {
-          fallbackRole = 'Receptionist';
-          full_name = 'Priya Sundaram';
-        }
-
-        const userObj = {
-          email: targetEmail,
-          full_name: full_name,
-          mobile_no: targetEmail,
-          roles: [fallbackRole]
-        };
-
-        const response = NextResponse.json({ success: true, user: userObj });
-        response.cookies.set('hospital_erp_user', JSON.stringify(userObj), {
-          httpOnly: false,
-          path: '/',
-          maxAge: 60 * 60 * 24 * 7 // 7 days
-        });
-        return response;
-      }
-
-      return NextResponse.json({ error: 'Invalid email/mobile or password' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
     }
 
     // 2. Fetch User Profile and Roles from Frappe User DocType
