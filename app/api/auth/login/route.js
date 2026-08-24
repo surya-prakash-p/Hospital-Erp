@@ -16,7 +16,7 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
-import { findServerUser, saveServerUser } from '@/lib/server-user-store';
+import { findServerUser, saveServerUser, isUserDeleted } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
@@ -27,6 +27,10 @@ export async function POST(req) {
     }
 
     let targetEmail = identifier.trim();
+
+    if (isUserDeleted(targetEmail)) {
+      return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
+    }
 
     // 1. Check server-side persistent credentials store first (for instant, reliable login by email or mobile)
     let localMatchedUser = findServerUser(targetEmail, password);
