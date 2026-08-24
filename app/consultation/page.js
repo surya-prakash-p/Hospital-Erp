@@ -14,11 +14,7 @@ import { jsPDF } from "jspdf";
 export default function ConsultationPage() {
   const { user, hasRole } = useAuth();
   const [queue, setQueue] = useState([]);
-  const [doctorsList, setDoctorsList] = useState([
-    { name: "Dr. Rajesh", doctor_name: "Dr. Rajesh", specialization: "General Physician" },
-    { name: "Dr. Priya", doctor_name: "Dr. Priya", specialization: "Cardiologist" },
-    { name: "Dr. Vignesh", doctor_name: "Dr. Vignesh", specialization: "Pediatrician" }
-  ]);
+  const [doctorsList, setDoctorsList] = useState([]);
   const [labTestsList, setLabTestsList] = useState([]);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [selectedPatientHistory, setSelectedPatientHistory] = useState("");

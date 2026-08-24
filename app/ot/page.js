@@ -8,10 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getQueue } from "@/lib/hospital-service";
 
-const INITIAL_SURGERIES = [
-  { id: "SURG-309", patient: "Surya Prakash", surgeon: "Dr. Rajesh Kumar", assistant: "Nurse Mary", date: "2026-07-17 09:30 AM", room: "OT-1", type: "Angioplasty", status: "Scheduled" },
-  { id: "SURG-310", patient: "Muthu Vel", surgeon: "Dr. Anita Roy", assistant: "Nurse Sarah", date: "2026-07-16 02:00 PM", room: "OT-2", type: "Appendectomy", status: "Ongoing" },
-];
+const INITIAL_SURGERIES = [];
 
 export default function OTPage() {
   const [surgeries, setSurgeries] = useState(INITIAL_SURGERIES);

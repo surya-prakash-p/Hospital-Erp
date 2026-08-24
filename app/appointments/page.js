@@ -8,10 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getQueue, getDoctors } from "@/lib/hospital-service";
 
-const INITIAL_APPOINTMENTS = [
-  { token: "T-01", patient: "Surya Prakash", doctor: "Dr. Rajesh Kumar", time: "2026-07-17 10:00 AM", status: "Confirmed" },
-  { token: "T-02", patient: "Muthu Vel", doctor: "Dr. Anita Roy", time: "2026-07-17 10:30 AM", status: "Confirmed" },
-];
+const INITIAL_APPOINTMENTS = [];
 
 export default function BookAppointmentsPage() {
   const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);

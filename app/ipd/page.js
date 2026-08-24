@@ -8,11 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { getQueue } from "@/lib/hospital-service";
 
-// Mock static admissions data for high fidelity
-const INITIAL_ADMISSIONS = [
-  { id: "IPD-1021", patient_name: "Surya Prakash", mobile: "9876543210", ward: "ICU", bed: "ICU-01", doctor: "Dr. Rajesh Kumar", admittedDate: "2026-07-15", reason: "Acute Chest Pain", diet: "Low sodium fluid diet", bp: "120/80", hr: "76 bpm", temp: "98.6 F" },
-  { id: "IPD-1022", patient_name: "Rajesh Kumar", mobile: "9876543211", ward: "General Male", bed: "GEN-01", doctor: "Dr. Anita Roy", admittedDate: "2026-07-16", reason: "Post-op appendectomy recovery", diet: "Soft solid diet", bp: "115/75", hr: "82 bpm", temp: "99.1 F" },
-];
+const INITIAL_ADMISSIONS = [];
 
 export default function InpatientPortalPage() {
   const [admissions, setAdmissions] = useState(INITIAL_ADMISSIONS);
