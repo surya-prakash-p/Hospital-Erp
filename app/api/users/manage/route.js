@@ -79,7 +79,7 @@ export async function DELETE(req) {
     const cleanIdentifier = identifier.trim();
 
     // 1. Delete from server-side credentials store
-    deleteServerUser(cleanIdentifier);
+    await deleteServerUser(cleanIdentifier);
 
     // 2. Delete from Frappe Cloud if enabled
     if (apiKey && apiSecret) {
@@ -115,7 +115,7 @@ export async function POST(req) {
     const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ['Staff Member'];
 
     // Always persist to server-side credentials store for immediate, seamless login
-    saveServerUser({
+    await saveServerUser({
       email: cleanEmail,
       password: password,
       full_name: full_name || cleanEmail,

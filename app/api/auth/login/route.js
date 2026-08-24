@@ -26,8 +26,9 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Please enter Email / Mobile Number and Password' }, { status: 400 });
     }
 
-    const cleanInputStr = identifier.trim().toLowerCase();
-    const cleanInputDigits = identifier.replace(/\D/g, '');
+    let targetEmail = identifier.trim();
+    const cleanInputStr = targetEmail.toLowerCase();
+    const cleanInputDigits = targetEmail.replace(/\D/g, '');
     const isInputDigits = cleanInputDigits.length >= 7;
 
     // Fetch central cloud store for multi-device sync
@@ -123,7 +124,7 @@ export async function POST(req) {
       }
 
       // Save to server store as background sync
-      saveServerUser({
+      await saveServerUser({
         email: registeredUser.email,
         password: inputPwd,
         full_name: registeredUser.full_name,
