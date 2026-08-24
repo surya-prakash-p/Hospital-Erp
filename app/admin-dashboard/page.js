@@ -147,6 +147,14 @@ export default function AdminDashboardPage() {
   const [staffToDelete, setStaffToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Reset Password State
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [staffToReset, setStaffToReset] = useState(null);
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
   // Edit Roles & Permissions Form State
   const [editRoles, setEditRoles] = useState([]);
   const [editPermissions, setEditPermissions] = useState([]);
@@ -410,6 +418,53 @@ export default function AdminDashboardPage() {
       showToast(err.message || "Failed to delete staff member", "error");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleExecutePasswordReset = async (e) => {
+    e.preventDefault();
+    if (!staffToReset) return;
+
+    if (!resetNewPassword || resetNewPassword.trim().length < 4) {
+      showToast("Password must be at least 4 characters long", "error");
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      showToast("New password and confirm password do not match", "error");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      await createStaffUser({
+        id: staffToReset.id,
+        email: staffToReset.email,
+        mobile_no: staffToReset.mobile_no,
+        password: resetNewPassword.trim(),
+        full_name: staffToReset.full_name,
+        roles: staffToReset.roles || [staffToReset.designation || "Staff Member"],
+        permissions: staffToReset.permissions || [],
+        department: staffToReset.department || "",
+        designation: staffToReset.designation || "",
+        status: staffToReset.status || "Active"
+      });
+
+      addSystemActivityLog(
+        "Staff Password Reset",
+        `Password updated for ${staffToReset.full_name} (${staffToReset.email || staffToReset.mobile_no})`,
+        "user"
+      );
+      showToast(`Password successfully reset for ${staffToReset.full_name}!`, "success");
+      setIsResetModalOpen(false);
+      setStaffToReset(null);
+      setResetNewPassword("");
+      setResetConfirmPassword("");
+      await loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to reset password", "error");
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -943,6 +998,18 @@ export default function AdminDashboardPage() {
                               title="Edit Staff Profile"
                             >
                               <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setStaffToReset(staff);
+                                setResetNewPassword("");
+                                setResetConfirmPassword("");
+                                setIsResetModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title="Reset Staff Password"
+                            >
+                              <KeyRound className="w-4 h-4" />
                             </button>
                             {(isHospitalAdmin || user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*')) && (
                               <button
@@ -1722,6 +1789,121 @@ export default function AdminDashboardPage() {
                 )}
               </button>
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 8. Reset Staff Password Modal */}
+      {isResetModalOpen && staffToReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Reset Staff Password</h3>
+                  <p className="text-xs text-slate-500 font-medium">Update login password for {staffToReset.full_name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetModalOpen(false);
+                  setStaffToReset(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecutePasswordReset} className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1">
+                <p className="text-slate-900 font-bold">{staffToReset.full_name}</p>
+                <p className="text-slate-500 font-medium">
+                  {staffToReset.email || 'No email'} • Mobile: <strong className="text-slate-800">{staffToReset.mobile_no || 'N/A'}</strong>
+                </p>
+                <div className="flex items-center gap-1.5 pt-1">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700">
+                    {staffToReset.roles ? staffToReset.roles[0] : (staffToReset.designation || 'Staff')}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                    {staffToReset.department || 'General Medicine'}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">New Password *</Label>
+                <div className="relative">
+                  <Input
+                    type={showResetPassword ? "text" : "password"}
+                    required
+                    placeholder="Enter new strong password"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="pr-10 text-xs py-2 rounded-xl"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">Confirm New Password *</Label>
+                <Input
+                  type={showResetPassword ? "text" : "password"}
+                  required
+                  placeholder="Re-enter new password to confirm"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  className="text-xs py-2 rounded-xl"
+                />
+              </div>
+
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-800 font-medium flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>Updating this password will immediately invalidate the staff member's old password across all devices.</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetModalOpen(false);
+                    setStaffToReset(null);
+                  }}
+                  disabled={isResettingPassword}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isResettingPassword}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isResettingPassword ? (
+                    <span>Updating Password...</span>
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4" />
+                      <span>Save & Apply New Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
 
           </div>
         </div>
