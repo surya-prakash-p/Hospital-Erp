@@ -66,11 +66,7 @@ const PERMISSION_OPTIONS = [
 
 // Initial fallback activities if local storage is empty
 const INITIAL_SYSTEM_ACTIVITIES = [
-  { id: "act-1", title: "New staff user created", desc: "Dr. Rajesh Kumar (Doctor)", time: "09:30 AM", type: "user", color: "bg-amber-50 text-amber-600 border-amber-200" },
-  { id: "act-2", title: "Role permission updated", desc: "Chief Pharmacist role permissions granted", time: "09:15 AM", type: "role", color: "bg-blue-50 text-blue-600 border-blue-200" },
-  { id: "act-3", title: "Department added", desc: "Diagnostics & Laboratory Block", time: "08:45 AM", type: "dept", color: "bg-emerald-50 text-emerald-600 border-emerald-200" },
-  { id: "act-4", title: "Staff profile updated", desc: "Priya Sundaram (Front Desk)", time: "08:10 AM", type: "profile", color: "bg-rose-50 text-rose-600 border-rose-200" },
-  { id: "act-5", title: "System backup completed", desc: "Daily Frappe Cloud automated sync", time: "02:30 AM", type: "system", color: "bg-teal-50 text-teal-600 border-teal-200" }
+  { id: "act-1", title: "Hospital ERP System Initialized", desc: "Hospital Admin Portal Online", time: "09:00 AM", type: "system", color: "bg-emerald-50 text-emerald-600 border-emerald-200" }
 ];
 
 export default function AdminDashboardPage() {
