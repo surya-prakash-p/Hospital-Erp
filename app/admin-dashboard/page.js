@@ -199,28 +199,17 @@ export default function AdminDashboardPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const data = await getStaffUsers();
-      setStaffUsers(data);
-
-      if (typeof window !== 'undefined') {
-        const savedActivities = localStorage.getItem('hospital_system_activities');
-        if (savedActivities) {
-          setActivities(JSON.parse(savedActivities));
-        } else {
-          // Generate initial activities based on loaded staff members
-          const generated = (data || []).slice(0, 5).map((s, idx) => ({
-            id: `act-gen-${idx}`,
-            title: "Staff user active",
-            desc: `${s.full_name} (${s.roles ? s.roles[0] : "Staff"})`,
-            time: `${10 - idx}:15 AM`,
-            type: "user",
-            color: "bg-amber-50 text-amber-600 border-amber-200"
-          }));
-          const initialLogs = generated.length > 0 ? generated : INITIAL_SYSTEM_ACTIVITIES;
-          setActivities(initialLogs);
-          localStorage.setItem('hospital_system_activities', JSON.stringify(initialLogs));
+      const res = await fetch('/api/users/manage', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setStaffUsers(data.users || []);
+          setActivities(data.activities || []);
+          return;
         }
       }
+      const data = await getStaffUsers();
+      setStaffUsers(data || []);
     } catch (e) {
       showToast("Error loading staff directory", "error");
     } finally {

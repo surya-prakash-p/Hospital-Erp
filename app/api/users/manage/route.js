@@ -53,14 +53,19 @@ async function frappeFetch(endpoint, options = {}) {
   return json;
 }
 
-import { saveServerUser, deleteServerUser, readCloudStore } from '@/lib/server-user-store';
+export const dynamic = 'force-dynamic';
 
-// GET: List all users from Cloud Store
+import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
+
+// GET: List all users and central activities from Cloud Store
 export async function GET(req) {
   try {
     const cloudData = await readCloudStore();
-    const cloudUsers = cloudData.users || [];
-    return NextResponse.json({ success: true, users: cloudUsers });
+    return NextResponse.json({
+      success: true,
+      users: cloudData.users || [],
+      activities: cloudData.activities || []
+    });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -78,10 +83,11 @@ export async function DELETE(req) {
 
     const cleanIdentifier = identifier.trim();
 
-    // 1. Delete from server-side credentials store
+    // 1. Delete from Central Cloud Database
     await deleteServerUser(cleanIdentifier);
+    await addCloudActivity("Staff Member Deleted", `Identifier: ${cleanIdentifier}`, "user");
 
-    // 2. Delete from Frappe Cloud if enabled
+    // 2. Delete from Frappe Cloud User Doctype if enabled
     if (apiKey && apiSecret) {
       try {
         await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanIdentifier)}`, {
@@ -114,7 +120,7 @@ export async function POST(req) {
     const lastName = nameParts.slice(1).join(' ') || '';
     const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ['Staff Member'];
 
-    // Always persist to server-side credentials store for immediate, seamless login
+    // Always persist to Central Cloud Database for immediate, seamless login & multi-device sync
     await saveServerUser({
       email: cleanEmail,
       password: password,
@@ -125,6 +131,12 @@ export async function POST(req) {
       department: department || '',
       designation: designation || userRoles[0]
     });
+
+    if (password) {
+      await addCloudActivity("New staff user created", `${full_name || cleanEmail} (${userRoles[0]})`, "user");
+    } else {
+      await addCloudActivity("Staff Profile Updated", `${full_name || cleanEmail} (${userRoles[0]})`, "profile");
+    }
 
     let frappeUser = null;
 
