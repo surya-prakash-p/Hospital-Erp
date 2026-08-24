@@ -16,7 +16,7 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
-import { findServerUser, saveServerUser, isUserDeleted } from '@/lib/server-user-store';
+import { findServerUser, saveServerUser, isUserDeleted, findServerUserByIdentifier } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
@@ -32,57 +32,32 @@ export async function POST(req) {
       return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
     }
 
-    // 1. Check server-side persistent credentials store first (for instant, reliable login by email or mobile)
-    let localMatchedUser = findServerUser(targetEmail, password);
+    // 1. Check if user is registered in server-side persistent credentials store
+    const registeredUser = findServerUserByIdentifier(targetEmail);
 
-    // If not in server store, search localStaff backup sent from browser localStorage
-    if (!localMatchedUser && Array.isArray(localStaff) && localStaff.length > 0) {
-      const cleanInput = targetEmail.toLowerCase();
-      const cleanInputDigits = targetEmail.replace(/\D/g, '');
-      const isDigits = cleanInputDigits.length >= 7;
-
-      const foundInLocal = localStaff.find(s => {
-        const sEmail = (s.email || '').trim().toLowerCase();
-        const sMobileDigits = (s.mobile_no || s.phone || s.mobile || '').replace(/\D/g, '');
-        const sPassword = (s.password || '').trim();
-        const inputPwd = (password || '').trim();
-
-        const emailMatch = Boolean(sEmail && sEmail === cleanInput);
-        const mobileMatch = Boolean(isDigits && sMobileDigits.length >= 7 && (
-          sMobileDigits === cleanInputDigits ||
-          sMobileDigits.endsWith(cleanInputDigits) ||
-          cleanInputDigits.endsWith(sMobileDigits)
-        ));
-
-        const passwordMatch = Boolean(sPassword && inputPwd && sPassword === inputPwd);
-
-        return (emailMatch || mobileMatch) && passwordMatch;
-      });
-
-      if (foundInLocal) {
-        localMatchedUser = saveServerUser({
-          email: foundInLocal.email,
-          password: password,
-          full_name: foundInLocal.full_name,
-          mobile_no: foundInLocal.mobile_no || foundInLocal.phone,
-          roles: foundInLocal.roles || [foundInLocal.role || 'Staff Member'],
-          permissions: foundInLocal.permissions || [],
-          department: foundInLocal.department || '',
-          designation: foundInLocal.designation || foundInLocal.role
-        });
+    if (registeredUser) {
+      if (isUserDeleted(registeredUser.email) || isUserDeleted(registeredUser.mobile_no)) {
+        return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
       }
-    }
 
-    if (localMatchedUser) {
+      // Check password strictly against registered user's current password
+      const storedPwd = (registeredUser.password || '').trim();
+      const inputPwd = (password || '').trim();
+
+      if (!inputPwd || !storedPwd || storedPwd !== inputPwd) {
+        return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
+      }
+
+      // Password matches registered user -> LOGIN SUCCESS
       const userObj = {
-        email: localMatchedUser.email,
-        full_name: localMatchedUser.full_name,
-        name: localMatchedUser.full_name,
-        mobile_no: localMatchedUser.mobile_no,
-        roles: localMatchedUser.roles || ['Staff Member'],
-        permissions: localMatchedUser.permissions || [],
-        department: localMatchedUser.department || '',
-        designation: localMatchedUser.designation || ''
+        email: registeredUser.email,
+        full_name: registeredUser.full_name,
+        name: registeredUser.full_name,
+        mobile_no: registeredUser.mobile_no,
+        roles: registeredUser.roles || ['Staff Member'],
+        permissions: registeredUser.permissions || [],
+        department: registeredUser.department || '',
+        designation: registeredUser.designation || ''
       };
 
       const response = NextResponse.json({ success: true, user: userObj });
