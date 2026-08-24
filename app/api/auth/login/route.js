@@ -16,7 +16,7 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
-import { findServerUser, saveServerUser, isUserDeleted, findServerUserByIdentifier, readServerUsers } from '@/lib/server-user-store';
+import { findServerUser, saveServerUser, isUserDeleted, findServerUserByIdentifier, readServerUsers, readCloudStore } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
@@ -30,8 +30,13 @@ export async function POST(req) {
     const cleanInputDigits = identifier.replace(/\D/g, '');
     const isInputDigits = cleanInputDigits.length >= 7;
 
+    // Fetch central cloud store for multi-device sync
+    const cloudStore = await readCloudStore();
+    const serverUsers = cloudStore.users || readServerUsers();
+    const serverDeleted = cloudStore.deleted || [];
+
     // Check if identifier is in localDeleted or server deleted list
-    const isDeletedOnServer = isUserDeleted(identifier);
+    const isDeletedOnServer = isUserDeleted(identifier, serverDeleted);
     const isDeletedOnClient = Array.isArray(localDeleted) && localDeleted.some(d => {
       const dStr = (d || '').trim().toLowerCase();
       const dDigits = dStr.replace(/\D/g, '');
@@ -44,7 +49,6 @@ export async function POST(req) {
     }
 
     // Merge server users with localStaff sent from client browser
-    const serverUsers = readServerUsers();
     let mergedUsersMap = new Map();
 
     // 1. Add server users first

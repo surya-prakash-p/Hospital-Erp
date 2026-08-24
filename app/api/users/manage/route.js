@@ -53,43 +53,18 @@ async function frappeFetch(endpoint, options = {}) {
   return json;
 }
 
-// GET: List all users from Frappe
+import { saveServerUser, deleteServerUser, readCloudStore } from '@/lib/server-user-store';
+
+// GET: List all users from Cloud Store
 export async function GET(req) {
   try {
-    if (apiKey && apiSecret) {
-      try {
-        const data = await frappeFetch('/api/resource/User?fields=["name","email","first_name","last_name","full_name","mobile_no","enabled","user_type"]&limit=200');
-        const users = data.data || [];
-        
-        // Fetch detailed roles for each user in parallel
-        const usersWithRoles = await Promise.all(users.map(async (u) => {
-          try {
-            const userDetail = await frappeFetch(`/api/resource/User/${encodeURIComponent(u.name)}`);
-            const info = userDetail.data || {};
-            const roles = (info.roles || []).map(r => r.role);
-            return {
-              ...u,
-              roles: roles.length > 0 ? roles : ['Staff Member']
-            };
-          } catch (err) {
-            return { ...u, roles: ['Staff Member'] };
-          }
-        }));
-
-        return NextResponse.json({ success: true, users: usersWithRoles });
-      } catch (err) {
-        console.warn("Frappe user fetch failed, fallback to local users", err.message);
-      }
-    }
-
-    return NextResponse.json({ success: true, users: [] });
-
+    const cloudData = await readCloudStore();
+    const cloudUsers = cloudData.users || [];
+    return NextResponse.json({ success: true, users: cloudUsers });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-
-import { saveServerUser, deleteServerUser } from '@/lib/server-user-store';
 
 // DELETE: Remove User from Backend Credentials & Frappe
 export async function DELETE(req) {
