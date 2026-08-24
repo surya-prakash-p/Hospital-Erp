@@ -37,7 +37,8 @@ export default function LoginPage() {
 
   const handleRoleSelect = (roleName) => {
     setSelectedRole(roleName);
-    if (demoAccounts[roleName]) {
+    // Only auto-fill demo credentials if the user has not typed an identifier/password yet
+    if (demoAccounts[roleName] && (!identifier.trim() || !password)) {
       const account = demoAccounts[roleName];
       setIdentifier(loginMode === 'mobile' ? account.mobile : account.email);
       setPassword(account.pass);
@@ -47,10 +48,6 @@ export default function LoginPage() {
   const toggleLoginMode = (mode) => {
     setLoginMode(mode);
     setError('');
-    if (selectedRole && demoAccounts[selectedRole]) {
-      const account = demoAccounts[selectedRole];
-      setIdentifier(mode === 'mobile' ? account.mobile : account.email);
-    }
   };
 
   const handleSubmit = async (e) => {

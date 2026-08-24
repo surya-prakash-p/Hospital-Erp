@@ -20,7 +20,7 @@ import { findServerUser, saveServerUser } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
-    const { identifier, password } = await req.json();
+    const { identifier, password, localStaff } = await req.json();
 
     if (!identifier || !password) {
       return NextResponse.json({ error: 'Please enter Email / Mobile Number and Password' }, { status: 400 });
@@ -29,7 +29,42 @@ export async function POST(req) {
     let targetEmail = identifier.trim();
 
     // 1. Check server-side persistent credentials store first (for instant, reliable login by email or mobile)
-    const localMatchedUser = findServerUser(targetEmail, password);
+    let localMatchedUser = findServerUser(targetEmail, password);
+
+    // If not in server store, search localStaff backup sent from browser localStorage
+    if (!localMatchedUser && Array.isArray(localStaff) && localStaff.length > 0) {
+      const cleanInput = targetEmail.toLowerCase();
+      const cleanInputDigits = targetEmail.replace(/\D/g, '');
+      const isDigits = cleanInputDigits.length >= 7;
+
+      const foundInLocal = localStaff.find(s => {
+        const sEmail = (s.email || '').trim().toLowerCase();
+        const sMobileDigits = (s.mobile_no || s.phone || s.mobile || '').replace(/\D/g, '');
+
+        const emailMatch = Boolean(sEmail && sEmail === cleanInput);
+        const mobileMatch = Boolean(isDigits && sMobileDigits.length >= 7 && (
+          sMobileDigits === cleanInputDigits ||
+          sMobileDigits.endsWith(cleanInputDigits) ||
+          cleanInputDigits.endsWith(sMobileDigits)
+        ));
+
+        return emailMatch || mobileMatch;
+      });
+
+      if (foundInLocal) {
+        localMatchedUser = saveServerUser({
+          email: foundInLocal.email,
+          password: password || foundInLocal.password,
+          full_name: foundInLocal.full_name,
+          mobile_no: foundInLocal.mobile_no || foundInLocal.phone,
+          roles: foundInLocal.roles || [foundInLocal.role || 'Staff Member'],
+          permissions: foundInLocal.permissions || [],
+          department: foundInLocal.department || '',
+          designation: foundInLocal.designation || foundInLocal.role
+        });
+      }
+    }
+
     if (localMatchedUser) {
       const userObj = {
         email: localMatchedUser.email,

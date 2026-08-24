@@ -112,7 +112,7 @@ export async function POST(req) {
       email: cleanEmail,
       password: password,
       full_name: full_name || cleanEmail,
-      mobile_no: mobile_no || cleanEmail,
+      mobile_no: mobile_no || '',
       roles: userRoles,
       permissions: permissions || [],
       department: department || '',
