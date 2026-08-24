@@ -3,59 +3,30 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { 
-  User, 
   Lock, 
   Eye, 
   EyeOff, 
   ShieldCheck, 
-  ChevronDown, 
   AlertCircle, 
   Loader2,
-  Phone,
   Mail
 } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [loginMode, setLoginMode] = useState('username'); // 'username' | 'mobile'
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Quick Demo credentials mapping
-  const demoAccounts = {
-    'Hospital Admin': { email: 'admin@thangamhospital.com', mobile: '9900000001', pass: 'AdminPassword123!' },
-    'Doctor': { email: 'doctor@thangamhospital.com', mobile: '9900000002', pass: 'DoctorPassword123!' },
-    'Pharmacist': { email: 'pharmacy@thangamhospital.com', mobile: '9900000003', pass: 'PharmaPassword123!' },
-    'Receptionist': { email: 'reception@thangamhospital.com', mobile: '9900000004', pass: 'ReceptPassword123!' },
-    'Lab Technician': { email: 'lab@thangamhospital.com', mobile: '9900000005', pass: 'LabPassword123!' }
-  };
-
-  const handleRoleSelect = (roleName) => {
-    setSelectedRole(roleName);
-    // Only auto-fill demo credentials if the user has not typed an identifier/password yet
-    if (demoAccounts[roleName] && (!identifier.trim() || !password)) {
-      const account = demoAccounts[roleName];
-      setIdentifier(loginMode === 'mobile' ? account.mobile : account.email);
-      setPassword(account.pass);
-    }
-  };
-
-  const toggleLoginMode = (mode) => {
-    setLoginMode(mode);
-    setError('');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!identifier.trim()) {
-      setError(loginMode === 'mobile' ? 'Please enter your mobile number' : 'Please enter your username or email');
+      setError('Please enter your Email Address or Mobile Number');
       return;
     }
 
@@ -78,7 +49,7 @@ export default function LoginPage() {
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
       
       {/* Outer Main Container Card */}
-      <div className="w-full max-w-6xl bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-2xl p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="w-full max-w-5xl bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-2xl p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         
         {/* LEFT PANEL: Branding & Actual Thangam Hospital Image */}
         <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
@@ -110,7 +81,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Actual Thangam Hospital Building Photo (Clean with no overlay badges) */}
+          {/* Actual Thangam Hospital Building Photo */}
           <div className="relative rounded-2xl overflow-hidden shadow-xl border border-white/80 group">
             <img 
               src="/thangam_hospital_building.jpg" 
@@ -132,7 +103,7 @@ export default function LoginPage() {
                 Welcome Back
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Sign in to access your dashboard
+                Sign in to access your hospital portal
               </p>
             </div>
             
@@ -151,20 +122,20 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Username / Email or Mobile Field */}
+            {/* Email Address or Mobile Number Input */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">
-                {loginMode === 'mobile' ? 'Mobile Number' : 'Username / Email'}
+                Email Address or Mobile Number
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  {loginMode === 'mobile' ? <Phone className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                  <Mail className="w-4 h-4" />
                 </div>
                 <input
-                  type={loginMode === 'mobile' ? 'tel' : 'text'}
+                  type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder={loginMode === 'mobile' ? 'Enter your 10-digit mobile number' : 'Enter your username or email'}
+                  placeholder="Enter email or 10-digit mobile number"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                   required
                 />
@@ -219,38 +190,11 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Select Role Dropdown */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-xs font-semibold text-slate-700">
-                Select Role
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-blue-600">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => handleRoleSelect(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-800 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer"
-                >
-                  <option value="">Select your role</option>
-                  <option value="Hospital Admin">Hospital Admin</option>
-                  <option value="Doctor">Doctor</option>
-                  <option value="Pharmacist">Pharmacist</option>
-                  <option value="Receptionist">Receptionist</option>
-                  <option value="Lab Technician">Lab Technician</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
-                  <ChevronDown className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-
             {/* Sign In Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+              className="w-full mt-3 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -266,37 +210,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400">
-              <span className="bg-white px-3">OR</span>
-            </div>
-          </div>
-
-          {/* Sign in with Mobile Number Button */}
-          <button
-            type="button"
-            onClick={() => toggleLoginMode(loginMode === 'mobile' ? 'username' : 'mobile')}
-            className="w-full py-2.5 px-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-xs"
-          >
-            {loginMode === 'mobile' ? (
-              <>
-                <Mail className="w-4 h-4 text-blue-600" />
-                Sign in with Email / Username
-              </>
-            ) : (
-              <>
-                <Phone className="w-4 h-4 text-emerald-600" />
-                Sign in with Mobile Number
-              </>
-            )}
-          </button>
-
           {/* Footer Copyright */}
-          <div className="mt-6 text-center text-[11px] text-slate-400 font-normal">
+          <div className="mt-8 text-center text-[11px] text-slate-400 font-normal">
             © 2026 Thangam Hospitals. All rights reserved.
           </div>
 
