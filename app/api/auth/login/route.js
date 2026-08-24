@@ -16,24 +16,94 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
-import { findServerUser, saveServerUser, isUserDeleted, findServerUserByIdentifier } from '@/lib/server-user-store';
+import { findServerUser, saveServerUser, isUserDeleted, findServerUserByIdentifier, readServerUsers } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
-    const { identifier, password, localStaff } = await req.json();
+    const { identifier, password, localStaff, localDeleted } = await req.json();
 
     if (!identifier || !password) {
       return NextResponse.json({ error: 'Please enter Email / Mobile Number and Password' }, { status: 400 });
     }
 
-    let targetEmail = identifier.trim();
+    const cleanInputStr = identifier.trim().toLowerCase();
+    const cleanInputDigits = identifier.replace(/\D/g, '');
+    const isInputDigits = cleanInputDigits.length >= 7;
 
-    if (isUserDeleted(targetEmail)) {
+    // Check if identifier is in localDeleted or server deleted list
+    const isDeletedOnServer = isUserDeleted(identifier);
+    const isDeletedOnClient = Array.isArray(localDeleted) && localDeleted.some(d => {
+      const dStr = (d || '').trim().toLowerCase();
+      const dDigits = dStr.replace(/\D/g, '');
+      return (dStr && cleanInputStr && (dStr === cleanInputStr || dStr.includes(cleanInputStr))) ||
+             (isInputDigits && dDigits.length >= 7 && (dDigits === cleanInputDigits || dDigits.endsWith(cleanInputDigits) || cleanInputDigits.endsWith(dDigits)));
+    });
+
+    if (isDeletedOnServer || isDeletedOnClient) {
       return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
     }
 
-    // 1. Check if user is registered in server-side persistent credentials store
-    const registeredUser = findServerUserByIdentifier(targetEmail);
+    // Merge server users with localStaff sent from client browser
+    const serverUsers = readServerUsers();
+    let mergedUsersMap = new Map();
+
+    // 1. Add server users first
+    serverUsers.forEach(u => {
+      const key = (u.email || u.mobile_no || '').toLowerCase();
+      if (key) mergedUsersMap.set(key, { ...u });
+    });
+
+    // 2. Override with localStaff sent from client (has latest updated passwords)
+    if (Array.isArray(localStaff) && localStaff.length > 0) {
+      localStaff.forEach(lu => {
+        const emailKey = (lu.email || '').toLowerCase();
+        const mobileDigits = (lu.mobile_no || lu.phone || '').replace(/\D/g, '');
+
+        let matchKey = null;
+        for (let [k, v] of mergedUsersMap.entries()) {
+          const vEmail = (v.email || '').toLowerCase();
+          const vMobileDigits = (v.mobile_no || '').replace(/\D/g, '');
+
+          const emailMatch = Boolean(emailKey && vEmail && emailKey === vEmail);
+          const mobileMatch = Boolean(mobileDigits.length >= 7 && vMobileDigits.length >= 7 && (
+            mobileDigits === vMobileDigits || mobileDigits.endsWith(vMobileDigits) || vMobileDigits.endsWith(mobileDigits)
+          ));
+
+          if (emailMatch || mobileMatch) {
+            matchKey = k;
+            break;
+          }
+        }
+
+        if (matchKey) {
+          const existing = mergedUsersMap.get(matchKey);
+          mergedUsersMap.set(matchKey, {
+            ...existing,
+            ...lu,
+            password: (lu.password || '').trim() || existing.password
+          });
+        } else if (emailKey || mobileDigits) {
+          mergedUsersMap.set(emailKey || mobileDigits, { ...lu, password: (lu.password || '').trim() });
+        }
+      });
+    }
+
+    const allUsers = Array.from(mergedUsersMap.values());
+
+    // Find user in merged list
+    const registeredUser = allUsers.find(u => {
+      const userEmail = (u.email || '').trim().toLowerCase();
+      const userMobileDigits = (u.mobile_no || u.phone || '').replace(/\D/g, '');
+
+      const matchesEmail = Boolean(userEmail && userEmail === cleanInputStr);
+      const matchesMobile = Boolean(isInputDigits && userMobileDigits.length >= 7 && (
+        userMobileDigits === cleanInputDigits ||
+        userMobileDigits.endsWith(cleanInputDigits) ||
+        cleanInputDigits.endsWith(userMobileDigits)
+      ));
+
+      return matchesEmail || matchesMobile;
+    });
 
     if (registeredUser) {
       if (isUserDeleted(registeredUser.email) || isUserDeleted(registeredUser.mobile_no)) {
@@ -47,6 +117,18 @@ export async function POST(req) {
       if (!inputPwd || !storedPwd || storedPwd !== inputPwd) {
         return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
       }
+
+      // Save to server store as background sync
+      saveServerUser({
+        email: registeredUser.email,
+        password: inputPwd,
+        full_name: registeredUser.full_name,
+        mobile_no: registeredUser.mobile_no,
+        roles: registeredUser.roles,
+        permissions: registeredUser.permissions,
+        department: registeredUser.department,
+        designation: registeredUser.designation
+      });
 
       // Password matches registered user -> LOGIN SUCCESS
       const userObj = {
