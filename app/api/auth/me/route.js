@@ -16,6 +16,8 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
+import { isUserDeleted } from '@/lib/server-user-store';
+
 export async function GET(req) {
   try {
     const cookie = req.cookies.get('hospital_erp_user');
@@ -24,6 +26,13 @@ export async function GET(req) {
     }
 
     let user = JSON.parse(cookie.value);
+
+    // Revoke session if user has been deleted by Admin
+    if (isUserDeleted(user.email) || isUserDeleted(user.mobile_no)) {
+      const response = NextResponse.json({ authenticated: false, error: 'Account has been deleted' }, { status: 401 });
+      response.cookies.delete('hospital_erp_user');
+      return response;
+    }
 
     // Fetch fresh roles from Frappe Cloud if API credentials exist
     if (user.email && apiKey && apiSecret) {
