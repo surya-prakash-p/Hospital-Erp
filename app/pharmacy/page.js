@@ -112,7 +112,16 @@ export default function PharmacyPage() {
   const [newMedData, setNewMedData] = useState({
     medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
     dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
-    reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", gst: 12.0, expiry_date: ""
+    reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
+    batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 30, no_of_packs: 10
+  });
+
+  // Add Batch to Existing Medicine State
+  const [showAddBatchModal, setShowAddBatchModal] = useState(false);
+  const [addBatchMed, setAddBatchMed] = useState(null);
+  const [newBatchData, setNewBatchData] = useState({
+    batch_number: "", supplier: "ABC Pharma", mfg_date: "", exp_date: "",
+    pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01"
   });
 
   // PO & GRN States
@@ -126,7 +135,9 @@ export default function PharmacyPage() {
   const [selectedPO, setSelectedPO] = useState(null);
   const [grnItems, setGrnItems] = useState([]);
   const [grnAddMedName, setGrnAddMedName] = useState("");
-  const [grnAddQty, setGrnAddQty] = useState(100);
+  const [grnAddPackSize, setGrnAddPackSize] = useState(30);
+  const [grnAddPacksQty, setGrnAddPacksQty] = useState(10);
+  const [grnAddQty, setGrnAddQty] = useState(300);
   const [grnAddPrice, setGrnAddPrice] = useState("");
 
   // Supplier States
@@ -933,58 +944,427 @@ export default function PharmacyPage() {
     }
   };
 
-  // Add new medicine record
+  // Add new medicine record with mandatory Batch Number & Pack Size calculation
   const handleAddNewMedicine = async (e) => {
     e.preventDefault();
     if (!newMedData.medicine_name || !newMedData.generic_name || !newMedData.selling_price) {
-      showToast("Medicine Name, Generic Name, and Selling Price are required", "error");
+      showToast("Medicine Name, Generic Name, and Selling Price (MRP) are required", "error");
       return;
     }
+
+    // MANDATORY BATCH NUMBER CHECK
+    if (!newMedData.batch_number || !newMedData.batch_number.trim()) {
+      showToast("Batch Number is mandatory when adding a medicine batch", "error");
+      return;
+    }
+
+    if (!newMedData.expiry_date) {
+      showToast("Expiry Date is mandatory for medicine batch", "error");
+      return;
+    }
+
+    const packSize = parseInt(newMedData.pack_size) || 1;
+    const noOfPacks = parseFloat(newMedData.no_of_packs) || 0;
+    const totalUnits = packSize * noOfPacks;
 
     try {
       const data = {
         ...newMedData,
         purchase_price: parseFloat(newMedData.purchase_price) || 0.0,
         selling_price: parseFloat(newMedData.selling_price) || 0.0,
+        mrp: parseFloat(newMedData.mrp) || parseFloat(newMedData.selling_price) || 0.0,
         min_stock: parseInt(newMedData.min_stock) || 50,
         max_stock: parseInt(newMedData.max_stock) || 500,
         reorder_level: parseInt(newMedData.reorder_level) || 100,
         prescription_required: newMedData.category !== "OTC" ? 1 : 0,
         controlled_drug: newMedData.category === "Controlled Drug" ? 1 : 0,
         sleeping_pill: newMedData.category === "Sleeping Pill" ? 1 : 0,
-        stock: 0
+        stock: totalUnits
       };
 
       await createMedicine(data);
 
-      if (newMedData.expiry_date && typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
          const batches = JSON.parse(localStorage.getItem('hospital_batches')) || [];
-         batches.push({
-           batch_number: `BATCH-${data.medicine_name.split(" ")[0].toUpperCase()}-${Math.floor(1000 + Math.random()*9000)}`,
+         batches.unshift({
+           batch_number: newMedData.batch_number.trim().toUpperCase(),
            medicine: data.medicine_name,
-           mfg_date: new Date().toISOString().split("T")[0],
+           supplier: newMedData.supplier || "ABC Pharma",
+           mfg_date: newMedData.mfg_date || null,
            exp_date: newMedData.expiry_date,
-           current_stock: 0,
+           pack_size: packSize,
+           no_of_packs: noOfPacks,
+           total_units: totalUnits,
+           current_stock: totalUnits,
            purchase_price: data.purchase_price,
+           mrp: data.mrp,
            selling_price: data.selling_price,
-           supplier: "Default Supplier",
-           rack_location: data.rack_location
+           rack_location: data.rack_location || "Rack A-01"
          });
          localStorage.setItem('hospital_batches', JSON.stringify(batches));
       }
 
-      showToast(`Successfully added ${newMedData.medicine_name} to medicine index!`, "success");
+      showToast(`Successfully registered ${newMedData.medicine_name} (Batch: ${newMedData.batch_number.toUpperCase()}, Total: ${totalUnits} units)!`, "success");
       setIsAddModalOpen(false);
       setNewMedData({
         medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
         dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
-        reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", gst: 12.0, expiry_date: ""
+        reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
+        batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 30, no_of_packs: 10
       });
       loadAllData();
     } catch (err) {
       console.error(err);
       showToast("Failed to create medicine entry", "error");
     }
+  };
+
+  // Add a new batch to an existing medicine catalog item
+  const handleAddBatchToExistingMedicine = async (e) => {
+    e.preventDefault();
+    if (!addBatchMed) return;
+    if (!newBatchData.batch_number || !newBatchData.batch_number.trim()) {
+      showToast("Batch Number is mandatory", "error");
+      return;
+    }
+    if (!newBatchData.exp_date) {
+      showToast("Expiry Date is mandatory", "error");
+      return;
+    }
+    const packSize = parseInt(newBatchData.pack_size) || 1;
+    const noOfPacks = parseFloat(newBatchData.no_of_packs) || 0;
+    const totalUnits = packSize * noOfPacks;
+
+    try {
+      const batches = JSON.parse(localStorage.getItem('hospital_batches')) || [];
+      const batchNoUpper = newBatchData.batch_number.trim().toUpperCase();
+      const existingBatch = batches.find(b => b.medicine === addBatchMed.medicine_name && b.batch_number === batchNoUpper);
+      
+      if (existingBatch) {
+        showToast(`Batch ${batchNoUpper} already exists for ${addBatchMed.medicine_name}.`, "error");
+        return;
+      }
+
+      batches.unshift({
+        batch_number: batchNoUpper,
+        medicine: addBatchMed.medicine_name,
+        supplier: newBatchData.supplier || "ABC Pharma",
+        mfg_date: newBatchData.mfg_date || null,
+        exp_date: newBatchData.exp_date,
+        pack_size: packSize,
+        no_of_packs: noOfPacks,
+        total_units: totalUnits,
+        current_stock: totalUnits,
+        purchase_price: parseFloat(newBatchData.purchase_price) || addBatchMed.purchase_price || 0,
+        mrp: parseFloat(newBatchData.mrp) || addBatchMed.selling_price || 0,
+        selling_price: parseFloat(newBatchData.mrp) || addBatchMed.selling_price || 0,
+        rack_location: newBatchData.rack_location || addBatchMed.rack_location || "Rack A-01"
+      });
+
+      localStorage.setItem('hospital_batches', JSON.stringify(batches));
+
+      await createStockMovementLog({
+        medicine: addBatchMed.medicine_name,
+        batch: batchNoUpper,
+        previous_stock: 0,
+        updated_stock: totalUnits,
+        adjustment_type: "Add Batch",
+        quantity: totalUnits,
+        reason: "New Batch Added to Inventory",
+        remarks: `Supplier: ${newBatchData.supplier || "ABC Pharma"} | Pack Size: ${packSize} x ${noOfPacks} packs`,
+        performed_by: pharmacistName
+      });
+
+      showToast(`Batch ${batchNoUpper} added successfully to ${addBatchMed.medicine_name}!`, "success");
+      setShowAddBatchModal(false);
+      setAddBatchMed(null);
+      setNewBatchData({
+        batch_number: "", supplier: "ABC Pharma", mfg_date: "", exp_date: "",
+        pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01"
+      });
+      loadAllData();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to add batch", "error");
+    }
+  };
+
+  // Dynamic Register Print Handler supporting All Schedules (Schedule H, H1, X, OTC, Controlled, Regular, All)
+  const handlePrintRegister = (scheduleFilter = categoryFilter) => {
+    let targetMeds = [];
+    let reportTitle = "Pharmacy Drug Register";
+    let badgeBg = "#fee2e2";
+    let badgeColor = "#991b1b";
+
+    if (scheduleFilter === "All" || !scheduleFilter) {
+      targetMeds = medicines;
+      reportTitle = "Master Pharmacy Drug Register (All Schedules)";
+      badgeBg = "#e0e7ff";
+      badgeColor = "#3730a3";
+    } else if (scheduleFilter === "Schedule H") {
+      targetMeds = medicines.filter(m => m.category === "Schedule H" || m.schedule_type === "Schedule H");
+      reportTitle = "Statutory Schedule H Drug Register";
+      badgeBg = "#fee2e2";
+      badgeColor = "#991b1b";
+    } else if (scheduleFilter === "Schedule H1") {
+      targetMeds = medicines.filter(m => m.category === "Schedule H1" || m.schedule_type === "Schedule H1");
+      reportTitle = "Statutory Schedule H1 Drug Register";
+      badgeBg = "#fed7aa";
+      badgeColor = "#9a3412";
+    } else if (scheduleFilter === "Schedule X") {
+      targetMeds = medicines.filter(m => m.category === "Schedule X" || m.schedule_type === "Schedule X");
+      reportTitle = "Statutory Schedule X Narcotics Register";
+      badgeBg = "#fef08a";
+      badgeColor = "#854d0e";
+    } else if (scheduleFilter === "Controlled Drug") {
+      targetMeds = medicines.filter(m => m.category === "Controlled Drug" || m.controlled_drug === 1);
+      reportTitle = "Statutory Controlled Drug Register";
+      badgeBg = "#f3e8ff";
+      badgeColor = "#6b21a8";
+    } else if (scheduleFilter === "OTC") {
+      targetMeds = medicines.filter(m => m.category === "OTC");
+      reportTitle = "OTC Medicine Inventory Register";
+      badgeBg = "#d1fae5";
+      badgeColor = "#065f46";
+    } else if (scheduleFilter === "Regular Medicine") {
+      targetMeds = medicines.filter(m => m.category === "Regular Medicine" || m.schedule_type === "None");
+      reportTitle = "Regular Medicine Inventory Register";
+      badgeBg = "#e2e8f0";
+      badgeColor = "#334155";
+    } else {
+      targetMeds = medicines.filter(m => m.category === scheduleFilter);
+      reportTitle = `${scheduleFilter} Drug Register`;
+    }
+
+    if (targetMeds.length === 0) {
+      showToast(`No medicines found for schedule: "${scheduleFilter === "All" ? "All Schedules" : scheduleFilter}"`, "error");
+      return;
+    }
+
+    const reportRows = [];
+    targetMeds.forEach(med => {
+      const medBatches = med.batches && med.batches.length > 0 
+        ? med.batches 
+        : [{
+            batch_number: "N/A",
+            pack_size: 10,
+            no_of_packs: 0,
+            total_units: med.stock || 0,
+            current_stock: med.stock || 0,
+            supplier: "N/A",
+            mfg_date: "N/A",
+            exp_date: "N/A",
+            rack_location: med.rack_location || "N/A"
+          }];
+
+      medBatches.forEach(b => {
+        const pSize = b.pack_size || 10;
+        const cStock = b.current_stock !== undefined ? b.current_stock : 0;
+        const nPacks = b.no_of_packs !== undefined ? b.no_of_packs : (pSize > 0 ? (cStock / pSize) : cStock);
+        reportRows.push({
+          medicine_name: med.medicine_name,
+          generic_name: med.generic_name || "N/A",
+          schedule: med.category || "Regular",
+          batch_number: b.batch_number || "N/A",
+          pack_size: pSize,
+          no_of_packs: typeof nPacks === 'number' ? (Number.isInteger(nPacks) ? nPacks : nPacks.toFixed(1)) : nPacks,
+          total_units: cStock,
+          supplier: b.supplier || "Default Supplier",
+          mfg_date: b.mfg_date || "N/A",
+          exp_date: b.exp_date || "N/A",
+          current_stock: cStock,
+          rack_location: b.rack_location || med.rack_location || "N/A"
+        });
+      });
+    });
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      showToast("Pop-up blocked! Please allow pop-ups to print the Register.", "error");
+      return;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${reportTitle} - THANGAM HOSPITAL</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 10mm;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              padding: 15px;
+              background: #fff;
+              font-size: 11px;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 2px solid #4338ca;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .hospital-title {
+              font-size: 22px;
+              font-weight: 800;
+              color: #1e1b4b;
+              margin: 0;
+              letter-spacing: 0.5px;
+            }
+            .pharmacy-subtitle {
+              font-size: 13px;
+              font-weight: 600;
+              color: #4f46e5;
+              margin-top: 3px;
+            }
+            .report-title {
+              font-size: 15px;
+              font-weight: 700;
+              color: #dc2626;
+              margin-top: 6px;
+              text-transform: uppercase;
+              letter-spacing: 0.8px;
+            }
+            .meta-info {
+              text-align: right;
+              font-size: 10px;
+              color: #475569;
+              line-height: 1.5;
+            }
+            .meta-info strong {
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            th, td {
+              border: 1px solid #cbd5e1;
+              padding: 6px 8px;
+              text-align: left;
+              font-size: 10px;
+            }
+            th {
+              background-color: #f1f5f9;
+              color: #1e293b;
+              font-weight: 700;
+              text-transform: uppercase;
+              font-size: 9px;
+              letter-spacing: 0.3px;
+            }
+            tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-mono { font-family: monospace; font-weight: 600; }
+            .badge-batch {
+              display: inline-block;
+              background: ${badgeBg};
+              color: ${badgeColor};
+              font-weight: bold;
+              padding: 1px 5px;
+              border-radius: 3px;
+              font-size: 9.5px;
+            }
+            .footer {
+              margin-top: 30px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              color: #64748b;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 12px;
+            }
+            .sign-box {
+              text-align: center;
+              width: 220px;
+              border-top: 1px dashed #94a3b8;
+              padding-top: 5px;
+              margin-top: 25px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="hospital-title">THANGAM HOSPITAL</h1>
+              <div class="pharmacy-subtitle">Central Pharmacy & Statutory Drug Store</div>
+              <div class="report-title">📋 ${reportTitle}</div>
+            </div>
+            <div class="meta-info">
+              <div><strong>Print Date:</strong> ${dateStr}</div>
+              <div><strong>Print Time:</strong> ${timeStr}</div>
+              <div><strong>Generated By:</strong> ${pharmacistName || "Chief Pharmacist"}</div>
+              <div><strong>Total Batches Logged:</strong> ${reportRows.length}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px;">#</th>
+                <th>Medicine Name</th>
+                <th>Generic Name</th>
+                <th>Batch Number</th>
+                <th class="text-center">Pack Size</th>
+                <th class="text-center">No. of Packs</th>
+                <th class="text-center">Total Units</th>
+                <th>Supplier</th>
+                <th class="text-center">MFG Date</th>
+                <th class="text-center">EXP Date</th>
+                <th class="text-center">Current Stock</th>
+                <th>Rack Location</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reportRows.map((r, idx) => `
+                <tr>
+                  <td class="text-center font-mono">${idx + 1}</td>
+                  <td><strong>${r.medicine_name}</strong></td>
+                  <td>${r.generic_name}</td>
+                  <td class="font-mono"><span class="badge-batch">${r.batch_number}</span></td>
+                  <td class="text-center font-mono">${r.pack_size}</td>
+                  <td class="text-center font-mono">${r.no_of_packs}</td>
+                  <td class="text-center font-mono"><strong>${r.total_units}</strong></td>
+                  <td>${r.supplier}</td>
+                  <td class="text-center font-mono">${r.mfg_date}</td>
+                  <td class="text-center font-mono">${r.exp_date}</td>
+                  <td class="text-center font-mono"><strong>${r.current_stock}</strong></td>
+                  <td class="font-mono">${r.rack_location}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div>Verified &amp; Printed in accordance with statutory Drugs and Cosmetics Rules, Government of India.</div>
+            <div class="sign-box">Authorized Registered Pharmacist Signature &amp; Stamp</div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   // Download report of medicines whose stock levels are below reorder limits
@@ -1088,19 +1468,28 @@ export default function PharmacyPage() {
     if (!grnAddMedName) return;
     const catMed = medicines.find(m => m.medicine_name === grnAddMedName);
     const price = parseFloat(grnAddPrice) || catMed?.purchase_price || 0;
+    const pSize = parseInt(grnAddPackSize) || 30;
+    const nPacks = parseFloat(grnAddPacksQty) || 10;
+    const totUnits = pSize * nPacks;
+
     const newItem = {
       medicine: grnAddMedName,
       batch_number: `BATCH-${grnAddMedName.split(" ")[0].toUpperCase()}-${Math.floor(1000 + Math.random()*9000)}`,
       mfg_date: new Date().toISOString().split("T")[0],
       exp_date: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split("T")[0],
-      quantity: parseInt(grnAddQty) || 100,
+      pack_size: pSize,
+      no_of_packs: nPacks,
+      quantity: totUnits,
       purchase_price: price,
       selling_price: catMed?.selling_price || price * 1.2,
+      mrp: catMed?.selling_price || price * 1.2,
       rack_location: catMed?.rack_location || "Rack A-01"
     };
     setGrnItems(prev => [...prev, newItem]);
     setGrnAddMedName("");
-    setGrnAddQty(100);
+    setGrnAddPackSize(30);
+    setGrnAddPacksQty(10);
+    setGrnAddQty(300);
     setGrnAddPrice("");
   };
 
@@ -1111,7 +1500,13 @@ export default function PharmacyPage() {
   const handleUpdateGRNItem = (index, field, value) => {
     setGrnItems(prev => prev.map((item, idx) => {
       if (idx === index) {
-        return { ...item, [field]: value };
+        const updated = { ...item, [field]: value };
+        if (field === 'pack_size' || field === 'no_of_packs') {
+          const ps = parseInt(field === 'pack_size' ? value : updated.pack_size) || 1;
+          const np = parseFloat(field === 'no_of_packs' ? value : updated.no_of_packs) || 0;
+          updated.quantity = ps * np;
+        }
+        return updated;
       }
       return item;
     }));
@@ -2026,16 +2421,19 @@ export default function PharmacyPage() {
             {/* Removed Sync Frappe Bench Button */}
 
             
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-serif">New Medicine Catalog Record</DialogTitle>
-                <DialogDescription>Add general medicine metadata. Batches are logged during goods receipt (GRN).</DialogDescription>
+                <DialogTitle className="font-serif text-base">New Medicine Catalog Record & Initial Batch</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Every medicine must be added with a mandatory Batch Number and Pack Size. Total units are calculated automatically.
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddNewMedicine} className="space-y-4 pt-2">
+                {/* Medicine Basic Details */}
                 <div className="space-y-1">
                   <Label htmlFor="med-name" className="text-xs font-semibold">Medicine Name *</Label>
                   <Input 
-                    id="med-name" placeholder="e.g. Alprazolam 0.5mg" 
+                    id="med-name" placeholder="e.g. Paracetamol 650mg" 
                     value={newMedData.medicine_name || ""} 
                     onChange={(e) => setNewMedData(p => ({ ...p, medicine_name: e.target.value }))}
                     required 
@@ -2045,7 +2443,7 @@ export default function PharmacyPage() {
                   <div className="space-y-1">
                     <Label htmlFor="med-generic" className="text-xs font-semibold">Generic Formula *</Label>
                     <Input 
-                      id="med-generic" placeholder="e.g. Alprazolam" 
+                      id="med-generic" placeholder="e.g. Paracetamol" 
                       value={newMedData.generic_name || ""} 
                       onChange={(e) => setNewMedData(p => ({ ...p, generic_name: e.target.value }))}
                       required 
@@ -2054,7 +2452,7 @@ export default function PharmacyPage() {
                   <div className="space-y-1">
                     <Label htmlFor="med-brand" className="text-xs font-semibold">Brand / Trade Name</Label>
                     <Input 
-                      id="med-brand" placeholder="e.g. Xanax" 
+                      id="med-brand" placeholder="e.g. Calpol 650" 
                       value={newMedData.brand || ""} 
                       onChange={(e) => setNewMedData(p => ({ ...p, brand: e.target.value }))}
                     />
@@ -2063,19 +2461,20 @@ export default function PharmacyPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label htmlFor="med-cat" className="text-xs font-semibold">Regulatory Category</Label>
+                    <Label htmlFor="med-cat" className="text-xs font-semibold">Drug Schedule / Category *</Label>
                     <select
                       id="med-cat"
-                      value={newMedData.category || ""}
+                      value={newMedData.category || "Regular Medicine"}
                       onChange={(e) => setNewMedData(p => ({ ...p, category: e.target.value }))}
                       className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
                     >
                       <option value="Regular Medicine">Regular Medicine</option>
                       <option value="Schedule H">Schedule H</option>
                       <option value="Schedule H1">Schedule H1</option>
-                      <option value="Sleeping Pill">Sleeping Pill</option>
-                      <option value="Controlled Drug">Controlled Drug</option>
+                      <option value="Schedule X">Schedule X</option>
                       <option value="OTC">OTC</option>
+                      <option value="Controlled Drug">Controlled Drug</option>
+                      <option value="Sleeping Pill">Sleeping Pill</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>
@@ -2083,7 +2482,7 @@ export default function PharmacyPage() {
                     <Label htmlFor="med-form" className="text-xs font-semibold">Dosage Form</Label>
                     <select
                       id="med-form"
-                      value={newMedData.dosage_form || ""}
+                      value={newMedData.dosage_form || "Tablet"}
                       onChange={(e) => setNewMedData(p => ({ ...p, dosage_form: e.target.value }))}
                       className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
                     >
@@ -2096,6 +2495,132 @@ export default function PharmacyPage() {
                       <option value="Powder">Powder</option>
                       <option value="Other">Other</option>
                     </select>
+                  </div>
+                </div>
+
+                {/* Batch Information Section */}
+                <div className="border border-indigo-200 bg-indigo-50/40 p-3 rounded-lg space-y-3">
+                  <div className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center justify-between border-b border-indigo-100 pb-1.5">
+                    <span>Initial Inventory Batch Details</span>
+                    <span className="text-[10px] text-indigo-600 font-normal">* Batch Number Mandatory</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="batch-no" className="text-xs font-bold text-rose-700">Batch Number *</Label>
+                      <Input 
+                        id="batch-no" placeholder="e.g. PCM-2026-A" 
+                        value={newMedData.batch_number || ""} 
+                        onChange={(e) => setNewMedData(p => ({ ...p, batch_number: e.target.value }))}
+                        className="font-mono uppercase bg-white border-rose-300 focus:border-rose-500"
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="batch-supplier" className="text-xs font-semibold">Supplier *</Label>
+                      <select
+                        id="batch-supplier"
+                        value={newMedData.supplier || "ABC Pharma"}
+                        onChange={(e) => setNewMedData(p => ({ ...p, supplier: e.target.value }))}
+                        className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
+                      >
+                        {suppliers.map(s => (
+                          <option key={s.name} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="med-mfg" className="text-xs font-semibold">MFG Date</Label>
+                      <Input 
+                        id="med-mfg" type="date"
+                        value={newMedData.mfg_date || ""} 
+                        onChange={(e) => setNewMedData(p => ({ ...p, mfg_date: e.target.value }))}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="med-exp" className="text-xs font-bold text-rose-700">EXP Date *</Label>
+                      <Input 
+                        id="med-exp" type="date"
+                        value={newMedData.expiry_date || ""} 
+                        onChange={(e) => setNewMedData(p => ({ ...p, expiry_date: e.target.value }))}
+                        className="bg-white border-rose-300"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pack Size & Automatic Total Quantity Calculation */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label htmlFor="pack-size" className="text-xs font-semibold">Pack Size (Units/Pack) *</Label>
+                      <Input 
+                        id="pack-size" type="number" min="1" placeholder="e.g. 30"
+                        value={newMedData.pack_size ?? 30} 
+                        onChange={(e) => setNewMedData(p => ({ ...p, pack_size: parseInt(e.target.value) || 0 }))}
+                        className="bg-white font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="no-packs" className="text-xs font-semibold">No. of Packs *</Label>
+                      <Input 
+                        id="no-packs" type="number" min="0" step="0.5" placeholder="e.g. 10"
+                        value={newMedData.no_of_packs ?? 10} 
+                        onChange={(e) => setNewMedData(p => ({ ...p, no_of_packs: parseFloat(e.target.value) || 0 }))}
+                        className="bg-white font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Read-Only Automatic Total Units Banner */}
+                  <div className="bg-indigo-600 text-white rounded-md p-2.5 flex items-center justify-between text-xs shadow-xs">
+                    <div>
+                      <span className="opacity-80 block text-[10px] uppercase tracking-wider font-semibold">Automatic Total Stock Calculation</span>
+                      <span className="font-medium">
+                        Pack Size: <strong>{newMedData.pack_size || 0}</strong> tablets &nbsp;×&nbsp; No. of Packs: <strong>{newMedData.no_of_packs || 0}</strong>
+                      </span>
+                    </div>
+                    <div className="text-right pl-3 border-l border-indigo-400">
+                      <span className="text-[10px] opacity-80 block uppercase tracking-wider font-semibold">Total Units</span>
+                      <span className="text-base font-black font-mono">
+                        {(parseInt(newMedData.pack_size) || 0) * (parseFloat(newMedData.no_of_packs) || 0)} units
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing & Location */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="med-pur" className="text-xs font-semibold">Purchase Price (₹) *</Label>
+                    <Input 
+                      id="med-pur" type="number" placeholder="₹" min="0" step="0.01"
+                      value={newMedData.purchase_price || ""} 
+                      onChange={(e) => setNewMedData(p => ({ ...p, purchase_price: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="med-mrp" className="text-xs font-semibold">MRP (₹) *</Label>
+                    <Input 
+                      id="med-mrp" type="number" placeholder="₹" min="0" step="0.01"
+                      value={newMedData.mrp || newMedData.selling_price || ""} 
+                      onChange={(e) => setNewMedData(p => ({ ...p, mrp: e.target.value, selling_price: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="med-rack" className="text-xs font-semibold">Rack Location</Label>
+                    <Input 
+                      id="med-rack" placeholder="e.g. Rack A-01" 
+                      value={newMedData.rack_location || ""} 
+                      onChange={(e) => setNewMedData(p => ({ ...p, rack_location: e.target.value }))}
+                    />
                   </div>
                 </div>
 
@@ -2117,7 +2642,7 @@ export default function PharmacyPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="med-reorder" className="text-xs font-semibold">Reorder Lvl</Label>
+                    <Label htmlFor="med-reorder" className="text-xs font-semibold">Reorder Level</Label>
                     <Input 
                       id="med-reorder" type="number" 
                       value={newMedData.reorder_level || ""} 
@@ -2126,58 +2651,148 @@ export default function PharmacyPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-pur" className="text-xs font-semibold">Purchase Pr. (₹) *</Label>
-                    <Input 
-                      id="med-pur" type="number" placeholder="₹" 
-                      value={newMedData.purchase_price || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, purchase_price: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-sel" className="text-xs font-semibold">Selling Price (₹) *</Label>
-                    <Input 
-                      id="med-sel" type="number" placeholder="₹" 
-                      value={newMedData.selling_price || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, selling_price: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-gst" className="text-xs font-semibold">GST %</Label>
-                    <Input 
-                      id="med-gst" type="number" 
-                      value={newMedData.gst || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, gst: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-rack" className="text-xs font-semibold">Default Rack Location</Label>
-                    <Input 
-                      id="med-rack" placeholder="e.g. Rack C-01" 
-                      value={newMedData.rack_location || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, rack_location: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-exp" className="text-xs font-semibold">Expiry Date</Label>
-                    <Input 
-                      id="med-exp" type="date"
-                      value={newMedData.expiry_date || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, expiry_date: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold mt-2 h-9 text-xs">
-                  Save to Drug Database
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 text-xs shadow-md">
+                  Save Medicine &amp; Register Batch
                 </Button>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add New Batch to Existing Medicine Dialog */}
+          <Dialog open={showAddBatchModal} onOpenChange={setShowAddBatchModal}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-serif text-base">Add New Batch to Inventory</DialogTitle>
+                <DialogDescription className="text-xs">
+                  {addBatchMed ? `Registering additional batch for ${addBatchMed.medicine_name}` : "Add medicine batch"}
+                </DialogDescription>
+              </DialogHeader>
+              {addBatchMed && (
+                <form onSubmit={handleAddBatchToExistingMedicine} className="space-y-4 pt-2">
+                  <div className="bg-slate-100 p-2.5 rounded-md text-xs font-medium text-slate-800 flex justify-between items-center">
+                    <div>
+                      <span className="font-bold">{addBatchMed.medicine_name}</span>
+                      <span className="text-[10px] text-slate-500 block">{addBatchMed.generic_name} • {addBatchMed.category}</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-mono text-[10px] font-bold">
+                      Current: {addBatchMed.stock} units
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-no" className="text-xs font-bold text-rose-700">Batch Number *</Label>
+                      <Input 
+                        id="add-batch-no" placeholder="e.g. PCM-2026-B" 
+                        value={newBatchData.batch_number || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, batch_number: e.target.value }))}
+                        className="font-mono uppercase border-rose-300 focus:border-rose-500"
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-supplier" className="text-xs font-semibold">Supplier *</Label>
+                      <select
+                        id="add-batch-supplier"
+                        value={newBatchData.supplier || "ABC Pharma"}
+                        onChange={(e) => setNewBatchData(p => ({ ...p, supplier: e.target.value }))}
+                        className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
+                      >
+                        {suppliers.map(s => (
+                          <option key={s.name} value={s.name}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-mfg" className="text-xs font-semibold">MFG Date</Label>
+                      <Input 
+                        id="add-batch-mfg" type="date"
+                        value={newBatchData.mfg_date || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, mfg_date: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-exp" className="text-xs font-bold text-rose-700">EXP Date *</Label>
+                      <Input 
+                        id="add-batch-exp" type="date"
+                        value={newBatchData.exp_date || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, exp_date: e.target.value }))}
+                        className="border-rose-300"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-size" className="text-xs font-semibold">Pack Size (Units/Pack) *</Label>
+                      <Input 
+                        id="add-batch-size" type="number" min="1" placeholder="e.g. 30"
+                        value={newBatchData.pack_size ?? 30} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, pack_size: parseInt(e.target.value) || 0 }))}
+                        className="font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-packs" className="text-xs font-semibold">No. of Packs *</Label>
+                      <Input 
+                        id="add-batch-packs" type="number" min="0" step="0.5" placeholder="e.g. 10"
+                        value={newBatchData.no_of_packs ?? 10} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, no_of_packs: parseFloat(e.target.value) || 0 }))}
+                        className="font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-indigo-600 text-white rounded-md p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="opacity-80 block text-[10px] uppercase font-semibold">Auto Calculated Total</span>
+                      <span className="font-medium">
+                        {newBatchData.pack_size || 0} tabs × {newBatchData.no_of_packs || 0} packs
+                      </span>
+                    </div>
+                    <div className="text-right pl-3 border-l border-indigo-400 font-mono font-bold text-sm">
+                      {(parseInt(newBatchData.pack_size) || 0) * (parseFloat(newBatchData.no_of_packs) || 0)} units
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-pur" className="text-xs font-semibold">Purchase Pr. (₹)</Label>
+                      <Input 
+                        id="add-batch-pur" type="number" placeholder="₹"
+                        value={newBatchData.purchase_price || addBatchMed.purchase_price || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, purchase_price: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-mrp" className="text-xs font-semibold">MRP (₹)</Label>
+                      <Input 
+                        id="add-batch-mrp" type="number" placeholder="₹"
+                        value={newBatchData.mrp || addBatchMed.selling_price || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, mrp: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="add-batch-rack" className="text-xs font-semibold">Rack</Label>
+                      <Input 
+                        id="add-batch-rack" placeholder="Rack A-01"
+                        value={newBatchData.rack_location || addBatchMed.rack_location || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, rack_location: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs">
+                    Save New Batch
+                  </Button>
+                </form>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -2590,19 +3205,21 @@ export default function PharmacyPage() {
                 </div>
                 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs focus:outline-none shadow-sm flex-1 sm:flex-none sm:w-[160px]"
-                  >
-                    <option value="All">All Categories</option>
-                    <option value="Regular Medicine">Regular Medicine</option>
-                    <option value="Schedule H">Schedule H</option>
-                    <option value="Schedule H1">Schedule H1</option>
-                    <option value="Sleeping Pill">Sleeping Pill</option>
-                    <option value="Controlled Drug">Controlled Drug</option>
-                    <option value="OTC">OTC</option>
-                  </select>
+                  <div className="flex flex-col">
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="h-9 rounded-md border border-indigo-200 bg-white px-3 py-1 text-xs focus:outline-none shadow-sm flex-1 sm:flex-none sm:w-[170px] font-medium text-slate-800"
+                    >
+                      <option value="All">Drug Schedule: All</option>
+                      <option value="Regular Medicine">Regular Medicine</option>
+                      <option value="Schedule H">Schedule H</option>
+                      <option value="Schedule H1">Schedule H1</option>
+                      <option value="Schedule X">Schedule X</option>
+                      <option value="OTC">OTC</option>
+                      <option value="Controlled Drug">Controlled Drug</option>
+                    </select>
+                  </div>
 
                   <select
                     value={statusFilter}
@@ -2617,6 +3234,29 @@ export default function PharmacyPage() {
                     <option value="Expiring / Expired">Expiring / Expired</option>
                   </select>
                 </div>
+
+                {/* Prominent Drug Schedule Register Print Button for All Schedules */}
+                <Button 
+                  onClick={() => handlePrintRegister(categoryFilter)}
+                  size="sm"
+                  className={`font-bold gap-1.5 shadow-sm h-9 text-xs px-3 border transition-all ${
+                    categoryFilter === "Schedule H"
+                      ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-700"
+                      : categoryFilter === "Schedule H1"
+                      ? "bg-amber-600 hover:bg-amber-700 text-white border-amber-700"
+                      : categoryFilter === "Schedule X"
+                      ? "bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-700"
+                      : categoryFilter === "Controlled Drug"
+                      ? "bg-purple-600 hover:bg-purple-700 text-white border-purple-700"
+                      : categoryFilter === "OTC"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700"
+                  }`}
+                >
+                  <Printer className="w-4 h-4" /> 🖨 {
+                    categoryFilter === "All" ? "Print Register (All Schedules)" : `Print ${categoryFilter} Register`
+                  }
+                </Button>
 
                 {statusFilter === "Expiring / Expired" && (
                   <Button 
@@ -2643,20 +3283,22 @@ export default function PharmacyPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider">
-                      <th className="px-5 py-2.5">Medicine Name</th>
-                      <th className="px-5 py-2.5">Category</th>
-                      <th className="px-5 py-2.5">Rack Location</th>
-                      <th className="px-5 py-2.5 text-center">Current Stock</th>
-                      <th className="px-5 py-2.5 text-center">Min / Max</th>
-                      <th className="px-5 py-2.5 text-center">Status</th>
-                      <th className="px-5 py-2.5 text-right">Actions</th>
+                    <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                      <th className="px-4 py-3">Medicine</th>
+                      <th className="px-3 py-3">Schedule</th>
+                      <th className="px-3 py-3 font-mono">Batch No.</th>
+                      <th className="px-3 py-3 text-center">Pack Size</th>
+                      <th className="px-3 py-3 text-center font-bold">Total Units</th>
+                      <th className="px-3 py-3 text-center">Expiry</th>
+                      <th className="px-3 py-3">Rack</th>
+                      <th className="px-3 py-3 text-center">Stock Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {filteredMedicines.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
+                        <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                           No medicines found matching the selected filters.
                         </td>
                       </tr>
@@ -2665,6 +3307,9 @@ export default function PharmacyPage() {
                         const isOut = med.stock === 0;
                         const isLow = med.stock < med.min_stock;
                         const isReorder = med.stock <= med.reorder_level;
+
+                        const primaryBatch = (med.batches && med.batches.length > 0) ? med.batches[0] : null;
+                        const batchCount = med.batches ? med.batches.length : 0;
 
                         // Expiring warning checks
                         const today = new Date();
@@ -2687,9 +3332,9 @@ export default function PharmacyPage() {
                           badgeLabel = "Controlled Drug";
                         }
 
-                        // Check if any batch is expired/expiring
-                        const anyExpired = (med.batches || []).some(b => new Date(b.exp_date) <= today);
+                        const anyExpired = (med.batches || []).some(b => b.exp_date && new Date(b.exp_date) <= today);
                         const anyExpiring = (med.batches || []).some(b => {
+                          if (!b.exp_date) return false;
                           const diff = new Date(b.exp_date) - today;
                           const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
                           return days > 0 && days <= 90;
@@ -2697,7 +3342,7 @@ export default function PharmacyPage() {
 
                         if (anyExpired && !isOut) {
                           badgeColor = "bg-orange-50 text-orange-800 border-orange-200";
-                          badgeLabel = "Expired Batch Alarm";
+                          badgeLabel = "Expired Batch";
                         } else if (anyExpiring && !isLow && !isOut) {
                           badgeColor = "bg-amber-50 text-amber-800 border-amber-200";
                           badgeLabel = "Expiring Soon";
@@ -2709,28 +3354,63 @@ export default function PharmacyPage() {
                         }
 
                         return (
-                          <tr key={med.medicine_name} className={`hover:bg-slate-50/20 items-center ${med.disabled ? "bg-slate-50/50 opacity-60" : ""}`}>
-                            <td className="px-5 py-3">
-                              <div className="font-semibold text-slate-900">{med.medicine_name}</div>
+                          <tr key={med.medicine_name} className={`hover:bg-slate-50/50 transition-colors ${med.disabled ? "bg-slate-50/50 opacity-60" : ""}`}>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{med.medicine_name}</div>
                               <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || "Generics"}</div>
                             </td>
-                            <td className="px-5 py-3 font-medium text-slate-600">{med.category}</td>
-                            <td className="px-5 py-3 text-slate-500 font-mono">{med.rack_location || "N/A"}</td>
-                            <td className="px-5 py-3 text-center font-mono font-bold text-slate-700">{med.stock}</td>
-                            <td className="px-5 py-3 text-center font-mono text-slate-500">{med.min_stock} / {med.max_stock}</td>
-                            <td className="px-5 py-3 text-center">
+                            <td className="px-3 py-3 font-medium text-slate-700">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                                med.category === "Schedule H" || med.category === "Schedule H1" || med.category === "Schedule X"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : med.category === "OTC"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}>
+                                {med.category || "Regular"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 font-mono text-[11px]">
+                              {primaryBatch ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px]">
+                                    {primaryBatch.batch_number}
+                                  </span>
+                                  {batchCount > 1 && (
+                                    <span className="text-[9px] text-slate-500 font-semibold bg-slate-100 px-1 rounded">
+                                      +{batchCount - 1} more
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">No Batch</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono text-slate-600">
+                              {primaryBatch ? `${primaryBatch.pack_size || 30} tabs/pack` : "30 tabs/pack"}
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono font-black text-slate-900 text-sm">
+                              {med.stock}
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono text-[11px] text-slate-600">
+                              {primaryBatch && primaryBatch.exp_date ? primaryBatch.exp_date : (med.expiry_date || "N/A")}
+                            </td>
+                            <td className="px-3 py-3 text-slate-600 font-mono text-[11px]">
+                              {primaryBatch ? (primaryBatch.rack_location || med.rack_location || "N/A") : (med.rack_location || "N/A")}
+                            </td>
+                            <td className="px-3 py-3 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}`}>
                                 {badgeLabel}
                               </span>
                             </td>
-                            <td className="px-5 py-3 text-right relative">
+                            <td className="px-4 py-3 text-right relative">
                               <div className="inline-block text-left">
                                 <Button 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setActiveMenuMed(activeMenuMed === med.medicine_name ? null : med.medicine_name);
                                   }} 
-                                  variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-slate-200 bg-white"
+                                  variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-slate-200 bg-white font-medium"
                                 >
                                   Actions <ChevronDown className="w-3 h-3" />
                                 </Button>
@@ -2741,7 +3421,7 @@ export default function PharmacyPage() {
                                       className="fixed inset-0 z-45" 
                                       onClick={() => setActiveMenuMed(null)}
                                     />
-                                    <div className="absolute right-0 mt-1 w-44 rounded-md shadow-lg bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none z-50 text-left">
+                                    <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none z-50 text-left">
                                       <div className="py-1">
                                         <button
                                           onClick={() => {
@@ -2751,7 +3431,29 @@ export default function PharmacyPage() {
                                           }}
                                           className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-700 hover:bg-slate-50 w-full"
                                         >
-                                          <Eye className="w-3.5 h-3.5 text-indigo-500" /> View Details
+                                          <Eye className="w-3.5 h-3.5 text-indigo-500" /> View Details &amp; Batches
+                                        </button>
+
+                                        <button
+                                          onClick={() => {
+                                            setAddBatchMed(med);
+                                            setNewBatchData({
+                                              batch_number: "",
+                                              supplier: "ABC Pharma",
+                                              mfg_date: "",
+                                              exp_date: "",
+                                              pack_size: primaryBatch?.pack_size || 30,
+                                              no_of_packs: 10,
+                                              purchase_price: med.purchase_price || "",
+                                              mrp: med.selling_price || "",
+                                              rack_location: med.rack_location || "Rack A-01"
+                                            });
+                                            setShowAddBatchModal(true);
+                                            setActiveMenuMed(null);
+                                          }}
+                                          className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-emerald-700 font-semibold hover:bg-emerald-50 w-full"
+                                        >
+                                          <PlusCircle className="w-3.5 h-3.5 text-emerald-600" /> + Add New Batch
                                         </button>
                                         
                                         <button

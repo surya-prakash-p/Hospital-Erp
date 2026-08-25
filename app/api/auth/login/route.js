@@ -3,28 +3,29 @@ import { readCloudStore, isUserDeleted } from '@/lib/server-user-store';
 
 export async function POST(req) {
   try {
-    const { identifier, password } = await req.json();
+    const body = await req.json();
+    const loginIdentifier = (body.identifier || body.email || '').trim();
+    const password = (body.password || '').trim();
 
-    if (!identifier || !password) {
+    if (!loginIdentifier || !password) {
       return NextResponse.json({ error: 'Please enter Email / Mobile Number and Password' }, { status: 400 });
     }
 
-    const targetEmail = identifier.trim();
-    const cleanInputStr = targetEmail.toLowerCase();
-    const cleanInputDigits = targetEmail.replace(/\D/g, '');
+    const cleanInputStr = loginIdentifier.toLowerCase();
+    const cleanInputDigits = loginIdentifier.replace(/\D/g, '');
     const isInputDigits = cleanInputDigits.length >= 7;
 
-    // 1. Fetch CENTRAL CLOUD DATABASE as the SINGLE SOURCE OF TRUTH
+    // 1. Fetch Central Cloud Store (Single Source of Truth)
     const cloudStore = await readCloudStore();
     const serverUsers = cloudStore.users || [];
     const serverDeleted = cloudStore.deleted || [];
 
-    // 2. Check if user is in deleted list
-    if (isUserDeleted(targetEmail, serverDeleted)) {
+    // 2. Check if account is deleted
+    if (isUserDeleted(loginIdentifier, serverDeleted)) {
       return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
     }
 
-    // 3. Find user in Central Cloud Database by Email OR Mobile Number
+    // 3. Match user by Email OR Mobile Number
     const registeredUser = serverUsers.find(u => {
       const userEmail = (u.email || '').trim().toLowerCase();
       const userMobileDigits = (u.mobile_no || u.phone || '').replace(/\D/g, '');
@@ -43,38 +44,45 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
     }
 
-    // Check if user is deleted
-    if (isUserDeleted(registeredUser.email, serverDeleted) || isUserDeleted(registeredUser.mobile_no, serverDeleted)) {
-      return NextResponse.json({ error: 'This staff account has been deleted by Hospital Admin' }, { status: 401 });
+    // Check if account is inactive or deleted
+    if (registeredUser.active === false || isUserDeleted(registeredUser.email, serverDeleted) || isUserDeleted(registeredUser.mobile_no, serverDeleted)) {
+      return NextResponse.json({ error: 'This staff account has been deactivated or deleted' }, { status: 401 });
     }
 
-    // 4. Verify password strictly against Central Cloud Database
+    // 4. Verify password
     const storedPwd = (registeredUser.password || '').trim();
-    const inputPwd = (password || '').trim();
-
-    if (!inputPwd || !storedPwd || storedPwd !== inputPwd) {
+    if (!storedPwd || storedPwd !== password) {
       return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
     }
 
-    // 5. Password matches -> Construct session object with sessionVersion for session invalidation
+    // 5. Construct session object
     const userObj = {
-      id: registeredUser.id,
+      id: registeredUser.id || `USER-${Date.now()}`,
       email: registeredUser.email,
-      full_name: registeredUser.full_name,
-      name: registeredUser.full_name,
-      mobile_no: registeredUser.mobile_no,
+      full_name: registeredUser.full_name || registeredUser.name || registeredUser.email,
+      name: registeredUser.full_name || registeredUser.name || registeredUser.email,
+      mobile_no: registeredUser.mobile_no || '',
+      mobileNo: registeredUser.mobile_no || '',
+      role: registeredUser.role || (registeredUser.roles?.[0]) || 'Staff Member',
       roles: registeredUser.roles || ['Staff Member'],
-      permissions: registeredUser.permissions || [],
       department: registeredUser.department || '',
       designation: registeredUser.designation || '',
-      sessionVersion: registeredUser.sessionVersion || 1
+      frappeStaffId: registeredUser.frappeStaffId || '',
+      active: true
     };
 
     const response = NextResponse.json({ success: true, user: userObj });
+
+    // Set Better Auth & ERP session cookies
+    response.cookies.set('better-auth.session_token', JSON.stringify(userObj), {
+      httpOnly: false,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7
+    });
     response.cookies.set('hospital_erp_user', JSON.stringify(userObj), {
       httpOnly: false,
       path: '/',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
+      maxAge: 60 * 60 * 24 * 7
     });
 
     return response;

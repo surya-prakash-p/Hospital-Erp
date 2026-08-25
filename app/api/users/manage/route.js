@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { requireAuth } from '@/lib/auth-guard';
+import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
 
 let frappeConfig = null;
 try {
@@ -16,7 +18,6 @@ const siteUrl = process.env.FRAPPE_SITE_URL || frappeConfig?.site_url || 'https:
 const apiKey = process.env.FRAPPE_API_KEY || frappeConfig?.api_key;
 const apiSecret = process.env.FRAPPE_API_SECRET || frappeConfig?.api_secret;
 
-// Helper to make authorized Frappe requests
 async function frappeFetch(endpoint, options = {}) {
   if (!apiKey || !apiSecret) {
     throw new Error("Frappe API credentials missing in frappe_config.json");
@@ -55,15 +56,21 @@ async function frappeFetch(endpoint, options = {}) {
 
 export const dynamic = 'force-dynamic';
 
-import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
-
-// GET: List all users and central activities from Cloud Store
+// GET: List all staff users & activities with sanitized responses (No passwords or hashes returned)
 export async function GET(req) {
   try {
     const cloudData = await readCloudStore();
+    const sanitizedUsers = (cloudData.users || []).map(u => {
+      const { password, ...safeUser } = u;
+      return {
+        ...safeUser,
+        role: safeUser.role || (safeUser.roles?.[0]) || 'Staff Member'
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      users: cloudData.users || [],
+      users: sanitizedUsers,
       activities: cloudData.activities || []
     });
   } catch (error) {
@@ -71,9 +78,12 @@ export async function GET(req) {
   }
 }
 
-// DELETE: Remove User from Backend Credentials & Frappe
+// DELETE: Remove/Deactivate User in Better Auth & Frappe
 export async function DELETE(req) {
   try {
+    const authResult = await requireAuth(req, ['Hospital Admin', 'System Manager']);
+    if (authResult.errorResponse) return authResult.errorResponse;
+
     const { searchParams } = new URL(req.url);
     const identifier = searchParams.get('identifier') || searchParams.get('email') || searchParams.get('mobile_no');
 
@@ -83,11 +93,9 @@ export async function DELETE(req) {
 
     const cleanIdentifier = identifier.trim();
 
-    // 1. Delete from Central Cloud Database
     await deleteServerUser(cleanIdentifier);
     await addCloudActivity("Staff Member Deleted", `Identifier: ${cleanIdentifier}`, "user");
 
-    // 2. Delete from Frappe Cloud User Doctype if enabled
     if (apiKey && apiSecret) {
       try {
         await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanIdentifier)}`, {
@@ -104,9 +112,12 @@ export async function DELETE(req) {
   }
 }
 
-// POST: Create or Update User with Role & Password in Backend
+// POST: Create or Update Staff User with Better Auth & Frappe linking
 export async function POST(req) {
   try {
+    const authResult = await requireAuth(req, ['Hospital Admin', 'System Manager']);
+    if (authResult.errorResponse) return authResult.errorResponse;
+
     const body = await req.json();
     const { email, password, full_name, mobile_no, roles, permissions, department, designation, employee_id } = body;
 
@@ -114,35 +125,37 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Email address is required' }, { status: 400 });
     }
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     const nameParts = (full_name || cleanEmail).split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
     const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ['Staff Member'];
+    const primaryRole = userRoles[0];
 
-    // Always persist to Central Cloud Database for immediate, seamless login & multi-device sync
-    await saveServerUser({
+    const savedUser = await saveServerUser({
       email: cleanEmail,
       password: password,
       full_name: full_name || cleanEmail,
+      name: full_name || cleanEmail,
       mobile_no: mobile_no || '',
+      role: primaryRole,
       roles: userRoles,
       permissions: permissions || [],
       department: department || '',
-      designation: designation || userRoles[0]
+      designation: designation || primaryRole,
+      frappeStaffId: employee_id || cleanEmail,
+      active: true
     });
 
     if (password) {
-      await addCloudActivity("New staff user created", `${full_name || cleanEmail} (${userRoles[0]})`, "user");
+      await addCloudActivity("New staff user created", `${full_name || cleanEmail} (${primaryRole})`, "user");
     } else {
-      await addCloudActivity("Staff Profile Updated", `${full_name || cleanEmail} (${userRoles[0]})`, "profile");
+      await addCloudActivity("Staff Profile Updated", `${full_name || cleanEmail} (${primaryRole})`, "profile");
     }
 
     let frappeUser = null;
-
     if (apiKey && apiSecret) {
       try {
-        // Check if user already exists in Frappe
         let existingUser = null;
         try {
           const checkRes = await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanEmail)}`);
@@ -154,7 +167,6 @@ export async function POST(req) {
         const roleObjects = userRoles.map(r => ({ role: r }));
 
         if (existingUser) {
-          // Update existing user
           const updateRes = await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanEmail)}`, {
             method: 'PUT',
             body: JSON.stringify({
@@ -167,7 +179,6 @@ export async function POST(req) {
           });
           frappeUser = updateRes.data;
         } else {
-          // Create new user in Frappe
           const createRes = await frappeFetch('/api/resource/User', {
             method: 'POST',
             body: JSON.stringify({
@@ -186,7 +197,6 @@ export async function POST(req) {
           frappeUser = createRes.data;
         }
 
-        // Set/reset password if password is provided
         if (password) {
           try {
             await frappeFetch('/api/method/frappe.core.doctype.user.user.reset_password', {
@@ -197,7 +207,7 @@ export async function POST(req) {
               })
             });
           } catch (pwdErr) {
-            console.warn("Password reset via Frappe method warning:", pwdErr.message);
+            console.warn("Frappe password reset warning:", pwdErr.message);
           }
         }
       } catch (frappeErr) {
@@ -205,26 +215,20 @@ export async function POST(req) {
       }
     }
 
-    const createdUserObj = {
-      email: cleanEmail,
-      full_name: full_name || cleanEmail,
-      mobile_no: mobile_no || cleanEmail,
-      roles: userRoles,
-      permissions: permissions || [],
-      department: department || '',
-      designation: designation || userRoles[0],
-      employee_id: employee_id || `STF-${Math.floor(100 + Math.random() * 900)}`,
-      frappe_synced: !!frappeUser
-    };
-
+    const { password: _, ...sanitizedUser } = savedUser || {};
     return NextResponse.json({
       success: true,
-      message: 'User credentials and roles saved successfully in backend',
-      user: createdUserObj
+      message: `Staff user ${cleanEmail} saved successfully in Better Auth & Frappe`,
+      user: {
+        ...sanitizedUser,
+        email: cleanEmail,
+        full_name: full_name || cleanEmail,
+        roles: userRoles,
+        role: primaryRole,
+        frappe_user: frappeUser ? frappeUser.name : null
+      }
     });
-
   } catch (error) {
-    console.error('User management endpoint error:', error);
-    return NextResponse.json({ error: 'Failed to manage user: ' + error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
