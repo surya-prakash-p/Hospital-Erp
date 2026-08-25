@@ -45,6 +45,7 @@ export default function PharmacyPage() {
   // Custom enhanced states
   const [userRole, setUserRole] = useState("Administrator"); // Administrator, Pharmacist, Store Manager
   const [activeMenuMed, setActiveMenuMed] = useState(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   
   // Stock Adjustment States
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -3439,7 +3440,19 @@ export default function PharmacyPage() {
                                 <Button 
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setActiveMenuMed(activeMenuMed === med.medicine_name ? null : med.medicine_name);
+                                    if (activeMenuMed === med.medicine_name) {
+                                      setActiveMenuMed(null);
+                                    } else {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const spaceBelow = window.innerHeight - rect.bottom;
+                                      const menuHeight = 240;
+                                      const openUp = spaceBelow < menuHeight && rect.top > menuHeight;
+                                      setMenuPos({
+                                        top: openUp ? Math.max(10, rect.top - menuHeight) : (rect.bottom + 4),
+                                        left: Math.max(10, rect.right - 192)
+                                      });
+                                      setActiveMenuMed(med.medicine_name);
+                                    }
                                   }} 
                                   variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-slate-200 bg-white font-medium shadow-xs"
                                 >
@@ -3449,12 +3462,13 @@ export default function PharmacyPage() {
                                 {activeMenuMed === med.medicine_name && (
                                   <>
                                     <div 
-                                      className="fixed inset-0 z-45" 
+                                      className="fixed inset-0 z-[90]" 
                                       onClick={() => setActiveMenuMed(null)}
                                     />
-                                    <div className={`absolute right-0 w-48 rounded-md shadow-xl bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none z-50 text-left ${
-                                      isLastRow ? "bottom-full mb-1" : "top-full mt-1"
-                                    }`}>
+                                    <div 
+                                      style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
+                                      className="fixed z-[100] w-48 rounded-md shadow-2xl bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none text-left"
+                                    >
                                       <div className="py-1">
                                         <button
                                           onClick={() => {
