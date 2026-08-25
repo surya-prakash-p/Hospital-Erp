@@ -449,6 +449,40 @@ export default function PharmacyPage() {
     };
   }, [medicines, drugRegister, purchaseOrders, queue]);
 
+  // Drug Schedule matching helper
+  const isCategoryMatch = (med, filter) => {
+    if (!filter || filter === "All") return true;
+
+    const cat = (med.category || "").trim();
+    const stype = (med.schedule_type || "").trim();
+    const isCtrl = med.controlled_drug === 1;
+
+    if (filter === "Schedule H") {
+      return cat === "Schedule H" || stype === "Schedule H";
+    }
+    if (filter === "Schedule H1") {
+      return cat === "Schedule H1" || stype === "Schedule H1";
+    }
+    if (filter === "Schedule X") {
+      return cat === "Schedule X" || stype === "Schedule X";
+    }
+    if (filter === "Controlled Drug") {
+      return cat === "Controlled Drug" || isCtrl;
+    }
+    if (filter === "OTC") {
+      return cat === "OTC";
+    }
+    if (filter === "Regular Medicine") {
+      return (
+        cat === "Regular Medicine" ||
+        stype === "None" ||
+        (!["Schedule H", "Schedule H1", "Schedule X", "Controlled Drug", "OTC"].includes(cat) && !isCtrl)
+      );
+    }
+
+    return cat === filter;
+  };
+
   // Filtered inventory list
   const filteredMedicines = useMemo(() => {
     return medicines.filter(med => {
@@ -460,7 +494,7 @@ export default function PharmacyPage() {
         (med.qrcode || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (med.batches || []).some(b => (b.batch_number || "").toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesCategory = categoryFilter === "All" || med.category === categoryFilter;
+      const matchesCategory = isCategoryMatch(med, categoryFilter);
       
       let matchesStatus = true;
       if (statusFilter === "Low Stock") matchesStatus = med.stock < med.min_stock;
@@ -1091,50 +1125,46 @@ export default function PharmacyPage() {
 
   // Dynamic Register Print Handler supporting All Schedules (Schedule H, H1, X, OTC, Controlled, Regular, All)
   const handlePrintRegister = (scheduleFilter = categoryFilter) => {
-    let targetMeds = [];
     let reportTitle = "Pharmacy Drug Register";
     let badgeBg = "#fee2e2";
     let badgeColor = "#991b1b";
 
     if (scheduleFilter === "All" || !scheduleFilter) {
-      targetMeds = medicines;
       reportTitle = "Master Pharmacy Drug Register (All Schedules)";
       badgeBg = "#e0e7ff";
       badgeColor = "#3730a3";
     } else if (scheduleFilter === "Schedule H") {
-      targetMeds = medicines.filter(m => m.category === "Schedule H" || m.schedule_type === "Schedule H");
       reportTitle = "Statutory Schedule H Drug Register";
       badgeBg = "#fee2e2";
       badgeColor = "#991b1b";
     } else if (scheduleFilter === "Schedule H1") {
-      targetMeds = medicines.filter(m => m.category === "Schedule H1" || m.schedule_type === "Schedule H1");
       reportTitle = "Statutory Schedule H1 Drug Register";
       badgeBg = "#fed7aa";
       badgeColor = "#9a3412";
     } else if (scheduleFilter === "Schedule X") {
-      targetMeds = medicines.filter(m => m.category === "Schedule X" || m.schedule_type === "Schedule X");
       reportTitle = "Statutory Schedule X Narcotics Register";
       badgeBg = "#fef08a";
       badgeColor = "#854d0e";
     } else if (scheduleFilter === "Controlled Drug") {
-      targetMeds = medicines.filter(m => m.category === "Controlled Drug" || m.controlled_drug === 1);
       reportTitle = "Statutory Controlled Drug Register";
       badgeBg = "#f3e8ff";
       badgeColor = "#6b21a8";
     } else if (scheduleFilter === "OTC") {
-      targetMeds = medicines.filter(m => m.category === "OTC");
       reportTitle = "OTC Medicine Inventory Register";
       badgeBg = "#d1fae5";
       badgeColor = "#065f46";
     } else if (scheduleFilter === "Regular Medicine") {
-      targetMeds = medicines.filter(m => m.category === "Regular Medicine" || m.schedule_type === "None");
       reportTitle = "Regular Medicine Inventory Register";
       badgeBg = "#e2e8f0";
       badgeColor = "#334155";
     } else {
-      targetMeds = medicines.filter(m => m.category === scheduleFilter);
       reportTitle = `${scheduleFilter} Drug Register`;
     }
+
+    // Always use exact filtered list currently displayed on screen for 100% parity
+    const targetMeds = (scheduleFilter === categoryFilter && (!searchQuery || searchQuery.trim() === "")) 
+      ? filteredMedicines 
+      : medicines.filter(m => isCategoryMatch(m, scheduleFilter));
 
     if (targetMeds.length === 0) {
       showToast(`No medicines found for schedule: "${scheduleFilter === "All" ? "All Schedules" : scheduleFilter}"`, "error");
