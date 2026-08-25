@@ -3310,7 +3310,7 @@ export default function PharmacyPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto min-h-[320px] pb-16">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
@@ -3333,10 +3333,11 @@ export default function PharmacyPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredMedicines.map(med => {
+                      filteredMedicines.map((med, index) => {
                         const isOut = med.stock === 0;
                         const isLow = med.stock < med.min_stock;
                         const isReorder = med.stock <= med.reorder_level;
+                        const isLastRow = index >= filteredMedicines.length - 2 || filteredMedicines.length <= 2;
 
                         const primaryBatch = (med.batches && med.batches.length > 0) ? med.batches[0] : null;
                         const batchCount = med.batches ? med.batches.length : 0;
@@ -3440,7 +3441,7 @@ export default function PharmacyPage() {
                                     e.stopPropagation();
                                     setActiveMenuMed(activeMenuMed === med.medicine_name ? null : med.medicine_name);
                                   }} 
-                                  variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-slate-200 bg-white font-medium"
+                                  variant="outline" size="sm" className="h-7 text-[10px] gap-1 border-slate-200 bg-white font-medium shadow-xs"
                                 >
                                   Actions <ChevronDown className="w-3 h-3" />
                                 </Button>
@@ -3451,7 +3452,9 @@ export default function PharmacyPage() {
                                       className="fixed inset-0 z-45" 
                                       onClick={() => setActiveMenuMed(null)}
                                     />
-                                    <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none z-50 text-left">
+                                    <div className={`absolute right-0 w-48 rounded-md shadow-xl bg-white border border-slate-200 divide-y divide-slate-100 focus:outline-none z-50 text-left ${
+                                      isLastRow ? "bottom-full mb-1" : "top-full mt-1"
+                                    }`}>
                                       <div className="py-1">
                                         <button
                                           onClick={() => {
