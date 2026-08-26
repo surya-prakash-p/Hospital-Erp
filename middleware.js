@@ -5,10 +5,10 @@ const ROUTE_PERMISSIONS = [
   { path: '/admin-dashboard', allowed: ['Hospital Admin', 'System Manager'] },
   { path: '/consultation', allowed: ['Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/doctors', allowed: ['Doctor', 'Hospital Admin', 'System Manager'] },
-  { path: '/pharmacy', allowed: ['Pharmacist', 'Hospital Admin', 'System Manager'] },
-  { path: '/inventory', allowed: ['Pharmacist', 'Store Manager', 'Hospital Admin', 'System Manager'] },
-  { path: '/lab', allowed: ['Lab Technician', 'Hospital Admin', 'System Manager'] },
-  { path: '/reception', allowed: ['Receptionist', 'Hospital Admin', 'System Manager'] },
+  { path: '/pharmacy', allowed: ['Pharmacist', 'Doctor', 'Hospital Admin', 'System Manager'] },
+  { path: '/inventory', allowed: ['Pharmacist', 'Store Manager', 'Doctor', 'Hospital Admin', 'System Manager'] },
+  { path: '/lab', allowed: ['Lab Technician', 'Doctor', 'Hospital Admin', 'System Manager'] },
+  { path: '/reception', allowed: ['Receptionist', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/appointments', allowed: ['Receptionist', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/patient-registry', allowed: ['Receptionist', 'Doctor', 'Nurse', 'Hospital Admin', 'System Manager'] },
   { path: '/billing', allowed: ['Billing Clerk', 'Hospital Admin', 'System Manager'] },
@@ -43,9 +43,15 @@ export async function middleware(request) {
 
   // Parse user profile from session cookie if present
   let userRole = 'Staff Member';
+  let userRoles = [];
+  let userPermissions = [];
   try {
     const parsed = JSON.parse(sessionCookie.value);
     userRole = parsed.role || parsed.roles?.[0] || 'Staff Member';
+    userRoles = Array.isArray(parsed.roles) && parsed.roles.length > 0 
+      ? parsed.roles 
+      : (parsed.role ? [parsed.role] : ['Staff Member']);
+    userPermissions = Array.isArray(parsed.permissions) ? parsed.permissions : [];
   } catch (e) {}
 
   // Match current route against protection rules
@@ -54,12 +60,27 @@ export async function middleware(request) {
   );
 
   if (matchedRule) {
-    const isAllowed = matchedRule.allowed.includes(userRole) || 
-                      userRole === 'Hospital Admin' || 
-                      userRole === 'System Manager';
+    const isAdmin = userRole === 'Hospital Admin' || 
+                    userRole === 'System Manager' ||
+                    userRoles.includes('Hospital Admin') || 
+                    userRoles.includes('System Manager');
+
+    const hasAllowedRole = userRoles.some(r => matchedRule.allowed.includes(r)) || 
+                           matchedRule.allowed.includes(userRole);
+
+    const hasExplicitPermission = userPermissions.includes('*') ||
+                                  userPermissions.includes(pathname) ||
+                                  userPermissions.includes(matchedRule.path) ||
+                                  userPermissions.some(p => {
+                                    const pClean = (p || '').toLowerCase().replace('/', '').trim();
+                                    const pathClean = pathname.toLowerCase().replace('/', '').trim();
+                                    return pClean === pathClean || pathClean.includes(pClean) || pClean.includes(pathClean);
+                                  });
+
+    const isAllowed = isAdmin || hasAllowedRole || hasExplicitPermission;
 
     if (!isAllowed) {
-      // User is logged in but trying to access unauthorized route (e.g. Pharmacist accessing /admin-dashboard)
+      // User is logged in but trying to access unauthorized route
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
   }
