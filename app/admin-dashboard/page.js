@@ -84,6 +84,21 @@ export default function AdminDashboardPage() {
   const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
+  const formatActivityTime = (act) => {
+    if (!act) return '';
+    if (act.createdAt) {
+      try {
+        return new Date(act.createdAt).toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      } catch (e) {}
+    }
+    return act.time || '';
+  };
+
   // DOM Refs for smooth scrolling
   const staffTableRef = React.useRef(null);
   const deptSectionRef = React.useRef(null);
@@ -843,7 +858,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="text-[10px] text-slate-400 font-semibold whitespace-nowrap shrink-0 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {act.time}
+                  {formatActivityTime(act)}
                 </div>
               </div>
             ))}
@@ -1704,7 +1719,7 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="text-[11px] text-slate-400 font-semibold whitespace-nowrap shrink-0 flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      {act.time}
+                      {formatActivityTime(act)}
                     </div>
                   </div>
                 ))}

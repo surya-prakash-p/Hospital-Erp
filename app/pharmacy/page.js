@@ -31,10 +31,8 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { AIInvoiceImportModal } from "@/components/pharmacy/AIInvoiceImportModal";
-import { useAuth } from "@/lib/auth-context";
 
 export default function PharmacyPage() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [medicines, setMedicines] = useState([]);
   const [queue, setQueue] = useState([]);
@@ -2413,12 +2411,6 @@ export default function PharmacyPage() {
             Drugs & Cosmetics Act Compliance (FEFO Batches, Schedule Registers, Automated Logistics replenishment)
           </p>
         </div>
-        {user && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-right shadow-xs shrink-0">
-            <div className="text-xs font-bold text-emerald-950">{user.name || user.full_name}</div>
-            <div className="text-[10px] font-semibold text-emerald-700 font-mono">User ID: {user.userId || user.id || 'PHARM-001'} • Role: {user.role || 'Pharmacist'}</div>
-          </div>
-        )}
         <div className="flex flex-wrap items-center gap-2">
           <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
             <Button 
