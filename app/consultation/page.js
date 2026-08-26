@@ -468,11 +468,17 @@ export default function ConsultationPage() {
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Consultation</h2>
           <p className="text-muted-foreground mt-1">
             {isDoctorUser 
-              ? `Patient queue & clinical desk for ${currentDoctorName || "Doctor"}`
+              ? `Clinical desk for ${user?.name || user?.full_name || "Doctor"}`
               : "Doctor's diagnosis and prescription queue"
             }
           </p>
         </div>
+        {user && (
+          <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl px-4 py-2 text-right shadow-xs">
+            <div className="text-xs font-bold text-indigo-950">{user.name || user.full_name}</div>
+            <div className="text-[10px] font-semibold text-indigo-700 font-mono">User ID: {user.userId || user.id || 'DOC-001'} • Role: {user.role || 'Doctor'}</div>
+          </div>
+        )}
       </div>
 
       {/* Doctor Columns Queue */}

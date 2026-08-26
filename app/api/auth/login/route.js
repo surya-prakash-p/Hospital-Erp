@@ -6,6 +6,7 @@ export async function POST(req) {
     const body = await req.json();
     const loginIdentifier = (body.identifier || body.email || '').trim();
     const password = (body.password || '').trim();
+    const loginType = (body.loginType || 'staff').toLowerCase();
 
     if (!loginIdentifier || !password) {
       return NextResponse.json({ error: 'Please enter Email / Mobile Number and Password' }, { status: 400 });
@@ -55,19 +56,45 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid email/mobile number or password' }, { status: 401 });
     }
 
-    // 5. Construct session object
+    // 5. Server-side Login Type / Role Authorization Check
+    const userRole = registeredUser.role || (registeredUser.roles?.[0]) || 'Staff Member';
+    const userRoles = registeredUser.roles || [userRole];
+
+    if (loginType === 'master') {
+      const isMaster = userRoles.includes('Hospital Admin') || userRoles.includes('System Manager') || userRole === 'Hospital Admin';
+      if (!isMaster) {
+        return NextResponse.json({ error: 'This account is not authorized for Master / Hospital Admin Login.' }, { status: 403 });
+      }
+    } else if (loginType === 'doctor') {
+      const isDoctor = userRoles.includes('Doctor') || userRole === 'Doctor';
+      if (!isDoctor) {
+        return NextResponse.json({ error: 'This account is not authorized for Doctor Login.' }, { status: 403 });
+      }
+    } else if (loginType === 'pharmacist') {
+      const isPharmacist = userRoles.includes('Pharmacist') || userRole === 'Pharmacist';
+      if (!isPharmacist) {
+        return NextResponse.json({ error: 'This account is not authorized for Pharmacist Login.' }, { status: 403 });
+      }
+    }
+
+    // 6. Construct full identity session object
+    const userId = registeredUser.userId || registeredUser.id || `USER-${Date.now()}`;
     const userObj = {
-      id: registeredUser.id || `USER-${Date.now()}`,
+      id: userId,
+      userId: userId,
       email: registeredUser.email,
       full_name: registeredUser.full_name || registeredUser.name || registeredUser.email,
       name: registeredUser.full_name || registeredUser.name || registeredUser.email,
       mobile_no: registeredUser.mobile_no || '',
       mobileNo: registeredUser.mobile_no || '',
-      role: registeredUser.role || (registeredUser.roles?.[0]) || 'Staff Member',
-      roles: registeredUser.roles || ['Staff Member'],
+      role: userRole,
+      roles: userRoles,
+      permissions: registeredUser.permissions || [],
       department: registeredUser.department || '',
-      designation: registeredUser.designation || '',
-      frappeStaffId: registeredUser.frappeStaffId || '',
+      designation: registeredUser.designation || userRole,
+      frappeStaffId: registeredUser.frappeStaffId || userId,
+      sessionVersion: registeredUser.sessionVersion || 1,
+      accountStatus: 'active',
       active: true
     };
 

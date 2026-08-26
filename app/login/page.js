@@ -9,11 +9,16 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Loader2,
-  Mail
+  Mail,
+  UserCheck,
+  Stethoscope,
+  Pill,
+  Users
 } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const [loginType, setLoginType] = useState('master'); // master, doctor, pharmacist, staff
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,7 +42,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(identifier, password);
+      await login(identifier, password, loginType);
     } catch (err) {
       setError(err.message || 'Invalid credentials. Please check your details.');
     } finally {
@@ -51,7 +56,7 @@ export default function LoginPage() {
       {/* Outer Main Container Card */}
       <div className="w-full max-w-5xl bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/60 shadow-2xl p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         
-        {/* LEFT PANEL: Branding & Actual Thangam Hospital Image */}
+        {/* LEFT PANEL: Branding & Hospital Photo */}
         <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
           
           {/* Top Brand Logo */}
@@ -81,7 +86,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Actual Thangam Hospital Building Photo */}
+          {/* Building Photo */}
           <div className="relative rounded-2xl overflow-hidden shadow-xl border border-white/80 group">
             <img 
               src="/thangam_hospital_building.jpg" 
@@ -92,24 +97,78 @@ export default function LoginPage() {
 
         </div>
 
-
         {/* RIGHT PANEL: White Floating Login Card */}
-        <div className="lg:col-span-6 bg-white rounded-[28px] shadow-xl border border-slate-100 p-6 sm:p-10 relative">
+        <div className="lg:col-span-6 bg-white rounded-[28px] shadow-xl border border-slate-100 p-6 sm:p-8 relative">
           
           {/* Header Row with Shield Badge */}
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start justify-between mb-4">
             <div>
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">
                 Welcome Back
               </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Sign in to access your hospital portal
+              <p className="text-xs text-slate-500 mt-0.5">
+                Select your login portal to access Hospital ERP
               </p>
             </div>
             
             <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
+          </div>
+
+          {/* Role Login Type Selection Tabs */}
+          <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => { setLoginType('master'); setError(''); }}
+              className={`flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                loginType === 'master' 
+                  ? 'bg-white text-indigo-700 shadow-xs border border-indigo-100' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Master</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setLoginType('doctor'); setError(''); }}
+              className={`flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                loginType === 'doctor' 
+                  ? 'bg-white text-blue-700 shadow-xs border border-blue-100' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <Stethoscope className="w-3.5 h-3.5" />
+              <span>Doctor</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setLoginType('pharmacist'); setError(''); }}
+              className={`flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                loginType === 'pharmacist' 
+                  ? 'bg-white text-emerald-700 shadow-xs border border-emerald-100' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <Pill className="w-3.5 h-3.5" />
+              <span>Pharmacist</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setLoginType('staff'); setError(''); }}
+              className={`flex items-center justify-center gap-1 py-2 px-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                loginType === 'staff' 
+                  ? 'bg-white text-slate-800 shadow-xs border border-slate-200' 
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Staff</span>
+            </button>
           </div>
 
           {/* Login Form */}
@@ -162,61 +221,58 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password Row */}
+            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 text-slate-600 cursor-pointer select-none">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-600">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span>Remember me</span>
               </label>
-
-              <button
-                type="button"
-                onClick={() => setError('Contact Hospital IT administrator to reset password.')}
-                className="font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-              >
+              <a href="#" className="font-semibold text-blue-600 hover:underline">
                 Forgot Password?
-              </button>
+              </a>
             </div>
 
-            {/* Sign In Button */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-3 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Signing In...
+                  <span>Authenticating...</span>
                 </>
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
-                  Sign In
+                  <span>Sign In to {loginType === 'master' ? 'Master Admin' : loginType === 'doctor' ? 'Doctor Portal' : loginType === 'pharmacist' ? 'Pharmacy Portal' : 'Hospital ERP'}</span>
                 </>
               )}
             </button>
           </form>
 
           {/* Footer Copyright */}
-          <div className="mt-8 text-center text-[11px] text-slate-400 font-normal">
+          <p className="text-[11px] text-slate-400 text-center mt-6">
             © 2026 Thangam Hospitals. All rights reserved.
-          </div>
+          </p>
 
         </div>
+
       </div>
+
     </div>
   );
 }
