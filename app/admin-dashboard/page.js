@@ -135,6 +135,7 @@ export default function AdminDashboardPage() {
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   const [editStaffName, setEditStaffName] = useState("");
+  const [editStaffEmail, setEditStaffEmail] = useState("");
   const [editStaffDesignation, setEditStaffDesignation] = useState("");
   const [editStaffDepartment, setEditStaffDepartment] = useState("");
   const [editStaffMobile, setEditStaffMobile] = useState("");
@@ -328,11 +329,13 @@ export default function AdminDashboardPage() {
 
   const handleEditStaffProfile = (staff) => {
     setEditingStaff(staff);
-    setEditStaffName(staff.full_name || "");
+    setEditStaffName(staff.full_name || staff.name || "");
+    setEditStaffEmail(staff.email || "");
     setEditStaffDesignation(staff.designation || (staff.roles ? staff.roles[0] : "Staff"));
     setEditStaffDepartment(staff.department || "General Medicine");
-    setEditStaffMobile(staff.mobile_no || "");
-    setEditStaffStatus(staff.status || "Active");
+    const rawMob = (staff.mobile_no || staff.mobileNo || staff.phone || "").trim();
+    setEditStaffMobile(rawMob.includes("@") ? "" : rawMob);
+    setEditStaffStatus(staff.status === "Inactive" || staff.active === false ? "Inactive" : "Active");
     setEditStaffPassword("");
     setIsProfileEditOpen(true);
   };
@@ -344,9 +347,9 @@ export default function AdminDashboardPage() {
     try {
       await createStaffUser({
         id: editingStaff.id,
-        email: editingStaff.email,
+        email: editStaffEmail.trim() || editingStaff.email,
         full_name: editStaffName,
-        mobile_no: editStaffMobile,
+        mobile_no: editStaffMobile.trim(),
         password: editStaffPassword || undefined,
         roles: editingStaff.roles || [editingStaff.designation || "Staff Member"],
         permissions: editingStaff.permissions || [],
@@ -1589,6 +1592,17 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Email Address</Label>
+                  <Input
+                    type="email"
+                    value={editStaffEmail}
+                    onChange={(e) => setEditStaffEmail(e.target.value)}
+                    required
+                    className="text-xs h-9 font-medium"
+                  />
+                </div>
+
+                <div>
                   <Label className="text-xs font-bold text-slate-700 mb-1 block">Designation</Label>
                   <Input
                     value={editStaffDesignation}
@@ -1608,11 +1622,13 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
-                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Mobile Number</Label>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Mobile Number (Login Identifier)</Label>
                   <Input
+                    type="tel"
+                    placeholder="e.g. 9363105887"
                     value={editStaffMobile}
                     onChange={(e) => setEditStaffMobile(e.target.value)}
-                    className="text-xs h-9"
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
 

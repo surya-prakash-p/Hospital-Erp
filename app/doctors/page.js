@@ -31,6 +31,7 @@ export default function DoctorsCatalogPage() {
   const [patients, setPatients] = useState("");
   const [successRate, setSuccessRate] = useState("");
   const [email, setEmail] = useState("");
+  const [mobileNo, setMobileNo] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("Available");
   const [about, setAbout] = useState("");
@@ -103,6 +104,7 @@ export default function DoctorsCatalogPage() {
     setPatients(doc.patients || "");
     setSuccessRate(doc.success_rate || "");
     setEmail(doc.email || "");
+    setMobileNo(doc.mobile_no || doc.mobileNo || doc.phone || "");
     setPassword(doc.password || "");
     setStatus(doc.status || "Available");
     setAbout(doc.about || "");
@@ -148,6 +150,7 @@ export default function DoctorsCatalogPage() {
       patients: patients.trim() || "0",
       success_rate: successRate.trim() || "100%",
       email: email.trim(),
+      mobile_no: mobileNo.trim(),
       password: password,
       status: status,
       about: about.trim()
@@ -423,6 +426,16 @@ export default function DoctorsCatalogPage() {
                     placeholder="e.g. rajesh@thangamhospital.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="mobileNo" className="text-xs font-semibold text-slate-700">Mobile Number (Login Identifier)</Label>
+                  <Input
+                    id="mobileNo"
+                    type="tel"
+                    placeholder="e.g. 9363105887"
+                    value={mobileNo}
+                    onChange={(e) => setMobileNo(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
