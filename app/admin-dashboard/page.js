@@ -265,14 +265,19 @@ export default function AdminDashboardPage() {
       const res = await fetch('/api/users/manage', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          setStaffUsers(data.users || []);
+        if (data.success && Array.isArray(data.users)) {
+          setStaffUsers(data.users);
           setActivities(data.activities || []);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('hospital_staff_users', JSON.stringify(data.users));
+          }
           return;
         }
       }
       const data = await getStaffUsers();
-      setStaffUsers(data || []);
+      if (data && data.length > 0) {
+        setStaffUsers(data);
+      }
     } catch (e) {
       showToast("Error loading staff directory", "error");
     } finally {
