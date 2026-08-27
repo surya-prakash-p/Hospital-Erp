@@ -79,8 +79,58 @@
       "sessionVersion": 1,
       "active": true,
       "updatedAt": "2026-08-27T08:52:00.823Z"
+    },
+    {
+      "id": "STAFF-6883",
+      "employeeId": "TH005",
+      "employee_id": "TH005",
+      "frappeStaffId": "TH005",
+      "email": "",
+      "mobile_no": "",
+      "password": "123456",
+      "full_name": "testing",
+      "roles": [
+        "Doctor"
+      ],
+      "role": "Doctor",
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Doctor",
+      "sessionVersion": 1,
+      "active": true,
+      "updatedAt": "2026-08-27T09:06:35.719Z"
+    },
+    {
+      "id": "STAFF-6382",
+      "employeeId": "TH006",
+      "employee_id": "TH006",
+      "frappeStaffId": "TH006",
+      "email": "",
+      "mobile_no": "",
+      "password": "123789",
+      "full_name": "Vishnu",
+      "roles": [
+        "Receptionist"
+      ],
+      "role": "Receptionist",
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Receptionist",
+      "sessionVersion": 1,
+      "active": true,
+      "updatedAt": "2026-08-27T09:08:48.778Z"
     }
   ],
   "deleted": [],
-  "activities": []
+  "activities": [
+    {
+      "id": "act-1787821728933",
+      "title": "New staff user created",
+      "desc": "Vishnu (TH006 - Receptionist)",
+      "time": "02:38 pm",
+      "createdAt": "2026-08-27T09:08:48.929Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    }
+  ]
 }

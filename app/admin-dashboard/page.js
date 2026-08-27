@@ -321,7 +321,12 @@ export default function AdminDashboardPage() {
       setPassword("");
       setDepartment("General Medicine");
       setQualifications("");
-      setConsultationFee("500");
+      setStaffUsers(prev => {
+        const empId = newStaff.employeeId || newStaff.employee_id;
+        const exists = prev.some(u => (u.employeeId || u.employee_id || u.id) === (empId || newStaff.id));
+        if (exists) return prev;
+        return [newStaff, ...prev];
+      });
 
       await loadData();
     } catch (err) {
