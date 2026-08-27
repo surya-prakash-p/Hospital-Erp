@@ -1,0 +1,67 @@
+{
+  "users": [
+    {
+      "id": "STAFF-ADMIN-1",
+      "employeeId": "TH001",
+      "employee_id": "TH001",
+      "frappeStaffId": "TH001",
+      "email": "suryapraks588@gmail.com",
+      "mobile_no": "8270173588",
+      "password": "Admin@2026",
+      "full_name": "Hospital Admin",
+      "roles": [
+        "Hospital Admin"
+      ],
+      "permissions": [
+        "*"
+      ],
+      "department": "Hospital Administration",
+      "designation": "Chief Administrator",
+      "sessionVersion": 1,
+      "createdAt": "2026-08-27T08:39:39.095Z"
+    },
+    {
+      "id": "STAFF-MGR-1",
+      "employeeId": "TH002",
+      "employee_id": "TH002",
+      "frappeStaffId": "TH002",
+      "email": "manager@thangamhospital.com",
+      "mobile_no": "8073788034",
+      "password": "123456",
+      "full_name": "Hospital Manager",
+      "roles": [
+        "Hospital Admin"
+      ],
+      "permissions": [
+        "*"
+      ],
+      "department": "Hospital Administration",
+      "designation": "General Manager",
+      "sessionVersion": 1,
+      "createdAt": "2026-08-27T08:39:39.097Z"
+    },
+    {
+      "id": "STAFF-9682",
+      "employeeId": "TH003",
+      "employee_id": "TH003",
+      "frappeStaffId": "TH003",
+      "email": "",
+      "mobile_no": "",
+      "password": "UpdatedPassword@2026",
+      "full_name": "Saranya",
+      "roles": [
+        "Hospital Admin"
+      ],
+      "role": "Hospital Admin",
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Hospital Admin",
+      "sessionVersion": 2,
+      "active": true,
+      "updatedAt": "2026-08-27T08:39:39.675Z"
+    }
+  ],
+  "deleted": [],
+  "activities": [],
+  "updatedAt": 1787819979720
+}
