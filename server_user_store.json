@@ -47,7 +47,7 @@
       "frappeStaffId": "TH003",
       "email": "",
       "mobile_no": "",
-      "password": "UpdatedPassword@2026",
+      "password": "Admin@123",
       "full_name": "Saranya",
       "roles": [
         "Hospital Admin"
@@ -56,12 +56,12 @@
       "permissions": [],
       "department": "General Medicine",
       "designation": "Hospital Admin",
-      "sessionVersion": 2,
+      "sessionVersion": 3,
       "active": true,
-      "updatedAt": "2026-08-27T08:39:39.675Z"
+      "updatedAt": "2026-08-27T08:44:04.875Z"
     }
   ],
   "deleted": [],
   "activities": [],
-  "updatedAt": 1787819979720
+  "updatedAt": 1787820245005
 }

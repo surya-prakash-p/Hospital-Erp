@@ -311,7 +311,7 @@ export default function AdminDashboardPage() {
       });
 
       addSystemActivityLog("New staff user created", `${newStaff.full_name} (${primaryRole})`, "user");
-      showToast(`Successfully created ${newStaff.full_name} (${primaryRole}) in backend!`, "success");
+      showToast(`Successfully created ${newStaff.full_name}! Employee ID: ${newStaff.employeeId || newStaff.employee_id}`, "success");
       setIsAddModalOpen(false);
       
       // Reset Form
