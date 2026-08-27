@@ -59,9 +59,28 @@
       "sessionVersion": 3,
       "active": true,
       "updatedAt": "2026-08-27T08:44:04.875Z"
+    },
+    {
+      "id": "STAFF-4514",
+      "employeeId": "TH004",
+      "employee_id": "TH004",
+      "frappeStaffId": "TH004",
+      "email": "",
+      "mobile_no": "",
+      "password": "123456",
+      "full_name": "Demo",
+      "roles": [
+        "Pharmacist"
+      ],
+      "role": "Pharmacist",
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Pharmacist",
+      "sessionVersion": 1,
+      "active": true,
+      "updatedAt": "2026-08-27T08:52:00.823Z"
     }
   ],
   "deleted": [],
-  "activities": [],
-  "updatedAt": 1787820245005
+  "activities": []
 }
