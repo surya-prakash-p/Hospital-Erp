@@ -34,7 +34,8 @@ import {
   ChevronRight,
   Filter,
   AlertTriangle,
-  Trash2
+  Trash2,
+  IdCard
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { getStaffUsers, createStaffUser, updateUserRolesAndPermissions, deleteStaffUser } from "@/lib/hospital-service";
+import { generateNextEmployeeId, validateEmployeeIdFormat } from "@/lib/employee-id";
 
 const ALL_ROLES = [
   "Hospital Admin",
@@ -175,6 +177,51 @@ export default function AdminDashboardPage() {
   const [editRoles, setEditRoles] = useState([]);
   const [editPermissions, setEditPermissions] = useState([]);
 
+  // Edit Employee ID Modal State (Admin Only)
+  const [isEditEmpIdModalOpen, setIsEditEmpIdModalOpen] = useState(false);
+  const [staffToEditEmpId, setStaffToEditEmpId] = useState(null);
+  const [newEmpIdInput, setNewEmpIdInput] = useState("");
+  const [isSavingEmpId, setIsSavingEmpId] = useState(false);
+
+  const handleSaveEmployeeId = async (e) => {
+    e.preventDefault();
+    if (!staffToEditEmpId) return;
+    const cleanId = newEmpIdInput.trim().toUpperCase();
+
+    if (!validateEmployeeIdFormat(cleanId)) {
+      showToast("Employee ID format must start with TH (e.g. TH001)", "error");
+      return;
+    }
+
+    setIsSavingEmpId(true);
+    try {
+      const res = await fetch('/api/users/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: staffToEditEmpId.id,
+          email: staffToEditEmpId.email,
+          employeeId: cleanId,
+          employee_id: cleanId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to change Employee ID");
+      }
+
+      showToast(`Successfully updated Employee ID to ${cleanId}!`, "success");
+      setIsEditEmpIdModalOpen(false);
+      setStaffToEditEmpId(null);
+      await loadData();
+    } catch (err) {
+      showToast(err.message || "Failed to update Employee ID", "error");
+    } finally {
+      setIsSavingEmpId(false);
+    }
+  };
+
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -239,8 +286,8 @@ export default function AdminDashboardPage() {
 
   const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!fullName.trim() || !email.trim() || !phone.trim() || !password) {
-      showToast("Full Name, Email, Mobile Number, and Password are required", "error");
+    if (!fullName.trim() || !password) {
+      showToast("Full Name and Password are required", "error");
       return;
     }
 
@@ -248,6 +295,7 @@ export default function AdminDashboardPage() {
     showToast(`Creating ${primaryRole} account and syncing backend...`, "info");
 
     try {
+      const targetDept = primaryRole === "Nurse" ? "Nursing & Wards" : (department.trim() || (primaryRole === "Doctor" ? "General Medicine" : primaryRole === "Pharmacist" ? "Pharmacy" : "Laboratory"));
       const newStaff = await createStaffUser({
         full_name: fullName.trim(),
         email: email.trim(),
@@ -255,7 +303,7 @@ export default function AdminDashboardPage() {
         password: password,
         role: primaryRole,
         roles: [primaryRole],
-        department: department.trim() || (primaryRole === "Doctor" ? "General Medicine" : primaryRole === "Pharmacist" ? "Pharmacy" : "Laboratory"),
+        department: targetDept,
         designation: primaryRole,
         qualifications: qualifications.trim(),
         consultation_fee: consultationFee,
@@ -918,6 +966,7 @@ export default function AdminDashboardPage() {
               <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
                 <tr className="border-b border-slate-200/80 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4 bg-slate-50">Staff Member</th>
+                  <th className="py-3 px-3 bg-slate-50">Employee ID</th>
                   <th className="py-3 px-3 bg-slate-50">Role</th>
                   <th className="py-3 px-3 bg-slate-50">Department</th>
                   <th className="py-3 px-3 bg-slate-50">Email</th>
@@ -929,7 +978,7 @@ export default function AdminDashboardPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                    <td colSpan={8} className="py-8 text-center text-slate-400 font-medium">
                       No staff members found matching criteria.
                     </td>
                   </tr>
@@ -943,6 +992,7 @@ export default function AdminDashboardPage() {
                     else if (staff.roles?.includes("Receptionist")) roleBadge = "bg-purple-50 text-purple-700 border-purple-200/80 font-bold";
 
                     const initials = (staff.full_name || staff.email || "US").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+                    const empIdDisplay = staff.employeeId || staff.employee_id || staff.frappeStaffId || "TH-STF-001";
 
                     return (
                       <tr key={staff.id || staff.email} className="hover:bg-slate-50/50 transition-colors">
@@ -956,6 +1006,30 @@ export default function AdminDashboardPage() {
                               <div className="font-bold text-slate-900">{staff.full_name}</div>
                               <div className="text-[10px] text-slate-400 font-medium">{staff.designation || (staff.roles ? staff.roles[0] : "Staff")}</div>
                             </div>
+                          </div>
+                        </td>
+
+                        {/* Employee ID */}
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-800">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
+                              {empIdDisplay}
+                            </span>
+                            {isHospitalAdmin ? (
+                              <button
+                                onClick={() => {
+                                  setStaffToEditEmpId(staff);
+                                  setNewEmpIdInput(empIdDisplay);
+                                  setIsEditEmpIdModalOpen(true);
+                                }}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                title="Edit Employee ID (Admin Only)"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                            ) : (
+                              <Lock className="w-3 h-3 text-slate-400" title="Employee ID Locked" />
+                            )}
                           </div>
                         </td>
 
@@ -1127,6 +1201,19 @@ export default function AdminDashboardPage() {
             </div>
 
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              
+              {/* Auto-Generated Employee ID Banner */}
+              <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] font-bold text-blue-900 uppercase tracking-wider">Server Auto-Generated Employee ID</div>
+                  <div className="text-[10px] text-blue-700 font-medium">Reserved sequentially for role ({primaryRole})</div>
+                </div>
+                <div className="px-3 py-1 bg-white rounded-lg border border-blue-300 text-xs font-mono font-extrabold text-blue-800 flex items-center gap-1.5 shadow-2xs">
+                  <IdCard className="w-4 h-4 text-blue-600" />
+                  <span>{generateNextEmployeeId(primaryRole, staffUsers, [], activities)}</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs font-bold text-slate-700 mb-1 block">Full Name *</Label>
@@ -1153,38 +1240,38 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
-                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Email Address (Login ID) *</Label>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Email Address (Optional)</Label>
                   <Input
                     type="email"
                     placeholder="e.g. ramesh@thangamhospital.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    required
                     className="text-xs h-9"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Mobile Number *</Label>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Mobile Number</Label>
                   <Input
                     type="tel"
                     placeholder="e.g. 9876543210"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    required
                     className="text-xs h-9"
                   />
                 </div>
 
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Department</Label>
-                  <Input
-                    placeholder="e.g. Cardiology, Pharmacy"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    className="text-xs h-9"
-                  />
-                </div>
+                {primaryRole !== "Nurse" && (
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700 mb-1 block">Department</Label>
+                    <Input
+                      placeholder="e.g. Cardiology, Pharmacy"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      className="text-xs h-9"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-xs font-bold text-slate-700 mb-1 block">Login Password *</Label>
@@ -1925,6 +2012,83 @@ export default function AdminDashboardPage() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Edit Employee ID Modal (Admin Only) */}
+      {isEditEmpIdModalOpen && staffToEditEmpId && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 font-sans">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+                  <IdCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Change Employee ID</h3>
+                  <p className="text-xs text-slate-500 font-medium">{staffToEditEmpId.full_name} ({staffToEditEmpId.roles?.[0] || 'Staff'})</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditEmpIdModalOpen(false);
+                  setStaffToEditEmpId(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEmployeeId} className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1">
+                <div className="text-slate-500 font-medium">Current Employee ID:</div>
+                <div className="font-mono font-bold text-slate-900 text-sm">
+                  {staffToEditEmpId.employeeId || staffToEditEmpId.employee_id || staffToEditEmpId.frappeStaffId || 'N/A'}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700 mb-1.5 block">New Employee ID *</Label>
+                <Input
+                  type="text"
+                  required
+                  placeholder="e.g. TH001"
+                  value={newEmpIdInput}
+                  onChange={(e) => setNewEmpIdInput(e.target.value.toUpperCase())}
+                  className="text-xs py-2 rounded-xl font-mono uppercase font-bold"
+                />
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 font-medium flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>Server will verify format and uniqueness before saving. Change will be recorded in audit log.</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditEmpIdModalOpen(false);
+                    setStaffToEditEmpId(null);
+                  }}
+                  disabled={isSavingEmpId}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingEmpId}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isSavingEmpId ? "Saving..." : "Save Employee ID"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

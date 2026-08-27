@@ -118,39 +118,81 @@ export async function POST(req) {
     const authResult = await requireAuth(req, ['Hospital Admin', 'System Manager']);
     if (authResult.errorResponse) return authResult.errorResponse;
 
-    const body = await req.json();
-    const { email, password, full_name, mobile_no, roles, permissions, department, designation, employee_id } = body;
+    const currentUser = authResult.user;
+    const adminEmployeeId = currentUser?.employeeId || currentUser?.employee_id || currentUser?.id || 'TH-ADM-001';
 
-    if (!email) {
-      return NextResponse.json({ error: 'Email address is required' }, { status: 400 });
+    const body = await req.json();
+    const { id, email, password, full_name, mobile_no, roles, permissions, department, designation, employee_id, employeeId } = body;
+
+    const requestedEmpId = (employeeId || employee_id || '').trim().toUpperCase();
+
+    if (!email && !requestedEmpId) {
+      return NextResponse.json({ error: 'Email address or Employee ID is required' }, { status: 400 });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const nameParts = (full_name || cleanEmail).split(' ');
+    const cloudStore = await readCloudStore();
+    const serverUsers = cloudStore.users || [];
+    const cleanEmail = (email || '').trim().toLowerCase();
+    
+    // Find existing user if updating
+    const existingUser = serverUsers.find(u => {
+      const uId = (u.id || '').trim();
+      const uEmpId = (u.employeeId || u.employee_id || u.frappeStaffId || '').trim().toUpperCase();
+      const uEmail = (u.email || '').trim().toLowerCase();
+      return (id && uId === id) || (requestedEmpId && uEmpId === requestedEmpId) || (cleanEmail && uEmail === cleanEmail);
+    });
+
+    const oldEmpId = existingUser ? (existingUser.employeeId || existingUser.employee_id || existingUser.frappeStaffId) : null;
+    const isEmpIdChanging = Boolean(oldEmpId && requestedEmpId && oldEmpId !== requestedEmpId);
+
+    const nameParts = (full_name || existingUser?.full_name || cleanEmail).split(' ');
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ') || '';
-    const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ['Staff Member'];
+    const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : (existingUser?.roles || ['Staff Member']);
     const primaryRole = userRoles[0];
 
     const savedUser = await saveServerUser({
-      email: cleanEmail,
+      id: id || existingUser?.id,
+      email: cleanEmail || existingUser?.email,
       password: password,
-      full_name: full_name || cleanEmail,
-      name: full_name || cleanEmail,
-      mobile_no: mobile_no || '',
+      full_name: full_name || existingUser?.full_name || cleanEmail,
+      name: full_name || existingUser?.full_name || cleanEmail,
+      mobile_no: mobile_no !== undefined ? mobile_no : existingUser?.mobile_no,
       role: primaryRole,
       roles: userRoles,
-      permissions: permissions || [],
-      department: department || '',
-      designation: designation || primaryRole,
-      frappeStaffId: employee_id || cleanEmail,
+      permissions: permissions || existingUser?.permissions || [],
+      department: department || existingUser?.department || '',
+      designation: designation || existingUser?.designation || primaryRole,
+      employeeId: requestedEmpId || oldEmpId,
+      employee_id: requestedEmpId || oldEmpId,
+      frappeStaffId: requestedEmpId || oldEmpId,
       active: true
     });
 
-    if (password) {
-      await addCloudActivity("New staff user created", `${full_name || cleanEmail} (${primaryRole})`, "user");
+    if (isEmpIdChanging) {
+      await addCloudActivity(
+        "Employee ID Changed",
+        `Old: ${oldEmpId} | New: ${savedUser.employeeId} | Changed By: ${adminEmployeeId}`,
+        "user"
+      );
+    } else if (!existingUser) {
+      await addCloudActivity(
+        "New staff user created",
+        `${savedUser.full_name} (${savedUser.employeeId} - ${primaryRole})`,
+        "user"
+      );
+    } else if (password) {
+      await addCloudActivity(
+        "Staff Password Reset",
+        `Password reset for ${savedUser.full_name} (${savedUser.employeeId}) by Admin`,
+        "user"
+      );
     } else {
-      await addCloudActivity("Staff Profile Updated", `${full_name || cleanEmail} (${primaryRole})`, "profile");
+      await addCloudActivity(
+        "Staff Profile Updated",
+        `${savedUser.full_name} (${savedUser.employeeId})`,
+        "profile"
+      );
     }
 
     let frappeUser = null;

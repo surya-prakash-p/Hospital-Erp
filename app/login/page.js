@@ -9,12 +9,12 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Loader2,
-  Mail
+  IdCard
 } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -25,8 +25,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!identifier.trim()) {
-      setError('Please enter your Email Address or Mobile Number');
+    if (!employeeId.trim()) {
+      setError('Please enter your Employee ID');
       return;
     }
 
@@ -37,9 +37,9 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(identifier, password);
+      await login(employeeId.trim(), password);
     } catch (err) {
-      setError(err.message || 'Invalid credentials. Please check your details.');
+      setError(err.message || 'Invalid Employee ID or password.');
     } finally {
       setLoading(false);
     }
@@ -99,11 +99,11 @@ export default function LoginPage() {
           {/* Header Row with Shield Badge */}
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Welcome Back
+              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight font-sans uppercase">
+                THANGAM HOSPITAL ERP
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Sign in to access your hospital portal
+                Sign in using your Employee ID and password
               </p>
             </div>
             
@@ -122,21 +122,21 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Email Address or Mobile Number Input */}
+            {/* Employee ID Input */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">
-                Email Address or Mobile Number
+                Employee ID
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="w-4 h-4" />
+                  <IdCard className="w-4 h-4" />
                 </div>
                 <input
                   type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="Enter email or 10-digit mobile number"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
+                  placeholder="e.g. TH001"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono uppercase"
                   required
                 />
               </div>
@@ -204,7 +204,7 @@ export default function LoginPage() {
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
-                  Sign In
+                  Login
                 </>
               )}
             </button>

@@ -114,7 +114,7 @@ export default function PharmacyPage() {
     medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
     dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
     reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
-    batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 30, no_of_packs: 10
+    batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10
   });
 
   // Add Batch to Existing Medicine State
@@ -1005,6 +1005,7 @@ export default function PharmacyPage() {
     try {
       const data = {
         ...newMedData,
+        tablets_per_strip: parseInt(newMedData.tablets_per_strip) || 10,
         purchase_price: parseFloat(newMedData.purchase_price) || 0.0,
         selling_price: parseFloat(newMedData.selling_price) || 0.0,
         mrp: parseFloat(newMedData.mrp) || parseFloat(newMedData.selling_price) || 0.0,
@@ -2490,9 +2491,9 @@ export default function PharmacyPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label htmlFor="med-cat" className="text-xs font-semibold">Drug Schedule / Category *</Label>
+                    <Label htmlFor="med-cat" className="text-xs font-semibold">Drug Category *</Label>
                     <select
                       id="med-cat"
                       value={newMedData.category || "Regular Medicine"}
@@ -2526,6 +2527,19 @@ export default function PharmacyPage() {
                       <option value="Powder">Powder</option>
                       <option value="Other">Other</option>
                     </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="med-tabs-per-strip" className="text-xs font-bold text-indigo-900">Tabs / Strip *</Label>
+                    <Input 
+                      id="med-tabs-per-strip" 
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 10" 
+                      value={newMedData.tablets_per_strip ?? 10} 
+                      onChange={(e) => setNewMedData(p => ({ ...p, tablets_per_strip: parseInt(e.target.value) || 1 }))}
+                      className="bg-white border-indigo-200 font-bold"
+                      required 
+                    />
                   </div>
                 </div>
 
@@ -5407,6 +5421,8 @@ export default function PharmacyPage() {
                         setOtcBasket(prev => [...prev, {
                           medicine_name: med.medicine_name,
                           qty: 1,
+                          sell_unit: "Strip",
+                          tablets_per_strip: med.tablets_per_strip || 10,
                           price: med.selling_price || 0,
                           stock: med.stock || 0,
                           category: med.category
@@ -5420,7 +5436,7 @@ export default function PharmacyPage() {
                       .filter(m => !m.disabled && m.stock > 0)
                       .map(m => (
                         <option key={m.medicine_name} value={m.medicine_name}>
-                          {m.medicine_name} (Stock: {m.stock} • ₹{m.selling_price})
+                          {m.medicine_name} (Stock: {m.stock} • ₹{m.selling_price}/strip)
                         </option>
                       ))
                     }
@@ -5428,49 +5444,100 @@ export default function PharmacyPage() {
                 </div>
 
                 {/* Basket List */}
-                <div className="border border-slate-100 rounded-lg overflow-hidden max-h-36 overflow-y-auto">
+                <div className="border border-slate-100 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                   {otcBasket.length === 0 ? (
                     <div className="p-4 text-center text-slate-400 text-[10px]">Basket is empty. Select medicines above.</div>
                   ) : (
                     <div className="divide-y divide-slate-100 bg-white text-[11px]">
-                      {otcBasket.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2 hover:bg-slate-50/20 font-mono">
-                          <span className="font-sans font-semibold text-slate-900 w-1/3 truncate">{item.medicine_name}</span>
-                          
-                          <div className="flex items-center gap-1.5">
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, qty: Math.max(1, it.qty - 1) } : it));
-                              }}
-                              className="w-4 h-4 rounded border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold"
-                            >
-                              -
-                            </button>
-                            <span className="font-semibold w-6 text-center">{item.qty}</span>
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, qty: Math.min(it.stock, it.qty + 1) } : it));
-                              }}
-                              className="w-4 h-4 rounded border border-slate-200 hover:bg-slate-50 flex items-center justify-center font-bold"
-                            >
-                              +
-                            </button>
-                          </div>
+                      {otcBasket.map((item, idx) => {
+                        const tabsPerStrip = item.tablets_per_strip || 10;
+                        const isTabletMode = item.sell_unit === "Tablet";
+                        const unitPrice = isTabletMode ? (item.price / tabsPerStrip) : item.price;
+                        const lineTotal = item.qty * unitPrice;
 
-                          <span className="w-16 text-right">₹{(item.qty * item.price).toFixed(2)}</span>
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              setOtcBasket(prev => prev.filter((_, i) => i !== idx));
-                            }} 
-                            className="text-slate-400 hover:text-rose-600 px-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                        return (
+                          <div key={idx} className="p-2.5 hover:bg-slate-50/50 border-b border-slate-100 flex flex-col gap-1 text-xs">
+                            <div className="flex items-center justify-between font-sans">
+                              <span className="font-bold text-slate-900">{item.medicine_name}</span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                Strip Price: ₹{item.price.toFixed(2)} ({tabsPerStrip} tabs/strip)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pt-1 font-mono">
+                              {/* Sell Unit Selector */}
+                              <select
+                                value={item.sell_unit || "Strip"}
+                                onChange={(e) => {
+                                  const newUnit = e.target.value;
+                                  setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, sell_unit: newUnit } : it));
+                                }}
+                                className="h-7 text-[11px] bg-slate-50 border border-slate-200 rounded px-2 font-semibold text-indigo-700 cursor-pointer font-sans"
+                              >
+                                <option value="Strip">Full Strip(s)</option>
+                                <option value="Tablet">Loose Tablet(s)</option>
+                              </select>
+
+                              {/* Qty Buttons */}
+                              <div className="flex items-center gap-1 font-sans">
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, qty: Math.max(1, it.qty - 1) } : it));
+                                  }}
+                                  className="w-5 h-5 rounded border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-xs"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.qty}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                                    setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, qty: val } : it));
+                                  }}
+                                  className="w-12 h-6 text-center border border-slate-200 rounded text-xs font-bold font-mono"
+                                />
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    setOtcBasket(prev => prev.map((it, i) => i === idx ? { ...it, qty: it.qty + 1 } : it));
+                                  }}
+                                  className="w-5 h-5 rounded border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-xs"
+                                >
+                                  +
+                                </button>
+                                <span className="text-[10px] text-slate-500 font-semibold">
+                                  {isTabletMode ? "tabs" : "strips"}
+                                </span>
+                              </div>
+
+                              {/* Line Total */}
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900">₹{lineTotal.toFixed(2)}</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    setOtcBasket(prev => prev.filter((_, i) => i !== idx));
+                                  }} 
+                                  className="text-slate-400 hover:text-rose-600 p-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Real-time Loose Unit Pricing Explanation */}
+                            {isTabletMode && (
+                              <div className="text-[10px] text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2 py-0.5 rounded font-sans flex items-center justify-between">
+                                <span>Per Tablet: ₹{unitPrice.toFixed(2)}</span>
+                                <span className="font-semibold">Selling {item.qty} loose tablet(s) out of {tabsPerStrip}/strip</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -5496,7 +5563,11 @@ export default function PharmacyPage() {
                 <div className="text-right flex flex-col justify-end">
                   <span className="text-[10px] font-bold text-slate-400">GRAND TOTAL</span>
                   <span className="text-lg font-bold text-slate-900 font-mono">
-                    ₹{otcBasket.reduce((acc, it) => acc + (it.qty * it.price), 0).toFixed(2)}
+                    ₹{otcBasket.reduce((acc, it) => {
+                      const tabsPerStrip = it.tablets_per_strip || 10;
+                      const unitPrice = it.sell_unit === "Tablet" ? (it.price / tabsPerStrip) : it.price;
+                      return acc + (it.qty * unitPrice);
+                    }, 0).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -5522,13 +5593,6 @@ export default function PharmacyPage() {
                     return;
                   }
 
-                  // Stock availability check
-                  const outOfStockMeds = otcBasket.filter(item => item.qty > item.stock);
-                  if (outOfStockMeds.length > 0) {
-                    showToast(`Warning: Insufficient stock for ${outOfStockMeds.map(i=>i.medicine_name).join(", ")}`, "error");
-                    return;
-                  }
-
                   try {
                     showToast("Processing direct OTC sale stock deduction...", "info");
                     
@@ -5537,12 +5601,19 @@ export default function PharmacyPage() {
                       otcCustomerMobile || "9999999999",
                       otcCustomerAge || "30",
                       otcCustomerGender || "Female",
-                      otcBasket.map(item => ({ medicine_name: item.medicine_name, qty: item.qty })),
+                      otcBasket.map(item => ({ 
+                        medicine_name: item.medicine_name, 
+                        qty: item.sell_unit === "Tablet" ? Math.max(1, Math.round(item.qty)) : item.qty * (item.tablets_per_strip || 10)
+                      })),
                       otcPaymentMethod,
                       pharmacistName
                     );
 
-                    const totalVal = otcBasket.reduce((acc, it) => acc + (it.qty * it.price), 0);
+                    const totalVal = otcBasket.reduce((acc, it) => {
+                      const tabsPerStrip = it.tablets_per_strip || 10;
+                      const unitPrice = it.sell_unit === "Tablet" ? (it.price / tabsPerStrip) : it.price;
+                      return acc + (it.qty * unitPrice);
+                    }, 0);
 
                     showToast(`Direct Sale completed. Invoice ${response.invoiceNumber} generated!`, "success");
                     

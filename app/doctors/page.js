@@ -133,27 +133,27 @@ export default function DoctorsCatalogPage() {
 
   const handleSaveSubmit = async (e) => {
     e.preventDefault();
-    if (!fullName.trim() || !specialization.trim() || !consultFee) {
-      showToast("Full Name, Specialization and Consultation Fee are required", "error");
+    if (!fullName.trim()) {
+      showToast("Full Name is required", "error");
       return;
     }
 
     const docPayload = {
       doctor_name: fullName.trim(),
-      specialization: specialization.trim(),
-      consultation_fee: parseFloat(consultFee),
+      specialization: specialization.trim() || "General Medicine",
+      consultation_fee: consultFee ? parseFloat(consultFee) : 0,
       doctor_image: docImage,
-      location: location.trim(),
-      experience: experience.trim(),
-      qualifications: qualifications.trim(),
+      location: location.trim() || "",
+      experience: experience.trim() || "",
+      qualifications: qualifications.trim() || "",
       rating: rating ? parseFloat(rating) : 5.0,
       patients: patients.trim() || "0",
       success_rate: successRate.trim() || "100%",
-      email: email.trim(),
-      mobile_no: mobileNo.trim(),
-      password: password,
-      status: status,
-      about: about.trim()
+      email: email.trim() || "",
+      mobile_no: mobileNo.trim() || "",
+      password: password || "",
+      status: status || "Available",
+      about: about.trim() || ""
     };
 
     const originalList = [...doctorsList];
@@ -340,31 +340,12 @@ export default function DoctorsCatalogPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="specialization" className="text-xs font-semibold text-slate-700">Specialization *</Label>
+                  <Label htmlFor="specialization" className="text-xs font-semibold text-slate-700">Specialization</Label>
                   <Input
                     id="specialization"
                     placeholder="e.g. Cardiologist"
                     value={specialization}
                     onChange={(e) => setSpecialization(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="location" className="text-xs font-semibold text-slate-700">Location</Label>
-                  <Input
-                    id="location"
-                    placeholder="e.g. Clinic Block A, 1st Floor"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="experience" className="text-xs font-semibold text-slate-700">Experience</Label>
-                  <Input
-                    id="experience"
-                    placeholder="e.g. 12 Years"
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
@@ -375,88 +356,6 @@ export default function DoctorsCatalogPage() {
                     value={qualifications}
                     onChange={(e) => setQualifications(e.target.value)}
                   />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="consultfee" className="text-xs font-semibold text-slate-700">Consultation Fee (₹) *</Label>
-                  <Input
-                    id="consultfee"
-                    type="number"
-                    placeholder="e.g. 500"
-                    value={consultFee}
-                    onChange={(e) => setConsultFee(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="rating" className="text-xs font-semibold text-slate-700">Rating (1.0 - 5.0)</Label>
-                  <Input
-                    id="rating"
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="5"
-                    placeholder="e.g. 4.8"
-                    value={rating}
-                    onChange={(e) => setRating(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="patients" className="text-xs font-semibold text-slate-700">Patients Count</Label>
-                  <Input
-                    id="patients"
-                    placeholder="e.g. 1500+"
-                    value={patients}
-                    onChange={(e) => setPatients(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="successrate" className="text-xs font-semibold text-slate-700">Success Rate (%)</Label>
-                  <Input
-                    id="successrate"
-                    placeholder="e.g. 98%"
-                    value={successRate}
-                    onChange={(e) => setSuccessRate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="email" className="text-xs font-semibold text-slate-700">Doctor Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="e.g. rajesh@thangamhospital.org"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="mobileNo" className="text-xs font-semibold text-slate-700">Mobile Number (Login Identifier)</Label>
-                  <Input
-                    id="mobileNo"
-                    type="tel"
-                    placeholder="e.g. 9363105887"
-                    value={mobileNo}
-                    onChange={(e) => setMobileNo(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="password" className="text-xs font-semibold text-slate-700">Doctor Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter login password..."
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="status" className="text-xs font-semibold text-slate-700">Status</Label>
