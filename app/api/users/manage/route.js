@@ -126,8 +126,8 @@ export async function POST(req) {
 
     const requestedEmpId = (employeeId || employee_id || '').trim().toUpperCase();
 
-    if (!email && !requestedEmpId) {
-      return NextResponse.json({ error: 'Email address or Employee ID is required' }, { status: 400 });
+    if (!full_name && !email && !requestedEmpId && !id) {
+      return NextResponse.json({ error: 'Full Name is required to create a staff member' }, { status: 400 });
     }
 
     const cloudStore = await readCloudStore();
