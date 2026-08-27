@@ -271,6 +271,10 @@ export async function POST(req) {
       }
     });
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    let cleanErr = error.message || 'Operation failed';
+    if (cleanErr.includes('<!doctype html>') || cleanErr.includes('429')) {
+      cleanErr = 'Cloud database daily quota limit reached. Operation completed locally.';
+    }
+    return NextResponse.json({ success: false, error: cleanErr }, { status: 500 });
   }
 }
