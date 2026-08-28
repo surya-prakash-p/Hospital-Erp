@@ -139,11 +139,26 @@ export default function FinancePage() {
     .filter(tx => tx.type === "Income" && tx.category === "Clinical Services")
     .reduce((acc, tx) => acc + tx.amount, 0);
 
+  const totalPharmacyIncome = customTx
+    .filter(tx => tx.type === "Income" && (
+      tx.category === "Pharmacy Income" || 
+      tx.category === "Pharmacy" || 
+      tx.category === "Pharmacy Sales" || 
+      (tx.title && tx.title.toLowerCase().includes("pharmacy sale"))
+    ))
+    .reduce((acc, tx) => acc + tx.amount, 0);
+
   const totalCustomIncome = customTx
-    .filter(tx => tx.type === "Income" && tx.category !== "Clinical Services")
+    .filter(tx => tx.type === "Income" && 
+      tx.category !== "Clinical Services" && 
+      tx.category !== "Pharmacy" && 
+      tx.category !== "Pharmacy Income" && 
+      tx.category !== "Pharmacy Sales" && 
+      (!tx.title || !tx.title.toLowerCase().includes("pharmacy sale"))
+    )
     .reduce((acc, tx) => acc + tx.amount, 0);
   
-  const totalRevenue = totalClinicalIncome + totalCustomIncome;
+  const totalRevenue = totalClinicalIncome + totalPharmacyIncome + totalCustomIncome;
   const totalExpenses = customTx.filter(tx => tx.type === "Expense").reduce((acc, tx) => acc + tx.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
 
@@ -153,7 +168,14 @@ export default function FinancePage() {
                           tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           tx.method.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "All" || tx.type === typeFilter;
-    const matchesCategory = categoryFilter === "All" || tx.category === categoryFilter;
+    
+    let matchesCategory = categoryFilter === "All" || tx.category === categoryFilter;
+    if (categoryFilter === "Pharmacy Income" || categoryFilter === "Pharmacy") {
+      matchesCategory = tx.category === "Pharmacy Income" || 
+                        tx.category === "Pharmacy" || 
+                        tx.category === "Pharmacy Sales" || 
+                        (tx.title && tx.title.toLowerCase().includes("pharmacy sale"));
+    }
     
     return matchesSearch && matchesType && matchesCategory;
   });
@@ -297,8 +319,9 @@ export default function FinancePage() {
                   <div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Gross Revenue</p>
                     <h3 className="text-2xl font-bold font-serif text-slate-900 mt-2">₹{totalRevenue.toLocaleString()}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <span className="font-semibold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded">₹{totalClinicalIncome.toLocaleString()}</span> from clinical billings
+                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 flex-wrap">
+                      <span className="font-semibold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded">₹{totalPharmacyIncome.toLocaleString()}</span> pharmacy &nbsp;•&nbsp;
+                      <span className="font-semibold text-teal-600 bg-teal-50 px-1 py-0.2 rounded">₹{totalClinicalIncome.toLocaleString()}</span> clinical
                     </p>
                   </div>
                   <div className="p-2 bg-indigo-50 text-indigo-500 rounded-lg">
@@ -391,9 +414,10 @@ export default function FinancePage() {
                   <select 
                     value={categoryFilter} 
                     onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="h-8 border border-input rounded-md px-2 text-[11px] bg-white focus:outline-none"
+                    className="h-8 border border-input rounded-md px-2 text-[11px] bg-white focus:outline-none font-semibold text-slate-800"
                   >
                     <option value="All">All Categories</option>
+                    <option value="Pharmacy Income">Pharmacy Income</option>
                     <option value="Clinical Services">Clinical Services</option>
                     <option value="Salary">Salary</option>
                     <option value="Medical Supplies">Medical Supplies</option>
@@ -418,7 +442,7 @@ export default function FinancePage() {
                   
                   <div className="divide-y divide-slate-200 bg-white">
                     {filteredTransactions.map((tx, idx) => {
-                      const isPatient = tx.id.startsWith("tx-consult-") || tx.id.startsWith("tx-lab-") || tx.id.startsWith("tx-pharm-") || tx.id.startsWith("tx-billing-");
+                      const isPatient = tx.id.startsWith("tx-consult-") || tx.id.startsWith("tx-lab-") || tx.id.startsWith("tx-pharm-") || tx.id.startsWith("tx-billing-") || tx.id.startsWith("tx-rx-");
                       return (
                         <div key={tx.id || idx} className="grid grid-cols-12 px-6 py-3 items-center text-xs hover:bg-slate-50/50 transition-colors">
                           <div className="col-span-2 text-slate-500 font-mono text-[10px]">{tx.date}</div>
@@ -428,16 +452,17 @@ export default function FinancePage() {
                           </div>
                           <div className="col-span-2">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium border
+                              ${(tx.category === "Pharmacy Income" || tx.category === "Pharmacy" || tx.category === "Pharmacy Sales") ? "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold" : ""}
                               ${tx.category === "Clinical Services" ? "bg-teal-50 text-teal-700 border-teal-100" : ""}
                               ${tx.category === "Salary" ? "bg-purple-50 text-purple-700 border-purple-100" : ""}
                               ${tx.category === "Medical Supplies" ? "bg-amber-50 text-amber-700 border-amber-100" : ""}
                               ${tx.category === "Utilities" ? "bg-orange-50 text-orange-700 border-orange-100" : ""}
                               ${tx.category === "Maintenance" ? "bg-sky-50 text-sky-700 border-sky-100" : ""}
                               ${tx.category === "Ambulance" ? "bg-rose-50 text-rose-700 border-rose-100" : ""}
-                              ${tx.category === "Rent" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ""}
+                              ${tx.category === "Rent" ? "bg-indigo-50 text-indigo-700 border-indigo-100" : ""}
                               ${tx.category === "Others" ? "bg-slate-50 text-slate-700 border-slate-100" : ""}`}
                             >
-                              {tx.category}
+                              {tx.category === "Pharmacy" ? "Pharmacy Income" : tx.category}
                             </span>
                           </div>
                           <div className="col-span-2 text-slate-600 font-medium flex items-center gap-1">
@@ -509,7 +534,7 @@ export default function FinancePage() {
                           ...prev, 
                           type: typeVal,
                           // auto set category defaults based on type
-                          category: typeVal === "Income" ? "Rent" : "Salary" 
+                          category: typeVal === "Income" ? "Pharmacy Income" : "Salary" 
                         }));
                       }}
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -539,6 +564,7 @@ export default function FinancePage() {
                         </>
                       ) : (
                         <>
+                          <option value="Pharmacy Income">Pharmacy Income</option>
                           <option value="Rent">Rent</option>
                           <option value="Others">Others</option>
                         </>
