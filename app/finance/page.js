@@ -18,7 +18,8 @@ import {
   CheckCircle, 
   AlertCircle, 
   Info,
-  Layers
+  Layers,
+  Pill
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -207,10 +208,14 @@ export default function FinancePage() {
             <p class="text-[10px] text-slate-400">Date: ${new Date().toLocaleDateString()}</p>
           </div>
           
-          <div class="grid grid-cols-3 gap-4 my-8">
+          <div class="grid grid-cols-4 gap-4 my-8">
             <div class="border p-4 rounded text-center">
               <span class="text-xs font-semibold text-slate-400 block uppercase">Total Revenue</span>
               <span class="text-lg font-bold text-slate-800">₹${totalRevenue.toLocaleString()}</span>
+            </div>
+            <div class="border p-4 rounded text-center bg-emerald-50">
+              <span class="text-xs font-semibold text-emerald-700 block uppercase">Pharmacy Income</span>
+              <span class="text-lg font-bold text-emerald-800">₹${totalPharmacyIncome.toLocaleString()}</span>
             </div>
             <div class="border p-4 rounded text-center">
               <span class="text-xs font-semibold text-slate-400 block uppercase">Total Expenses</span>
@@ -298,7 +303,8 @@ export default function FinancePage() {
 
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
@@ -310,8 +316,8 @@ export default function FinancePage() {
         </div>
       ) : (
         <>
-          {/* Summary Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Summary Metrics Cards (4 Column Grid with dedicated Pharmacy Total Income card) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Total Revenue */}
             <Card className="border-l-4 border-l-indigo-500 shadow-xs relative overflow-hidden">
               <CardContent className="pt-6">
@@ -330,6 +336,35 @@ export default function FinancePage() {
                 </div>
                 <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
                   <Wallet className="w-24 h-24 text-indigo-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pharmacy Total Income (Interactive Card) */}
+            <Card 
+              onClick={() => {
+                setCategoryFilter("Pharmacy Income");
+                showToast("Filtered ledger to show Pharmacy Income", "info");
+              }}
+              className="border-l-4 border-l-emerald-500 shadow-2xs relative overflow-hidden cursor-pointer hover:shadow-md hover:border-emerald-600 transition-all group"
+            >
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">Pharmacy Total Income</p>
+                    <h3 className="text-2xl font-bold font-serif text-emerald-700 mt-2">₹{totalPharmacyIncome.toLocaleString()}</h3>
+                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        {totalRevenue > 0 ? ((totalPharmacyIncome / totalRevenue) * 100).toFixed(1) : 0}% of Revenue
+                      </span>
+                    </p>
+                  </div>
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform">
+                    <Pill className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
+                  <Pill className="w-24 h-24 text-emerald-600" />
                 </div>
               </CardContent>
             </Card>
