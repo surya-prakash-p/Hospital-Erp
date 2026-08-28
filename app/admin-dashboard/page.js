@@ -469,12 +469,32 @@ export default function AdminDashboardPage() {
     if (!staffToDelete) return;
     setIsDeleting(true);
     try {
-      await deleteStaffUser(staffToDelete.email || staffToDelete.mobile_no);
+      const identifier = staffToDelete.id || staffToDelete.employeeId || staffToDelete.employee_id || staffToDelete.frappeStaffId || staffToDelete.email || staffToDelete.mobile_no || staffToDelete.full_name;
+      await deleteStaffUser(identifier);
       addSystemActivityLog(
         "Staff Member Deleted",
         `${staffToDelete.full_name} (${staffToDelete.roles?.[0] || 'Staff'}) was permanently deleted by Admin`,
         "profile"
       );
+
+      const deletedId = staffToDelete.id;
+      const deletedEmpId = staffToDelete.employeeId || staffToDelete.employee_id || staffToDelete.frappeStaffId;
+      const deletedEmail = staffToDelete.email;
+      const deletedName = staffToDelete.full_name || staffToDelete.name;
+
+      setStaffUsers(prev => prev.filter(u => {
+        const uId = u.id;
+        const uEmpId = u.employeeId || u.employee_id || u.frappeStaffId;
+        const uEmail = u.email;
+        const uName = u.full_name || u.name;
+
+        if (deletedId && uId === deletedId) return false;
+        if (deletedEmpId && uEmpId === deletedEmpId) return false;
+        if (deletedEmail && uEmail && deletedEmail.trim().toLowerCase() === uEmail.trim().toLowerCase()) return false;
+        if (deletedName && uName && deletedName.trim().toLowerCase() === uName.trim().toLowerCase()) return false;
+        return true;
+      }));
+
       showToast(`Staff member ${staffToDelete.full_name} deleted successfully!`, "success");
       setIsDeleteModalOpen(false);
       setStaffToDelete(null);
