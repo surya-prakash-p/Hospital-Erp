@@ -92,13 +92,14 @@ def call_gemini_text(prompt):
     if not GEMINI_API_KEY:
         frappe.throw("Gemini API key not configured in site_config.json as gemini_api_key")
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
             "parts": [{"text": prompt}]
         }],
         "generationConfig": {
-            "response_mime_type": "application/json"
+            "response_mime_type": "application/json",
+            "temperature": 0.0
         }
     }
     res = requests.post(url, json=payload)
@@ -110,27 +111,44 @@ def call_gemini_vision(base64_data, mime_type):
     if not GEMINI_API_KEY:
         frappe.throw("Gemini API key not configured")
         
-    prompt = """
-    Extract invoice details and line items from this document into JSON:
-    {
-      "supplier": "Supplier Name",
-      "invoice_number": "Invoice Number",
-      "invoice_date": "YYYY-MM-DD",
-      "items": [
-        {
-          "medicine": "Medicine Name (extract exactly as written)",
-          "batch": "Batch number",
-          "expiry": "YYYY-MM",
-          "qty": int,
-          "rate": float,
-          "mrp": float,
-          "gst": float
-        }
-      ]
-    }
-    """
+    prompt = """You are an expert OCR and data-extraction engine specialized in Indian GST pharmaceutical/medical supply invoices for hospital and pharmacy ERP systems.
+
+You will be given an image or PDF of a printed invoice. Extract ALL fields below with maximum accuracy. Invoices are often photographed (skewed, creased, handwritten annotations, stamps/signatures overlapping text) — use context and layout position to resolve ambiguous characters (e.g. 0 vs O, 1 vs I, 5 vs S).
+
+Return ONLY valid JSON matching the schema below. No explanations, no markdown fences, no extra text.
+
+### FIELDS TO EXTRACT
+1. SELLER / VENDOR DETAILS: seller_name, seller_address, seller_gst_no, seller_dl_no, seller_fssai_no, seller_mobile, seller_phone
+2. BUYER / CUSTOMER DETAILS: customer_code, customer_name, customer_address, customer_pin, customer_phone, customer_mobile, customer_dl_no, customer_gst_no
+3. INVOICE METADATA: invoice_no, invoice_date (ISO YYYY-MM-DD), page_no, sales_agent, agent_cell, due_date, cases
+4. LINE ITEMS: sl_no, product_name, pack, mfr, hsn_code, batch_no, exp_date (YYYY-MM), mrp, qty, free_qty, rate, disc_percent, gst_percent, amount
+5. TOTALS: total_qty, total_items, sub_total, discount, tax_amount, freight, credit_note, debit_note, round_off, net_amount, amount_in_words, total_outstandings, due_bills_count
+6. GST BREAKDOWN: slab_percent, sales_amount, gst_igst, cgst, sgst
+7. PAYMENT / BANK DETAILS: bank_name, account_no, ifsc_code, upi_id
+
+### RULES
+- If a field is not visible/present, return null — do NOT guess or hallucinate values.
+- Numbers must be plain numeric types.
+- Preserve original casing/spelling as printed on the invoice for names.
+- Never fabricate an invoice number, GST number, or batch number.
+
+### OUTPUT JSON SCHEMA
+{
+  "seller": { "seller_name": null, "seller_address": null, "seller_gst_no": null, "seller_dl_no": null, "seller_fssai_no": null, "seller_mobile": null, "seller_phone": null },
+  "customer": { "customer_code": null, "customer_name": null, "customer_address": null, "customer_pin": null, "customer_phone": null, "customer_mobile": null, "customer_dl_no": null, "customer_gst_no": null },
+  "invoice_meta": { "invoice_no": null, "invoice_date": null, "page_no": null, "sales_agent": null, "agent_cell": null, "due_date": null, "cases": null },
+  "line_items": [
+    { "sl_no": 1, "product_name": "string", "pack": "string", "mfr": "string", "hsn_code": "string", "batch_no": "string", "exp_date": "YYYY-MM", "mrp": 0.0, "qty": 0, "free_qty": 0, "rate": 0.0, "disc_percent": 0.0, "gst_percent": 5.0, "amount": 0.0 }
+  ],
+  "totals": { "total_qty": 0, "total_items": 0, "sub_total": 0.0, "discount": 0.0, "tax_amount": 0.0, "freight": 0.0, "credit_note": 0.0, "debit_note": 0.0, "round_off": 0.0, "net_amount": 0.0, "amount_in_words": null, "total_outstandings": 0.0, "due_bills_count": 0 },
+  "gst_breakdown": [ { "slab_percent": 5.0, "sales_amount": 0.0, "gst_igst": 0.0, "cgst": 0.0, "sgst": 0.0 } ],
+  "bank_details": { "bank_name": null, "account_no": null, "ifsc_code": null, "upi_id": null },
+  "confidence": { "overall_score": 1.0, "low_confidence_fields": [] },
+  "validation_warnings": []
+}
+"""
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
             "parts": [
@@ -144,7 +162,8 @@ def call_gemini_vision(base64_data, mime_type):
             ]
         }],
         "generationConfig": {
-            "response_mime_type": "application/json"
+            "response_mime_type": "application/json",
+            "temperature": 0.0
         }
     }
     res = requests.post(url, json=payload)

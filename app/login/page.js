@@ -134,7 +134,13 @@ export default function LoginPage() {
                 <input
                   type="text"
                   value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (/^TH/i.test(val)) {
+                      val = val.substring(0, 2) + val.substring(2).replace(/o/gi, '0');
+                    }
+                    setEmployeeId(val);
+                  }}
                   placeholder="e.g. TH001"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono uppercase"
                   required

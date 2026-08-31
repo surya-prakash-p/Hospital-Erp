@@ -27,3 +27,8 @@ dist-ssr
 
 # Credentials
 frappe_config.json
+
+# Python & OCR cache
+__pycache__/
+*.py[cod]
+*.traineddata

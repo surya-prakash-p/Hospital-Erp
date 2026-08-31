@@ -6,7 +6,7 @@ import {
   Pill, CheckCircle, AlertCircle, Info, Activity, PackageCheck, Plus, Layers, 
   PlusCircle, RefreshCw, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Archive, Calendar,
-  ArrowRight, X, Loader2, ArrowUpRight, HelpCircle, Truck, ChevronDown, Edit3, Sliders, Power, Users, ShoppingBag, Upload, MoreHorizontal
+  ArrowRight, X, Loader2, ArrowUpRight, HelpCircle, Truck, ChevronDown, Edit3, Sliders, Power, Users, ShoppingBag, Upload, MoreHorizontal, Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,11 +93,15 @@ export default function PharmacyPage() {
 
   // Slide-over active tab
   const [detailActiveTab, setDetailActiveTab] = useState("batches");
+  const [isMounted, setIsMounted] = useState(false);
   
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [invoiceFilter, setInvoiceFilter] = useState("All");
+  const [showImportedInvoicesModal, setShowImportedInvoicesModal] = useState(false);
+  const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
 
   // Registers Tab filter
   const [selectedRegister, setSelectedRegister] = useState("All Categories");
@@ -114,7 +118,8 @@ export default function PharmacyPage() {
     medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
     dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
     reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
-    batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10
+    batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10,
+    invoice_number: "", invoice_date: ""
   });
 
   // Add Batch to Existing Medicine State
@@ -122,7 +127,8 @@ export default function PharmacyPage() {
   const [addBatchMed, setAddBatchMed] = useState(null);
   const [newBatchData, setNewBatchData] = useState({
     batch_number: "", supplier: "ABC Pharma", mfg_date: "", exp_date: "",
-    pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01"
+    pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01",
+    invoice_number: "", invoice_date: ""
   });
 
   // PO & GRN States
@@ -142,29 +148,30 @@ export default function PharmacyPage() {
   const [grnAddPrice, setGrnAddPrice] = useState("");
 
   // Supplier States
-  const [suppliers, setSuppliers] = useState(() => {
+  const [suppliers, setSuppliers] = useState([
+    { name: "ABC Pharma", licNo: "DL-COI-90823H", type: "Verified", isNarcotics: false, code: "SUP-1001", status: "Active" },
+    { name: "XYZ Distributors", licNo: "DL-COI-12093H", type: "Verified", isNarcotics: false, code: "SUP-1002", status: "Active" },
+    { name: "Special Drugs Ltd", licNo: "DL-NDPS-0032A (Narcotic)", type: "Narcotics Lic", isNarcotics: true, code: "SUP-1003", status: "Active" }
+  ]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hospital_suppliers');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          setSuppliers(JSON.parse(saved));
         } catch (e) {
           console.error(e);
         }
       }
     }
-    return [
-      { name: "ABC Pharma", licNo: "DL-COI-90823H", type: "Verified", isNarcotics: false, code: "SUP-1001", status: "Active" },
-      { name: "XYZ Distributors", licNo: "DL-COI-12093H", type: "Verified", isNarcotics: false, code: "SUP-1002", status: "Active" },
-      { name: "Special Drugs Ltd", licNo: "DL-NDPS-0032A (Narcotic)", type: "Narcotics Lic", isNarcotics: true, code: "SUP-1003", status: "Active" }
-    ];
-  });
+  }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isMounted && typeof window !== 'undefined') {
       localStorage.setItem('hospital_suppliers', JSON.stringify(suppliers));
     }
-  }, [suppliers]);
+  }, [suppliers, isMounted]);
 
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
   const [editingSupplierIndex, setEditingSupplierIndex] = useState(null);
@@ -323,6 +330,7 @@ export default function PharmacyPage() {
   }
 
   useEffect(() => {
+    setIsMounted(true);
     loadAllData();
     
     // Always sync with Frappe bench periodically
@@ -484,6 +492,114 @@ export default function PharmacyPage() {
     return cat === filter;
   };
 
+  // Extract all imported invoices
+  const importedInvoices = useMemo(() => {
+    if (!isMounted) return [];
+    const map = new Map();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const grns = JSON.parse(localStorage.getItem('hospital_goods_receipts')) || [];
+        grns.forEach(grn => {
+          const invNo = (grn.invoice_number || "").trim();
+          if (invNo) {
+            const key = invNo.toLowerCase();
+            if (!map.has(key)) {
+              map.set(key, {
+                invoice_number: invNo,
+                supplier: grn.supplier || "Supplier",
+                invoice_date: grn.invoice_date || grn.received_date || "",
+                total_amount: grn.total_amount || 0,
+                items: [...(grn.items || [])],
+                item_count: (grn.items || []).length
+              });
+            } else {
+              const existing = map.get(key);
+              (grn.items || []).forEach(it => {
+                if (!existing.items.some(x => (x.medicine || "").toLowerCase() === (it.medicine || "").toLowerCase())) {
+                  existing.items.push(it);
+                }
+              });
+              existing.item_count = existing.items.length;
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("Could not read hospital_goods_receipts:", e);
+      }
+    }
+
+    medicines.forEach(m => {
+      const invNo = (m.invoice_number || "").trim();
+      if (invNo) {
+        const key = invNo.toLowerCase();
+        const itemObj = {
+          medicine: m.medicine_name,
+          batch_number: m.batch_number || (m.batches?.[0]?.batch_number) || "BATCH-01",
+          quantity: m.stock || 0,
+          pack: m.pack_size || "10'S",
+          exp_date: m.expiry_date || m.exp_date || "",
+          purchase_price: m.purchase_price || 0,
+          mrp: m.selling_price || m.mrp || 0,
+          rack: m.rack_location || "A-1"
+        };
+        if (!map.has(key)) {
+          map.set(key, {
+            invoice_number: invNo,
+            supplier: m.supplier || "Supplier",
+            invoice_date: m.invoice_date || "",
+            total_amount: (m.stock || 0) * (m.purchase_price || 0),
+            items: [itemObj],
+            item_count: 1
+          });
+        } else {
+          const existing = map.get(key);
+          if (!existing.items.some(x => (x.medicine || "").toLowerCase() === (m.medicine_name || "").toLowerCase())) {
+            existing.items.push(itemObj);
+            existing.item_count = existing.items.length;
+            existing.total_amount += (m.stock || 0) * (m.purchase_price || 0);
+          }
+        }
+      }
+
+      (m.batches || []).forEach(b => {
+        const bInvNo = (b.invoice_number || "").trim();
+        if (bInvNo) {
+          const key = bInvNo.toLowerCase();
+          const itemObj = {
+            medicine: m.medicine_name,
+            batch_number: b.batch_number || "BATCH-01",
+            quantity: b.current_stock || 0,
+            pack: b.pack_size || "10'S",
+            exp_date: b.exp_date || "",
+            purchase_price: b.purchase_price || 0,
+            mrp: b.mrp || 0,
+            rack: b.rack_location || "A-1"
+          };
+          if (!map.has(key)) {
+            map.set(key, {
+              invoice_number: bInvNo,
+              supplier: b.supplier || m.supplier || "Supplier",
+              invoice_date: b.invoice_date || m.invoice_date || "",
+              total_amount: (b.current_stock || 0) * (b.purchase_price || 0),
+              items: [itemObj],
+              item_count: 1
+            });
+          } else {
+            const existing = map.get(key);
+            if (!existing.items.some(x => (x.medicine || "").toLowerCase() === (m.medicine_name || "").toLowerCase())) {
+              existing.items.push(itemObj);
+              existing.item_count = existing.items.length;
+              existing.total_amount += (b.current_stock || 0) * (b.purchase_price || 0);
+            }
+          }
+        }
+      });
+    });
+
+    return Array.from(map.values());
+  }, [medicines, isMounted]);
+
   // Filtered inventory list
   const filteredMedicines = useMemo(() => {
     return medicines.filter(med => {
@@ -512,9 +628,30 @@ export default function PharmacyPage() {
         });
       }
 
-      return matchesSearch && matchesCategory && matchesStatus;
+      let matchesInvoice = true;
+      if (invoiceFilter && invoiceFilter !== "All") {
+        const invTarget = invoiceFilter.trim().toLowerCase();
+        const directMatch = med.invoice_number && med.invoice_number.trim().toLowerCase() === invTarget;
+        const batchMatch = (med.batches || []).some(b => b.invoice_number && b.invoice_number.trim().toLowerCase() === invTarget);
+        
+        const currentInv = importedInvoices.find(inv => (inv.invoice_number || "").trim().toLowerCase() === invTarget);
+        const nameMatch = currentInv ? (currentInv.items || []).some(it => {
+          const itName = (it.medicine || it.medicine_name || it.product_name || "").trim().toLowerCase();
+          const mName = (med.medicine_name || "").trim().toLowerCase();
+          return itName && (itName === mName || itName.includes(mName) || mName.includes(itName));
+        }) : false;
+
+        const registerMatch = (drugRegister || []).some(reg => 
+          Boolean(reg.reference && reg.reference.trim().toLowerCase() === invTarget &&
+          reg.medicine && (reg.medicine.trim().toLowerCase() === (med.medicine_name || "").trim().toLowerCase()))
+        );
+
+        matchesInvoice = directMatch || batchMatch || nameMatch || registerMatch;
+      }
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesInvoice;
     });
-  }, [medicines, searchQuery, categoryFilter, statusFilter, editedSuggQty]);
+  }, [medicines, searchQuery, categoryFilter, statusFilter, invoiceFilter, importedInvoices, drugRegister]);
 
   // Auto PO recommendations list
   const purchaseRecommendations = useMemo(() => {
@@ -982,8 +1119,8 @@ export default function PharmacyPage() {
   // Add new medicine record with mandatory Batch Number & Pack Size calculation
   const handleAddNewMedicine = async (e) => {
     e.preventDefault();
-    if (!newMedData.medicine_name || !newMedData.generic_name || !newMedData.selling_price) {
-      showToast("Medicine Name, Generic Name, and Selling Price (MRP) are required", "error");
+    if (!newMedData.medicine_name || !newMedData.generic_name || !newMedData.selling_price && !newMedData.mrp) {
+      showToast("Medicine Name, Generic Formula, and MRP are required", "error");
       return;
     }
 
@@ -998,24 +1135,28 @@ export default function PharmacyPage() {
       return;
     }
 
-    const packSize = parseInt(newMedData.pack_size) || 1;
-    const noOfPacks = parseFloat(newMedData.no_of_packs) || 0;
+    const packSize = parseInt(newMedData.pack_size) || 10;
+    const noOfPacks = parseFloat(newMedData.no_of_packs) || 10;
     const totalUnits = packSize * noOfPacks;
 
     try {
       const data = {
         ...newMedData,
+        generic_name: newMedData.generic_name || newMedData.medicine_name,
+        brand: newMedData.brand || "",
         tablets_per_strip: parseInt(newMedData.tablets_per_strip) || 10,
         purchase_price: parseFloat(newMedData.purchase_price) || 0.0,
-        selling_price: parseFloat(newMedData.selling_price) || 0.0,
-        mrp: parseFloat(newMedData.mrp) || parseFloat(newMedData.selling_price) || 0.0,
+        selling_price: parseFloat(newMedData.mrp || newMedData.selling_price) || 0.0,
+        mrp: parseFloat(newMedData.mrp || newMedData.selling_price) || 0.0,
         min_stock: parseInt(newMedData.min_stock) || 50,
         max_stock: parseInt(newMedData.max_stock) || 500,
         reorder_level: parseInt(newMedData.reorder_level) || 100,
+        rack_location: newMedData.rack_location || "Rack A-01",
         prescription_required: newMedData.category !== "OTC" ? 1 : 0,
         controlled_drug: newMedData.category === "Controlled Drug" ? 1 : 0,
         sleeping_pill: newMedData.category === "Sleeping Pill" ? 1 : 0,
-        stock: totalUnits
+        stock: totalUnits,
+        current_stock: totalUnits
       };
 
       await createMedicine(data);
@@ -1025,9 +1166,13 @@ export default function PharmacyPage() {
          batches.unshift({
            batch_number: newMedData.batch_number.trim().toUpperCase(),
            medicine: data.medicine_name,
+           medicine_name: data.medicine_name,
            supplier: newMedData.supplier || "ABC Pharma",
+           invoice_number: newMedData.invoice_number || "",
+           invoice_date: newMedData.invoice_date || "",
            mfg_date: newMedData.mfg_date || null,
            exp_date: newMedData.expiry_date,
+           expiry_date: newMedData.expiry_date,
            pack_size: packSize,
            no_of_packs: noOfPacks,
            total_units: totalUnits,
@@ -1046,7 +1191,8 @@ export default function PharmacyPage() {
         medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
         dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
         reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
-        batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 30, no_of_packs: 10
+        batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10,
+        invoice_number: "", invoice_date: ""
       });
       loadAllData();
     } catch (err) {
@@ -1085,6 +1231,8 @@ export default function PharmacyPage() {
         batch_number: batchNoUpper,
         medicine: addBatchMed.medicine_name,
         supplier: newBatchData.supplier || "ABC Pharma",
+        invoice_number: newBatchData.invoice_number || "",
+        invoice_date: newBatchData.invoice_date || "",
         mfg_date: newBatchData.mfg_date || null,
         exp_date: newBatchData.exp_date,
         pack_size: packSize,
@@ -1107,7 +1255,7 @@ export default function PharmacyPage() {
         adjustment_type: "Add Batch",
         quantity: totalUnits,
         reason: "New Batch Added to Inventory",
-        remarks: `Supplier: ${newBatchData.supplier || "ABC Pharma"} | Pack Size: ${packSize} x ${noOfPacks} packs`,
+        remarks: `Supplier: ${newBatchData.supplier || "ABC Pharma"}${newBatchData.invoice_number ? ` | Inv #${newBatchData.invoice_number}` : ''} | Pack Size: ${packSize} x ${noOfPacks} packs`,
         performed_by: pharmacistName
       });
 
@@ -1116,7 +1264,8 @@ export default function PharmacyPage() {
       setAddBatchMed(null);
       setNewBatchData({
         batch_number: "", supplier: "ABC Pharma", mfg_date: "", exp_date: "",
-        pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01"
+        pack_size: 30, no_of_packs: 10, purchase_price: "", mrp: "", rack_location: "Rack A-01",
+        invoice_number: "", invoice_date: ""
       });
       loadAllData();
     } catch (err) {
@@ -1669,97 +1818,216 @@ export default function PharmacyPage() {
     const newMeds = [...medicines];
     const newBatches = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('hospital_batches')) || []) : [];
     const newRegisters = [...drugRegister];
+    const existingGRNs = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('hospital_goods_receipts')) || []) : [];
     
     const now = new Date().toISOString();
     const today = now.split('T')[0];
     let updatedCount = 0;
+    const grnLineItems = [];
+
+    const supplierName = extractedData.supplier || extractedData.seller?.seller_name || "Supplier";
+    const invNo = extractedData.invoice_number || extractedData.invoice_meta?.invoice_no || `INV-${Date.now()}`;
+    const invDate = extractedData.invoice_date || extractedData.invoice_meta?.invoice_date || today;
     
     extractedData.items.forEach((item, i) => {
-      const qty = parseInt(item.qty) || 0;
-      if (qty <= 0) return;
+      const qty = parseInt(item.qty || item.quantity) || 0;
+      const freeQty = parseInt(item.free || item.free_qty) || 0;
+      const totalQtyReceived = qty + freeQty;
+      if (totalQtyReceived <= 0 && qty <= 0) return;
       
-      const medName = item.medicine;
-      const batchNo = item.batch;
-      const pPrice = parseFloat(item.rate) || 0;
-      const sPrice = parseFloat(item.mrp) || 0;
-      const expDate = item.expiry;
+      const medName = (item.medicine || item.product_name || "Unknown Medicine").trim();
+      const batchNo = (item.batch || item.batch_no || item.batch_number || `BATCH-${Date.now()}-${i}`).trim().toUpperCase();
+      const pPrice = parseFloat(item.rate ?? item.ptr ?? item.purchase_price) || 0;
+      const sPrice = parseFloat(item.mrp ?? item.selling_price) || (pPrice > 0 ? pPrice * 1.2 : 0);
+      const expDate = (item.exp_date || item.expiry || item.expiry_date || "12-2028").trim();
+      const rackLoc = item.rack || item.rack_location || "A-1";
+      const mfrCode = item.mfr || "";
+      const hsnCode = item.hsn || item.hsn_code || "30049099";
+      const packUnit = item.pack || item.pack_size || "10'S";
+      const pDis = parseFloat(item.p_dis || item.disc_percent) || 0;
+      const sDis = parseFloat(item.s_dis) || 0;
+      const gstPct = parseFloat(item.gst || item.gst_percent) || 5;
+      const lineVal = parseFloat(item.amount || item.value) || (qty * pPrice);
+
+      // Auto Detect Dosage Form
+      let detectedForm = "Tablet";
+      const upperName = medName.toUpperCase();
+      if (upperName.includes("INJ") || upperName.includes("AMP") || upperName.includes("VIAL") || upperName.includes("INJECTION")) {
+        detectedForm = "Injection";
+      } else if (upperName.includes("TAB")) {
+        detectedForm = "Tablet";
+      } else if (upperName.includes("CAP")) {
+        detectedForm = "Capsule";
+      } else if (upperName.includes("SYRUP") || upperName.includes("LIQUID") || upperName.includes("ML") || upperName.includes("SOLUTION")) {
+        detectedForm = "Syrup";
+      } else if (upperName.includes("OINT") || upperName.includes("CREAM")) {
+        detectedForm = "Ointment";
+      } else if (upperName.includes("DROP")) {
+        detectedForm = "Drops";
+      }
       
-      // 1. Update Medicine
-      let medIndex = newMeds.findIndex(m => m.medicine_name.toLowerCase() === medName.toLowerCase());
+      const newBatchObj = {
+        name: `BATCH-${batchNo}`,
+        medicine: medName,
+        medicine_name: medName,
+        batch_number: batchNo,
+        current_stock: totalQtyReceived > 0 ? totalQtyReceived : qty,
+        total_units: totalQtyReceived > 0 ? totalQtyReceived : qty,
+        pack_size: parseInt(packUnit) || 10,
+        no_of_packs: (parseInt(packUnit) || 10) > 0 ? Math.ceil((totalQtyReceived > 0 ? totalQtyReceived : qty) / (parseInt(packUnit) || 10)) : 1,
+        exp_date: expDate,
+        expiry_date: expDate,
+        purchase_price: pPrice,
+        mrp: sPrice,
+        selling_price: sPrice,
+        supplier: supplierName,
+        invoice_number: invNo,
+        invoice_date: invDate,
+        rack_location: rackLoc,
+        hsn_code: hsnCode,
+        mfr: mfrCode
+      };
+
+      // 1. Update/Create Medicine Record
+      let medIndex = newMeds.findIndex(m => (m.medicine_name || "").toLowerCase() === medName.toLowerCase());
       if (medIndex === -1) {
         const medObj = {
           name: `MED-${10000 + newMeds.length}`,
           medicine_name: medName,
           generic_name: medName,
-          category: "General",
-          stock: qty,
+          brand: mfrCode || medName,
+          manufacturer: mfrCode || supplierName,
+          hsn_code: hsnCode,
+          category: detectedForm === "Injection" ? "Schedule H" : "Regular Medicine",
+          dosage_form: detectedForm,
+          tablets_per_strip: (detectedForm === "Tablet" || detectedForm === "Capsule") ? 10 : null,
+          pack_size: packUnit,
+          stock: totalQtyReceived > 0 ? totalQtyReceived : qty,
           min_stock: 50,
-          max_stock: 200,
+          max_stock: 500,
+          purchase_price: pPrice,
           selling_price: sPrice,
+          mrp: sPrice,
+          gst: gstPct,
+          rack_location: rackLoc,
+          batch_number: batchNo,
+          exp_date: expDate,
+          expiry_date: expDate,
+          invoice_number: invNo,
+          invoice_date: invDate,
+          supplier: supplierName,
           disabled: 0,
-          batches: []
+          batches: [newBatchObj]
         };
         newMeds.push(medObj);
         medIndex = newMeds.length - 1;
       } else {
-        newMeds[medIndex].stock = (newMeds[medIndex].stock || 0) + qty;
+        newMeds[medIndex].stock = (newMeds[medIndex].stock || 0) + (totalQtyReceived > 0 ? totalQtyReceived : qty);
         newMeds[medIndex].selling_price = sPrice > 0 ? sPrice : newMeds[medIndex].selling_price;
-      }
-      
-      // 2. Update Batches
-      if (batchNo) {
-        const newBatchObj = {
-          name: `BATCH-${batchNo}`,
-          medicine: newMeds[medIndex].name || medName,
-          medicine_name: medName,
-          batch_number: batchNo,
-          current_stock: qty,
-          mfg_date: today,
-          exp_date: expDate || today,
-          purchase_price: pPrice,
-          selling_price: sPrice
-        };
-        newBatches.push(newBatchObj);
-        
+        newMeds[medIndex].mrp = sPrice > 0 ? sPrice : newMeds[medIndex].mrp;
+        newMeds[medIndex].batch_number = batchNo;
+        newMeds[medIndex].exp_date = expDate;
+        newMeds[medIndex].expiry_date = expDate;
+        newMeds[medIndex].rack_location = rackLoc;
+        newMeds[medIndex].pack_size = packUnit;
+        newMeds[medIndex].invoice_number = invNo;
+        newMeds[medIndex].invoice_date = invDate;
+        newMeds[medIndex].supplier = supplierName;
+        if (mfrCode) newMeds[medIndex].brand = mfrCode;
+        if (hsnCode) newMeds[medIndex].hsn_code = hsnCode;
+
         if (!newMeds[medIndex].batches) newMeds[medIndex].batches = [];
-        const existingBatchInMed = newMeds[medIndex].batches.findIndex(b => b.batch_number === batchNo);
+        const existingBatchInMed = newMeds[medIndex].batches.findIndex(b => (b.batch_number || "").toLowerCase() === batchNo.toLowerCase());
         if (existingBatchInMed >= 0) {
-          newMeds[medIndex].batches[existingBatchInMed].current_stock += qty;
+          newMeds[medIndex].batches[existingBatchInMed].current_stock += (totalQtyReceived > 0 ? totalQtyReceived : qty);
+          newMeds[medIndex].batches[existingBatchInMed].total_units = newMeds[medIndex].batches[existingBatchInMed].current_stock;
+          newMeds[medIndex].batches[existingBatchInMed].exp_date = expDate;
         } else {
-          newMeds[medIndex].batches.push({ ...newBatchObj });
+          newMeds[medIndex].batches.push(newBatchObj);
         }
       }
       
-      // 3. Log to Drug Register
+      // 2. Update/Create Batch Entry with Deduplication in Global Batches
+      const existingGlobalBatchIdx = newBatches.findIndex(b => 
+        (b.batch_number || "").toLowerCase() === batchNo.toLowerCase() && 
+        ((b.medicine_name || "").toLowerCase() === medName.toLowerCase() || (b.medicine || "").toLowerCase() === medName.toLowerCase())
+      );
+
+      if (existingGlobalBatchIdx >= 0) {
+        newBatches[existingGlobalBatchIdx].current_stock += (totalQtyReceived > 0 ? totalQtyReceived : qty);
+        newBatches[existingGlobalBatchIdx].total_units = newBatches[existingGlobalBatchIdx].current_stock;
+        newBatches[existingGlobalBatchIdx].exp_date = expDate;
+        newBatches[existingGlobalBatchIdx].expiry_date = expDate;
+        if (sPrice > 0) newBatches[existingGlobalBatchIdx].mrp = sPrice;
+        if (pPrice > 0) newBatches[existingGlobalBatchIdx].purchase_price = pPrice;
+      } else {
+        newBatches.push(newBatchObj);
+      }
+
+      // Add to GRN line item list
+      grnLineItems.push({
+        rack: rackLoc,
+        mfr: mfrCode,
+        hsn: hsnCode,
+        medicine: medName,
+        pack: packUnit,
+        batch_number: batchNo,
+        exp_date: expDate,
+        quantity: qty,
+        free_qty: freeQty,
+        purchase_price: pPrice,
+        mrp: sPrice,
+        p_dis: pDis,
+        s_dis: sDis,
+        gst: gstPct,
+        line_value: lineVal
+      });
+      
+      // 3. Log to Government Drug Register
       newRegisters.unshift({
         name: `GRN-AI-${Date.now()}-${i}`,
-        date: today,
+        date: invDate,
+        dispensing_date: invDate,
         medicine: medName,
-        batch: batchNo || "-",
+        batch_number: batchNo || "-",
         type: "PURCHASE_IN",
-        qty_in: qty,
+        qty_in: totalQtyReceived > 0 ? totalQtyReceived : qty,
         qty_out: 0,
         balance: newMeds[medIndex].stock,
-        reference: extractedData.invoice_number || "AI Invoice Import",
-        supplier: extractedData.supplier || "Imported Supplier",
+        reference: invNo,
+        supplier: supplierName,
         user: "Admin",
         pharmacist: typeof pharmacistName !== 'undefined' ? pharmacistName : "Admin",
-        category: newMeds[medIndex].category || "General"
+        category: newMeds[medIndex].category || "Regular Medicine"
       });
       
       updatedCount++;
     });
     
     if (updatedCount > 0) {
+      // Save Goods Receipt record with Invoice Number
+      const newGRN = {
+        name: `GRN-${Date.now()}`,
+        invoice_number: invNo,
+        invoice_date: invDate,
+        supplier: supplierName,
+        items: grnLineItems,
+        received_date: today,
+        total_amount: grnLineItems.reduce((acc, it) => acc + (it.line_value || (it.quantity * it.purchase_price)), 0)
+      };
+      existingGRNs.unshift(newGRN);
+
       if (typeof window !== 'undefined') {
         const medsObj = {};
-        newMeds.forEach(m => { medsObj[m.name || m.medicine_name] = m; });
+        newMeds.forEach(m => { medsObj[m.medicine_name || m.name] = m; });
         localStorage.setItem('hospital_medicines', JSON.stringify(medsObj));
         localStorage.setItem('hospital_batches', JSON.stringify(newBatches));
         localStorage.setItem('hospital_drug_register', JSON.stringify(newRegisters));
+        localStorage.setItem('hospital_goods_receipts', JSON.stringify(existingGRNs));
       }
       setMedicines(newMeds);
       setDrugRegister(newRegisters);
+      showToast(`Successfully extracted & saved ${updatedCount} medicines with Invoice ${invNo}!`, "success");
       loadAllData();
     }
   };
@@ -2450,124 +2718,157 @@ export default function PharmacyPage() {
               <ShoppingBag className="w-3.5 h-3.5" /> + Direct Medicine Sale
             </Button>
 
-            {/* Removed Sync Frappe Bench Button */}
+            <Button 
+              onClick={() => setIsAIImportModalOpen(true)}
+              size="sm" 
+              className="bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white gap-1.5 font-semibold shadow-xs h-8 text-xs"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice
+            </Button>
 
             
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="font-serif text-base">New Medicine Catalog Record & Initial Batch</DialogTitle>
-                <DialogDescription className="text-xs">
-                  Every medicine must be added with a mandatory Batch Number and Pack Size. Total units are calculated automatically.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddNewMedicine} className="space-y-4 pt-2">
-                {/* Medicine Basic Details */}
-                <div className="space-y-1">
-                  <Label htmlFor="med-name" className="text-xs font-semibold">Medicine Name *</Label>
-                  <Input 
-                    id="med-name" placeholder="e.g. Paracetamol 650mg" 
-                    value={newMedData.medicine_name || ""} 
-                    onChange={(e) => setNewMedData(p => ({ ...p, medicine_name: e.target.value }))}
-                    required 
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-generic" className="text-xs font-semibold">Generic Formula *</Label>
-                    <Input 
-                      id="med-generic" placeholder="e.g. Paracetamol" 
-                      value={newMedData.generic_name || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, generic_name: e.target.value }))}
-                      required 
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-brand" className="text-xs font-semibold">Brand / Trade Name</Label>
-                    <Input 
-                      id="med-brand" placeholder="e.g. Calpol 650" 
-                      value={newMedData.brand || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, brand: e.target.value }))}
-                    />
-                  </div>
-                </div>
+            <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 rounded-2xl bg-white border border-slate-200 shadow-2xl">
+              {/* Header */}
+              <div className="p-5 px-6 border-b border-slate-100 bg-white shrink-0 pr-12">
+                <DialogTitle className="text-base font-bold text-slate-900 tracking-tight">Add New Medicine</DialogTitle>
+              </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-cat" className="text-xs font-semibold">Drug Category *</Label>
-                    <select
-                      id="med-cat"
-                      value={newMedData.category || "Regular Medicine"}
-                      onChange={(e) => setNewMedData(p => ({ ...p, category: e.target.value }))}
-                      className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
-                    >
-                      <option value="Regular Medicine">Regular Medicine</option>
-                      <option value="Schedule H">Schedule H</option>
-                      <option value="Schedule H1">Schedule H1</option>
-                      <option value="Schedule X">Schedule X</option>
-                      <option value="OTC">OTC</option>
-                      <option value="Controlled Drug">Controlled Drug</option>
-                      <option value="Sleeping Pill">Sleeping Pill</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-form" className="text-xs font-semibold">Dosage Form</Label>
-                    <select
-                      id="med-form"
-                      value={newMedData.dosage_form || "Tablet"}
-                      onChange={(e) => setNewMedData(p => ({ ...p, dosage_form: e.target.value }))}
-                      className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
-                    >
-                      <option value="Tablet">Tablet</option>
-                      <option value="Capsule">Capsule</option>
-                      <option value="Syrup">Syrup</option>
-                      <option value="Injection">Injection</option>
-                      <option value="Ointment">Ointment</option>
-                      <option value="Drops">Drops</option>
-                      <option value="Powder">Powder</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-tabs-per-strip" className="text-xs font-bold text-indigo-900">Tabs / Strip *</Label>
-                    <Input 
-                      id="med-tabs-per-strip" 
-                      type="number"
-                      min="1"
-                      placeholder="e.g. 10" 
-                      value={newMedData.tablets_per_strip ?? 10} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, tablets_per_strip: parseInt(e.target.value) || 1 }))}
-                      className="bg-white border-indigo-200 font-bold"
-                      required 
-                    />
-                  </div>
-                </div>
-
-                {/* Batch Information Section */}
-                <div className="border border-indigo-200 bg-indigo-50/40 p-3 rounded-lg space-y-3">
-                  <div className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center justify-between border-b border-indigo-100 pb-1.5">
-                    <span>Initial Inventory Batch Details</span>
-                    <span className="text-[10px] text-indigo-600 font-normal">* Batch Number Mandatory</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="batch-no" className="text-xs font-bold text-rose-700">Batch Number *</Label>
-                      <Input 
-                        id="batch-no" placeholder="e.g. PCM-2026-A" 
-                        value={newMedData.batch_number || ""} 
-                        onChange={(e) => setNewMedData(p => ({ ...p, batch_number: e.target.value }))}
-                        className="font-mono uppercase bg-white border-rose-300 focus:border-rose-500"
-                        required 
+              {/* Form Body */}
+              <form onSubmit={handleAddNewMedicine} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs bg-white">
+                {/* 1. Medicine Information */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-blue-600">Medicine Information</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-name" className="text-xs text-slate-700 font-medium">Medicine Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-name"
+                        placeholder="e.g. Paracetamol 650mg"
+                        value={newMedData.medicine_name || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, medicine_name: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        required
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="batch-supplier" className="text-xs font-semibold">Supplier *</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-generic" className="text-xs text-slate-700 font-medium">Generic Formula <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-generic"
+                        placeholder="e.g. Paracetamol"
+                        value={newMedData.generic_name || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, generic_name: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-brand" className="text-xs text-slate-700 font-medium">Brand / Trade Name</Label>
+                      <Input
+                        id="med-brand"
+                        placeholder="e.g. Calpol 650"
+                        value={newMedData.brand || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, brand: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-cat" className="text-xs text-slate-700 font-medium">Drug Category <span className="text-red-500">*</span></Label>
                       <select
-                        id="batch-supplier"
+                        id="med-cat"
+                        value={newMedData.category || "Regular Medicine"}
+                        onChange={(e) => setNewMedData(p => ({ ...p, category: e.target.value }))}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 text-slate-800 transition"
+                      >
+                        <option value="Regular Medicine">Regular Medicine</option>
+                        <option value="Schedule H">Schedule H</option>
+                        <option value="Schedule H1">Schedule H1</option>
+                        <option value="Schedule X">Schedule X</option>
+                        <option value="OTC">OTC</option>
+                        <option value="Controlled Drug">Controlled Drug</option>
+                        <option value="Sleeping Pill">Sleeping Pill</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-form" className="text-xs text-slate-700 font-medium">Dosage Form</Label>
+                      <select
+                        id="med-form"
+                        value={newMedData.dosage_form || "Tablet"}
+                        onChange={(e) => setNewMedData(p => ({ ...p, dosage_form: e.target.value }))}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 text-slate-800 transition"
+                      >
+                        <option value="Tablet">Tablet</option>
+                        <option value="Capsule">Capsule</option>
+                        <option value="Syrup">Syrup</option>
+                        <option value="Injection">Injection</option>
+                        <option value="Ointment">Ointment</option>
+                        <option value="Drops">Drops</option>
+                        <option value="Powder">Powder</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    {(newMedData.dosage_form === "Tablet" || newMedData.dosage_form === "Capsule" || !newMedData.dosage_form) ? (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="med-tabs-per-strip" className="text-xs text-slate-700 font-medium">Tabs / Strip <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="med-tabs-per-strip"
+                          type="number"
+                          min="1"
+                          placeholder="10"
+                          value={newMedData.tablets_per_strip ?? 10}
+                          onChange={(e) => setNewMedData(p => ({ ...p, tablets_per_strip: parseInt(e.target.value) || 1 }))}
+                          className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                          required
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="med-rack-alt" className="text-xs text-slate-700 font-medium">Rack Location</Label>
+                        <Input
+                          id="med-rack-alt"
+                          placeholder="Rack A-01"
+                          value={newMedData.rack_location || "Rack A-01"}
+                          onChange={(e) => setNewMedData(p => ({ ...p, rack_location: e.target.value }))}
+                          className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. INITIAL INVENTORY BATCH DETAILS */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-blue-600 uppercase tracking-wide">INITIAL INVENTORY BATCH DETAILS</h4>
+                    <span className="text-[10px] font-bold text-blue-600 tracking-wide">* BATCH NUMBER MANDATORY</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-batch" className="text-xs text-slate-700 font-medium">Batch Number <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-batch"
+                        placeholder="E.G. PCM-2026-A"
+                        value={newMedData.batch_number || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, batch_number: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono uppercase focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-supplier" className="text-xs text-slate-700 font-medium">Supplier <span className="text-red-500">*</span></Label>
+                      <select
+                        id="med-supplier"
                         value={newMedData.supplier || "ABC Pharma"}
                         onChange={(e) => setNewMedData(p => ({ ...p, supplier: e.target.value }))}
-                        className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none"
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 text-slate-800 transition"
                       >
                         {suppliers.map(s => (
                           <option key={s.name} value={s.name}>{s.name}</option>
@@ -2576,129 +2877,190 @@ export default function PharmacyPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="med-mfg" className="text-xs font-semibold">MFG Date</Label>
-                      <Input 
-                        id="med-mfg" type="date"
-                        value={newMedData.mfg_date || ""} 
-                        onChange={(e) => setNewMedData(p => ({ ...p, mfg_date: e.target.value }))}
-                        className="bg-white"
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-inv-number" className="text-xs text-slate-700 font-medium">Invoice Number</Label>
+                      <Input
+                        id="med-inv-number"
+                        placeholder="E.G. PUR/2026/015"
+                        value={newMedData.invoice_number || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, invoice_number: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono uppercase focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="med-exp" className="text-xs font-bold text-rose-700">EXP Date *</Label>
-                      <Input 
-                        id="med-exp" type="date"
-                        value={newMedData.expiry_date || ""} 
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-inv-date" className="text-xs text-slate-700 font-medium">Invoice Date</Label>
+                      <Input
+                        id="med-inv-date"
+                        type="date"
+                        placeholder="dd-mm-yyyy"
+                        value={newMedData.invoice_date || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, invoice_date: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-exp-date" className="text-xs text-slate-700 font-medium">EXP Date (Month &amp; Year) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-exp-date"
+                        type="month"
+                        value={newMedData.expiry_date || ""}
                         onChange={(e) => setNewMedData(p => ({ ...p, expiry_date: e.target.value }))}
-                        className="bg-white border-rose-300"
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                         required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-rack" className="text-xs text-slate-700 font-medium">Rack Location</Label>
+                      <Input
+                        id="med-rack"
+                        placeholder="Rack A-01"
+                        value={newMedData.rack_location || "Rack A-01"}
+                        onChange={(e) => setNewMedData(p => ({ ...p, rack_location: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                       />
                     </div>
                   </div>
 
-                  {/* Pack Size & Automatic Total Quantity Calculation */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div className="space-y-1">
-                      <Label htmlFor="pack-size" className="text-xs font-semibold">Pack Size (Units/Pack) *</Label>
-                      <Input 
-                        id="pack-size" type="number" min="1" placeholder="e.g. 30"
-                        value={newMedData.pack_size ?? 30} 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-pack-size" className="text-xs text-slate-700 font-medium">Pack Size (Units/Pack) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-pack-size"
+                        type="number"
+                        min="1"
+                        placeholder="10"
+                        value={newMedData.pack_size ?? 10}
                         onChange={(e) => setNewMedData(p => ({ ...p, pack_size: parseInt(e.target.value) || 0 }))}
-                        className="bg-white font-mono"
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                         required
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="no-packs" className="text-xs font-semibold">No. of Packs *</Label>
-                      <Input 
-                        id="no-packs" type="number" min="0" step="0.5" placeholder="e.g. 10"
-                        value={newMedData.no_of_packs ?? 10} 
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-no-packs" className="text-xs text-slate-700 font-medium">No. of Packs <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-no-packs"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        placeholder="10"
+                        value={newMedData.no_of_packs ?? 10}
                         onChange={(e) => setNewMedData(p => ({ ...p, no_of_packs: parseFloat(e.target.value) || 0 }))}
-                        className="bg-white font-mono"
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                         required
                       />
                     </div>
                   </div>
 
-                  {/* Read-Only Automatic Total Units Banner */}
-                  <div className="bg-indigo-600 text-white rounded-md p-2.5 flex items-center justify-between text-xs shadow-xs">
+                  {/* AUTOMATIC TOTAL STOCK CALCULATION Banner */}
+                  <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
                     <div>
-                      <span className="opacity-80 block text-[10px] uppercase tracking-wider font-semibold">Automatic Total Stock Calculation</span>
-                      <span className="font-medium">
+                      <span className="text-blue-600 block text-[10px] uppercase tracking-wider font-bold">
+                        AUTOMATIC TOTAL STOCK CALCULATION
+                      </span>
+                      <span className="font-medium text-slate-700 text-xs mt-0.5 block">
                         Pack Size: <strong>{newMedData.pack_size || 0}</strong> tablets &nbsp;×&nbsp; No. of Packs: <strong>{newMedData.no_of_packs || 0}</strong>
                       </span>
                     </div>
-                    <div className="text-right pl-3 border-l border-indigo-400">
-                      <span className="text-[10px] opacity-80 block uppercase tracking-wider font-semibold">Total Units</span>
-                      <span className="text-base font-black font-mono">
+                    <div className="text-right pl-4 border-l border-blue-200">
+                      <span className="text-[10px] text-blue-600 block uppercase tracking-wider font-bold">TOTAL UNITS</span>
+                      <span className="text-lg font-black font-mono text-blue-700 block">
                         {(parseInt(newMedData.pack_size) || 0) * (parseFloat(newMedData.no_of_packs) || 0)} units
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Pricing & Location */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-pur" className="text-xs font-semibold">Purchase Price (₹) *</Label>
-                    <Input 
-                      id="med-pur" type="number" placeholder="₹" min="0" step="0.01"
-                      value={newMedData.purchase_price || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, purchase_price: e.target.value }))}
-                      required
-                    />
+                {/* 3. Pricing & Safety Thresholds */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-sm font-semibold text-blue-600">Pricing &amp; Thresholds</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-pur" className="text-xs text-slate-700 font-medium">Purchase Price (₹) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-pur"
+                        type="number"
+                        step="0.01"
+                        placeholder="₹"
+                        value={newMedData.purchase_price || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, purchase_price: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-mrp" className="text-xs text-slate-700 font-medium">MRP (₹) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="med-mrp"
+                        type="number"
+                        step="0.01"
+                        placeholder="₹"
+                        value={newMedData.mrp || newMedData.selling_price || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, mrp: e.target.value, selling_price: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-mrp" className="text-xs font-semibold">MRP (₹) *</Label>
-                    <Input 
-                      id="med-mrp" type="number" placeholder="₹" min="0" step="0.01"
-                      value={newMedData.mrp || newMedData.selling_price || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, mrp: e.target.value, selling_price: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-rack" className="text-xs font-semibold">Rack Location</Label>
-                    <Input 
-                      id="med-rack" placeholder="e.g. Rack A-01" 
-                      value={newMedData.rack_location || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, rack_location: e.target.value }))}
-                    />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-min" className="text-xs text-slate-700 font-medium">Min Stock</Label>
+                      <Input
+                        id="med-min"
+                        type="number"
+                        placeholder="50"
+                        value={newMedData.min_stock ?? 50}
+                        onChange={(e) => setNewMedData(p => ({ ...p, min_stock: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-max" className="text-xs text-slate-700 font-medium">Max Stock</Label>
+                      <Input
+                        id="med-max"
+                        type="number"
+                        placeholder="500"
+                        value={newMedData.max_stock ?? 500}
+                        onChange={(e) => setNewMedData(p => ({ ...p, max_stock: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-reorder" className="text-xs text-slate-700 font-medium">Reorder Level</Label>
+                      <Input
+                        id="med-reorder"
+                        type="number"
+                        placeholder="100"
+                        value={newMedData.reorder_level ?? 100}
+                        onChange={(e) => setNewMedData(p => ({ ...p, reorder_level: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="med-min" className="text-xs font-semibold">Min Stock</Label>
-                    <Input 
-                      id="med-min" type="number" 
-                      value={newMedData.min_stock || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, min_stock: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-max" className="text-xs font-semibold">Max Stock</Label>
-                    <Input 
-                      id="med-max" type="number" 
-                      value={newMedData.max_stock || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, max_stock: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="med-reorder" className="text-xs font-semibold">Reorder Level</Label>
-                    <Input 
-                      id="med-reorder" type="number" 
-                      value={newMedData.reorder_level || ""} 
-                      onChange={(e) => setNewMedData(p => ({ ...p, reorder_level: e.target.value }))}
-                    />
-                  </div>
+                {/* Footer Buttons */}
+                <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 shrink-0 bg-white">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="h-10 px-5 text-xs rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="h-10 px-6 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
+                  >
+                    Save Medicine &amp; Register Batch
+                  </Button>
                 </div>
-
-                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 text-xs shadow-md">
-                  Save Medicine &amp; Register Batch
-                </Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -2752,23 +3114,35 @@ export default function PharmacyPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label htmlFor="add-batch-mfg" className="text-xs font-semibold">MFG Date</Label>
+                      <Label htmlFor="add-batch-inv-no" className="text-xs font-semibold">Invoice Number</Label>
                       <Input 
-                        id="add-batch-mfg" type="date"
-                        value={newBatchData.mfg_date || ""} 
-                        onChange={(e) => setNewBatchData(p => ({ ...p, mfg_date: e.target.value }))}
+                        id="add-batch-inv-no" placeholder="e.g. PUR/2026/015" 
+                        value={newBatchData.invoice_number || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, invoice_number: e.target.value }))}
+                        className="font-mono uppercase bg-white"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="add-batch-exp" className="text-xs font-bold text-rose-700">EXP Date *</Label>
+                      <Label htmlFor="add-batch-inv-date" className="text-xs font-semibold">Invoice Date</Label>
                       <Input 
-                        id="add-batch-exp" type="date"
-                        value={newBatchData.exp_date || ""} 
-                        onChange={(e) => setNewBatchData(p => ({ ...p, exp_date: e.target.value }))}
-                        className="border-rose-300"
-                        required
+                        id="add-batch-inv-date" type="date"
+                        value={newBatchData.invoice_date || ""} 
+                        onChange={(e) => setNewBatchData(p => ({ ...p, invoice_date: e.target.value }))}
+                        className="font-mono bg-white"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="add-batch-exp" className="text-xs font-bold text-rose-700">EXP Date (Month & Year) *</Label>
+                    <Input 
+                      id="add-batch-exp" type="month"
+                      value={newBatchData.exp_date || ""} 
+                      onChange={(e) => setNewBatchData(p => ({ ...p, exp_date: e.target.value }))}
+                      className="border-rose-300 font-mono"
+                      placeholder="YYYY-MM"
+                      required
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -3269,7 +3643,7 @@ export default function PharmacyPage() {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs focus:outline-none shadow-sm flex-1 sm:flex-none sm:w-[150px]"
+                    className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs focus:outline-none shadow-sm flex-1 sm:flex-none sm:w-[140px]"
                   >
                     <option value="All">All Statuses</option>
                     <option value="Low Stock">Low Stock</option>
@@ -3277,6 +3651,21 @@ export default function PharmacyPage() {
                     <option value="Out Of Stock">Out Of Stock</option>
                     <option value="Controlled">Controlled Drugs</option>
                     <option value="Expiring / Expired">Expiring / Expired</option>
+                  </select>
+
+                  <select
+                    value={invoiceFilter}
+                    onChange={(e) => setInvoiceFilter(e.target.value)}
+                    className={`h-9 rounded-md border px-3 py-1 text-xs focus:outline-none shadow-sm flex-1 sm:flex-none sm:w-[180px] font-medium ${
+                      invoiceFilter !== "All" ? "border-indigo-500 bg-indigo-50/80 text-indigo-900 font-bold" : "border-slate-200 bg-white text-slate-800"
+                    }`}
+                  >
+                    <option value="All">All Invoices {isMounted && importedInvoices.length > 0 ? `(${importedInvoices.length})` : ""}</option>
+                    {importedInvoices.map((inv) => (
+                      <option key={inv.invoice_number} value={inv.invoice_number}>
+                        🧾 {inv.invoice_number} ({inv.supplier})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -3314,15 +3703,46 @@ export default function PharmacyPage() {
                   </Button>
                 )}
 
-                {(searchQuery || categoryFilter !== "All" || statusFilter !== "All") && (
+                {(searchQuery || categoryFilter !== "All" || statusFilter !== "All" || invoiceFilter !== "All") && (
                   <Button
-                    onClick={() => { setSearchQuery(""); setCategoryFilter("All"); setStatusFilter("All"); }}
+                    onClick={() => { setSearchQuery(""); setCategoryFilter("All"); setStatusFilter("All"); setInvoiceFilter("All"); }}
                     variant="ghost" size="sm" className="h-9 px-3 text-xs text-slate-500 hover:text-slate-900 w-full sm:w-auto"
                   >
                     Clear Filters
                   </Button>
                 )}
               </div>
+
+              {/* Active Invoice Filter Banner */}
+              {invoiceFilter !== "All" && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5 px-3.5 flex items-center justify-between text-xs text-indigo-950 shadow-xs animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="p-1 rounded bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-wide flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> Invoice Filter Active
+                    </span>
+                    <span className="font-bold text-sm text-indigo-900 font-mono">Invoice #{invoiceFilter}</span>
+                    {(() => {
+                      const meta = importedInvoices.find(inv => inv.invoice_number.toLowerCase() === invoiceFilter.toLowerCase());
+                      return meta ? (
+                        <span className="text-slate-600 font-medium">
+                          • Supplier: <strong>{meta.supplier}</strong> • Date: <strong>{meta.invoice_date || 'Recent'}</strong> • Net: <strong>₹{meta.total_amount?.toLocaleString("en-IN") || '0'}</strong>
+                        </span>
+                      ) : null;
+                    })()}
+                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 rounded-full text-[11px]">
+                      {filteredMedicines.length} Medicines Found
+                    </span>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setInvoiceFilter("All")}
+                    className="h-7 text-xs bg-white text-indigo-700 hover:bg-indigo-100 font-semibold gap-1 px-2.5 border-indigo-300 shadow-xs"
+                  >
+                    Clear Invoice Filter ✕
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto min-h-[320px] pb-16">
@@ -3428,21 +3848,25 @@ export default function PharmacyPage() {
                                     </span>
                                   )}
                                 </div>
+                              ) : med.batch_number ? (
+                                <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[10px]">
+                                  {med.batch_number}
+                                </span>
                               ) : (
                                 <span className="text-slate-400 italic">No Batch</span>
                               )}
                             </td>
                             <td className="px-3 py-3 text-center font-mono text-slate-600">
-                              {primaryBatch ? `${primaryBatch.pack_size || 30} tabs/pack` : "30 tabs/pack"}
+                              {primaryBatch ? `${primaryBatch.pack_size || med.pack_size || "10'S"} tabs/pack` : `${med.pack_size || "10'S"}`}
                             </td>
                             <td className="px-3 py-3 text-center font-mono font-black text-slate-900 text-sm">
-                              {med.stock}
+                              {med.stock ?? (primaryBatch?.current_stock || 0)}
                             </td>
                             <td className="px-3 py-3 text-center font-mono text-[11px] text-slate-600">
-                              {primaryBatch && primaryBatch.exp_date ? primaryBatch.exp_date : (med.expiry_date || "N/A")}
+                              {(primaryBatch && primaryBatch.exp_date) ? primaryBatch.exp_date : (med.expiry_date || med.exp_date || "12-2028")}
                             </td>
                             <td className="px-3 py-3 text-slate-600 font-mono text-[11px]">
-                              {primaryBatch ? (primaryBatch.rack_location || med.rack_location || "N/A") : (med.rack_location || "N/A")}
+                              {primaryBatch ? (primaryBatch.rack_location || med.rack_location || "A-1") : (med.rack_location || "A-1")}
                             </td>
                             <td className="px-3 py-3 text-center">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}`}>
@@ -3982,9 +4406,9 @@ export default function PharmacyPage() {
                     onClick={() => setIsAIImportModalOpen(true)}
                     size="xs" 
                     variant="outline" 
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 font-semibold text-[10px] px-2.5 py-1 shadow-sm"
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 font-semibold text-[10px] px-2.5 py-1 shadow-xs gap-1"
                   >
-                    <Upload className="w-3.5 h-3.5 mr-1" /> AI Invoice Import
+                    <Upload className="w-3.5 h-3.5" /> AI Invoice Import
                   </Button>
 
                   <AIInvoiceImportModal 
@@ -4170,8 +4594,7 @@ export default function PharmacyPage() {
                         <tr className="bg-slate-50 border-b font-bold uppercase text-slate-500">
                           <th className="p-2">Medicine</th>
                           <th className="p-2">Batch No. *</th>
-                          <th className="p-2">MFG Date</th>
-                          <th className="p-2">EXP Date *</th>
+                          <th className="p-2">EXP Date (MM-YY) *</th>
                           <th className="p-2 text-center">Qty</th>
                           <th className="p-2 text-right">Price (₹)</th>
                           <th className="p-2 text-right">Rack</th>
@@ -4181,7 +4604,7 @@ export default function PharmacyPage() {
                       <tbody className="divide-y bg-white">
                         {grnItems.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="p-6 text-center text-slate-400 italic">
+                            <td colSpan={7} className="p-6 text-center text-slate-400 italic">
                               No items yet — use the form below to add medicines to this receipt.
                             </td>
                           </tr>
@@ -4197,16 +4620,9 @@ export default function PharmacyPage() {
                             </td>
                             <td className="p-2">
                               <Input 
-                                type="date" value={item.mfg_date || ""} 
-                                onChange={(e) => handleUpdateGRNItem(index, 'mfg_date', e.target.value)}
-                                className="h-7 text-[10px] w-28 border-slate-200" 
-                              />
-                            </td>
-                            <td className="p-2">
-                              <Input 
-                                type="date" value={item.exp_date || ""} 
+                                type="month" value={item.exp_date || ""} 
                                 onChange={(e) => handleUpdateGRNItem(index, 'exp_date', e.target.value)}
-                                className="h-7 text-[10px] w-28 border-slate-200 border-amber-300 bg-amber-50/20" 
+                                className="h-7 text-[10px] w-28 border-slate-200 border-amber-300 bg-amber-50/20 font-mono" 
                               />
                             </td>
                             <td className="p-2 text-center">
@@ -4783,6 +5199,101 @@ export default function PharmacyPage() {
               </div>
             )}
           </div>
+
+          {/* Full-width Section: Imported Supplier Invoices & Goods Receipts */}
+          <Card className="shadow-xs border-slate-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-200/60 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm font-serif flex items-center gap-2 text-slate-900">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  Imported Supplier Invoices &amp; OCR Goods Receipts
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Historical log of distributor invoices processed via AI vision extraction and purchase bills.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowImportedInvoicesModal(true)}
+                  size="xs"
+                  variant="outline"
+                  className="bg-white hover:bg-slate-50 text-indigo-700 border-indigo-200 font-semibold text-[10px] px-3 py-1.5 shadow-xs gap-1.5"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Full Invoices Modal
+                </Button>
+                <Button
+                  onClick={() => setIsAIImportModalOpen(true)}
+                  size="xs"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-3 py-1.5 shadow-xs gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {importedInvoices.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No supplier invoices imported yet. Click &quot;AI Import Invoice&quot; to upload your pharmaceutical bills.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 text-xs overflow-x-auto">
+                  <div className="grid grid-cols-[1.5fr_1.8fr_1.2fr_1fr_1.2fr_1.5fr] px-6 py-3 font-bold text-slate-500 bg-slate-50/50 uppercase tracking-wider text-[10px]">
+                    <div>Invoice Reference</div>
+                    <div>Supplier / Vendor</div>
+                    <div>Invoice Date</div>
+                    <div className="text-center">Items</div>
+                    <div className="text-right">Net Value</div>
+                    <div className="text-right">Actions</div>
+                  </div>
+                  {importedInvoices.map((inv) => (
+                    <div key={inv.invoice_number} className="grid grid-cols-[1.5fr_1.8fr_1.2fr_1fr_1.2fr_1.5fr] px-6 py-3.5 items-center hover:bg-slate-50/60 transition-colors">
+                      <div className="font-mono font-bold text-indigo-700 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                        #{inv.invoice_number}
+                      </div>
+                      <div className="font-semibold text-slate-800">{inv.supplier}</div>
+                      <div className="text-slate-500 font-mono text-[11px]">{inv.invoice_date || "Recent"}</div>
+                      <div className="text-center">
+                        <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                          {inv.item_count || 1} items
+                        </span>
+                      </div>
+                      <div className="text-right font-black font-mono text-slate-900">
+                        ₹{(inv.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-right flex items-center justify-end gap-2">
+                        <Button
+                          onClick={() => {
+                            setSelectedInvoiceDetail(inv.invoice_number);
+                            setShowImportedInvoicesModal(true);
+                          }}
+                          size="xs"
+                          variant="outline"
+                          className="h-7 text-[10px] px-2.5 bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                        >
+                          Inspect Breakdown
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setSearchQuery("");
+                            setCategoryFilter("All");
+                            setStatusFilter("All");
+                            setInvoiceFilter(inv.invoice_number);
+                            setActiveTab("inventory");
+                            showToast(`Filtered inventory table for Invoice ${inv.invoice_number}`, "info");
+                          }}
+                          size="xs"
+                          className="h-7 text-[10px] px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+                        >
+                          Filter Inventory ➔
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -4895,11 +5406,12 @@ export default function PharmacyPage() {
                 <TabsContent value="batches" className="space-y-2 pt-2 focus-visible:outline-none">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Inventory Batches (FEFO Sorting)</div>
                   <div className="border rounded-lg overflow-hidden bg-white">
-                    <div className="grid grid-cols-6 p-2 bg-slate-50 font-bold border-b text-[9px] text-slate-500 uppercase tracking-wider">
-                      <div className="col-span-2">Batch Number</div>
+                    <div className="grid grid-cols-7 p-2 bg-slate-50 font-bold border-b text-[9px] text-slate-500 uppercase tracking-wider">
+                      <div className="col-span-2">Batch & Invoice</div>
                       <div>Expiry Date</div>
                       <div className="text-center">Stock</div>
                       <div>Supplier</div>
+                      <div>Inv Date</div>
                       <div className="text-center">Status</div>
                     </div>
                     {(!selectedMedicine.batches || selectedMedicine.batches.length === 0) ? (
@@ -4908,11 +5420,17 @@ export default function PharmacyPage() {
                       selectedMedicine.batches.map(batch => {
                         const alert = getExpiryAlert(batch.exp_date);
                         return (
-                          <div key={batch.batch_number} className="grid grid-cols-6 p-2 border-b items-center text-[10px] font-mono hover:bg-slate-50/20">
-                            <div className="col-span-2 font-semibold text-slate-800">{batch.batch_number}</div>
+                          <div key={batch.batch_number} className="grid grid-cols-7 p-2 border-b items-center text-[10px] font-mono hover:bg-slate-50/20">
+                            <div className="col-span-2">
+                              <span className="font-semibold text-slate-800 block">{batch.batch_number}</span>
+                              {batch.invoice_number && (
+                                <span className="text-[9px] text-indigo-600 font-sans block">Inv: {batch.invoice_number}</span>
+                              )}
+                            </div>
                             <div className="text-slate-600">{new Date(batch.exp_date).toLocaleDateString("en-IN")}</div>
                             <div className="text-center font-bold text-slate-700">{batch.current_stock}</div>
-                            <div className="text-slate-500 truncate">{batch.supplier || "N/A"}</div>
+                            <div className="text-slate-500 truncate" title={batch.supplier}>{batch.supplier || "N/A"}</div>
+                            <div className="text-slate-500 text-[9px]">{batch.invoice_date || "N/A"}</div>
                             <div className="text-center">
                               <span className={`px-1.5 py-0.25 rounded text-[8px] font-bold border ${alert.color}`}>
                                 {alert.label}
@@ -5970,6 +6488,206 @@ export default function PharmacyPage() {
             <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowWorkdeskDeleteModal(false)}>Cancel</Button>
               <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white" onClick={confirmWorkdeskDelete}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Imported Invoices Explorer Modal */}
+      {showImportedInvoicesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-linear-to-r from-indigo-50 to-white">
+              <div>
+                <h3 className="font-serif font-bold text-slate-900 text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  Imported Invoices & Purchase Receipts
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Browse all imported pharmaceutical supplier invoices and inspect medicines separated by Invoice ID.
+                </p>
+              </div>
+              <button onClick={() => { setShowImportedInvoicesModal(false); setSelectedInvoiceDetail(null); }} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 bg-slate-50/50">
+              {importedInvoices.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300 p-8 space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm">No Imported Invoices Found Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Upload purchase bills, GST invoices, or distributor receipts using AI Invoice Import to view them categorized by Invoice ID.
+                  </p>
+                  <Button 
+                    onClick={() => { setShowImportedInvoicesModal(false); setIsAIImportModalOpen(true); }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice Now
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Total Invoices</span>
+                      <div className="text-2xl font-black text-indigo-950 mt-0.5">{importedInvoices.length}</div>
+                    </div>
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Total Medicines Imported</span>
+                      <div className="text-2xl font-black text-emerald-700 mt-0.5">
+                        {importedInvoices.reduce((acc, it) => acc + (it.item_count || 1), 0)} items
+                      </div>
+                    </div>
+                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Total Procurement Net</span>
+                      <div className="text-2xl font-black text-slate-900 mt-0.5">
+                        ₹{importedInvoices.reduce((acc, it) => acc + (it.total_amount || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {importedInvoices.map((inv) => {
+                      const isExpanded = selectedInvoiceDetail === inv.invoice_number;
+                      // Find all medicines matching this invoice
+                      const invoiceMeds = medicines.filter(m => 
+                        (m.invoice_number && m.invoice_number.toLowerCase() === inv.invoice_number.toLowerCase()) ||
+                        (m.batches || []).some(b => b.invoice_number && b.invoice_number.toLowerCase() === inv.invoice_number.toLowerCase())
+                      );
+
+                      return (
+                        <div key={inv.invoice_number} className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all duration-200">
+                          <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-xs">
+                                  #{inv.invoice_number}
+                                </span>
+                                <span className="font-semibold text-slate-900 text-sm">{inv.supplier}</span>
+                                <span className="text-slate-400 text-xs">•</span>
+                                <span className="text-xs text-slate-500 font-medium">Date: {inv.invoice_date || 'N/A'}</span>
+                              </div>
+                              <div className="text-xs text-slate-500 flex items-center gap-3">
+                                <span>Total Items: <strong className="text-slate-800">{inv.item_count || invoiceMeds.length}</strong></span>
+                                <span>•</span>
+                                <span>Invoice Value: <strong className="text-slate-900">₹{inv.total_amount?.toLocaleString("en-IN") || '0.00'}</strong></span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedInvoiceDetail(isExpanded ? null : inv.invoice_number);
+                                }}
+                                className="h-8 text-xs border-slate-200 hover:bg-slate-50 text-slate-700 gap-1"
+                              >
+                                {isExpanded ? "Hide Breakdown ▲" : `View Medicines (${invoiceMeds.length || inv.item_count}) ▼`}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSearchQuery("");
+                                  setCategoryFilter("All");
+                                  setStatusFilter("All");
+                                  setInvoiceFilter(inv.invoice_number);
+                                  setShowImportedInvoicesModal(false);
+                                  setActiveTab("inventory");
+                                  showToast(`Filtered inventory table for Invoice ${inv.invoice_number}`, "info");
+                                }}
+                                className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1 shadow-xs"
+                              >
+                                Filter Table ➔
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Expanded Medicines Breakdown Table */}
+                          {isExpanded && (
+                            <div className="border-t border-slate-100 bg-slate-50/70 p-4 animate-in slide-in-from-top-1 duration-200">
+                              <h5 className="font-bold text-xs text-slate-700 mb-2 uppercase tracking-wide">
+                                Medicines Included in Invoice #{inv.invoice_number}
+                              </h5>
+                              <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                                      <th className="px-3 py-2">Medicine Name</th>
+                                      <th className="px-3 py-2">Batch No</th>
+                                      <th className="px-3 py-2 text-center">Pack</th>
+                                      <th className="px-3 py-2 text-center font-bold">Qty (Units)</th>
+                                      <th className="px-3 py-2 text-center">Expiry</th>
+                                      <th className="px-3 py-2 text-right">PTR / Rate (₹)</th>
+                                      <th className="px-3 py-2 text-right">MRP (₹)</th>
+                                      <th className="px-3 py-2 text-center">Rack</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {(invoiceMeds.length > 0 ? invoiceMeds : (inv.items || [])).map((m, idx) => {
+                                      const medBatch = m.batches?.[0] || m;
+                                      return (
+                                        <tr key={idx} className="hover:bg-slate-50/60">
+                                          <td className="px-3 py-2 font-bold text-slate-800">
+                                            {m.medicine_name || m.medicine || "Medicine"}
+                                          </td>
+                                          <td className="px-3 py-2 font-mono text-[11px] text-indigo-700 font-bold">
+                                            {medBatch.batch_number || m.batch_number || "BATCH-01"}
+                                          </td>
+                                          <td className="px-3 py-2 text-center text-slate-600">
+                                            {medBatch.pack_size || m.pack_size || m.pack || "10'S"}
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-mono font-black text-slate-900">
+                                            {m.stock || medBatch.current_stock || m.quantity || 1}
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-mono text-slate-600 text-[11px]">
+                                            {medBatch.exp_date || m.expiry_date || m.exp_date || "12-2028"}
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-mono text-slate-700">
+                                            ₹{parseFloat(m.purchase_price || medBatch.purchase_price || 0).toFixed(2)}
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-mono text-slate-900 font-semibold">
+                                            ₹{parseFloat(m.selling_price || m.mrp || medBatch.mrp || 0).toFixed(2)}
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-mono text-slate-600">
+                                            {medBatch.rack_location || m.rack_location || m.rack || "A-1"}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3.5 border-t bg-slate-50 flex justify-between items-center">
+              <Button 
+                onClick={() => { setShowImportedInvoicesModal(false); setIsAIImportModalOpen(true); }}
+                variant="outline"
+                className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> AI Import Another Invoice
+              </Button>
+
+              <Button 
+                onClick={() => { setShowImportedInvoicesModal(false); setSelectedInvoiceDetail(null); }}
+                className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4"
+              >
+                Close
+              </Button>
             </div>
           </div>
         </div>

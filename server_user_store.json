@@ -8,17 +8,22 @@
       "email": "suryapraks588@gmail.com",
       "mobile_no": "8270173588",
       "password": "Admin@2026",
-      "full_name": "Hospital Admin",
+      "full_name": "Surya",
       "roles": [
         "Hospital Admin"
       ],
       "permissions": [
         "*"
       ],
-      "department": "Hospital Administration",
-      "designation": "Chief Administrator",
+      "department": "General physician",
+      "designation": "Hospital Admin",
       "sessionVersion": 1,
-      "createdAt": "2026-08-27T08:39:39.095Z"
+      "createdAt": "2026-08-24T08:18:16.914Z",
+      "updatedAt": "2026-08-28T03:55:03.511Z",
+      "userId": "STAFF-ADMIN-1",
+      "name": "Surya",
+      "role": "Hospital Admin",
+      "active": true
     },
     {
       "id": "STAFF-MGR-1",
@@ -119,16 +124,272 @@
       "sessionVersion": 1,
       "active": true,
       "updatedAt": "2026-08-27T09:08:48.778Z"
+    },
+    {
+      "id": "STAFF-2188",
+      "email": "maha@gmail.com",
+      "mobile_no": "9363105777",
+      "password": "surya@54321",
+      "full_name": "maha",
+      "roles": [
+        "Pharmacist"
+      ],
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Pharmacist",
+      "sessionVersion": 2,
+      "updatedAt": "2026-08-24T08:35:12.372Z",
+      "employeeId": "TH-PHA-001",
+      "employee_id": "TH-PHA-001",
+      "frappeStaffId": "TH-PHA-001"
+    },
+    {
+      "id": "STAFF-5162",
+      "email": "velu@gmail.com",
+      "mobile_no": "7894561232",
+      "password": "123456",
+      "full_name": "Velu",
+      "roles": [
+        "Hospital Admin"
+      ],
+      "permissions": [],
+      "department": "General Medicine",
+      "designation": "Hospital Admin",
+      "sessionVersion": 2,
+      "updatedAt": "2026-08-27T04:56:33.355Z",
+      "employeeId": "TH-ADM-003",
+      "employee_id": "TH-ADM-003",
+      "frappeStaffId": "TH-ADM-003",
+      "role": "Hospital Admin",
+      "active": true
     }
   ],
-  "deleted": [],
+  "deleted": [
+    "7894561230",
+    "crossdevicetest@thangamhospital.com",
+    "9876501234",
+    "sync_test_user_2026@thangamhospital.com",
+    "naughtysurya2003@gmail.com",
+    "staff-5875",
+    "TH010",
+    "siddharth",
+    "staff-001",
+    "vijay@gmail.com",
+    "9363105889",
+    "TH-LAB-001",
+    "vijay"
+  ],
   "activities": [
     {
-      "id": "act-1787821728933",
+      "id": "act-1787901409131",
+      "title": "Staff Member Deleted",
+      "desc": "Identifier: STAFF-001",
+      "time": "12:46 pm",
+      "createdAt": "2026-08-28T07:16:49.109Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787893899076",
+      "title": "Staff Member Deleted",
+      "desc": "Identifier: STAFF-5875",
+      "time": "10:41 am",
+      "createdAt": "2026-08-28T05:11:39.035Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787889443361",
+      "title": "Employee ID Changed",
+      "desc": "Old: TH9876502320 | New: TH010 | Changed By: TH001",
+      "time": "09:27 am",
+      "createdAt": "2026-08-28T03:57:23.360Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787889328784",
       "title": "New staff user created",
-      "desc": "Vishnu (TH006 - Receptionist)",
-      "time": "02:38 pm",
-      "createdAt": "2026-08-27T09:08:48.929Z",
+      "desc": "Siddharth (TH9876502320 - Lab Technician)",
+      "time": "09:25 am",
+      "createdAt": "2026-08-28T03:55:28.784Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787889303664",
+      "title": "Employee ID Changed",
+      "desc": "Old: TH9876502319 | New: TH001 | Changed By: TH003",
+      "time": "09:25 am",
+      "createdAt": "2026-08-28T03:55:03.634Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787817600476",
+      "title": "Employee ID Changed",
+      "desc": "Old: TH-ADM-002 | New: TH001 | Changed By: TH-ADM-002",
+      "time": "01:30 pm",
+      "createdAt": "2026-08-27T08:00:00.475Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787806595003",
+      "title": "Employee ID Changed",
+      "desc": "Old: TH-ADM-001 | New: TH-ADM-003 | Changed By: TH-ADM-002",
+      "time": "10:26 am",
+      "createdAt": "2026-08-27T04:56:35.001Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787804895851",
+      "title": "Employee ID Changed",
+      "desc": "Old: TH-ADM-001 | New: TH-ADM-002 | Changed By: TH-ADM-001",
+      "time": "09:58 am",
+      "createdAt": "2026-08-27T04:28:15.814Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787748092188",
+      "title": "Staff Member Deleted",
+      "desc": "Identifier: naughtysurya2003@gmail.com",
+      "time": "06:11 pm",
+      "createdAt": "2026-08-26T12:41:32.167Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787746791748",
+      "title": "Staff Profile Updated",
+      "desc": "Dr. Senthil (Doctor)",
+      "time": "05:49 pm",
+      "createdAt": "2026-08-26T12:19:51.747Z",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787746791326",
+      "title": "Staff Profile Updated",
+      "desc": "Dr. Senthil (Doctor)",
+      "time": "05:49 pm",
+      "createdAt": "2026-08-26T12:19:51.326Z",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787746726378",
+      "title": "New staff user created",
+      "desc": "Dr. Senthil (Doctor)",
+      "time": "05:48 pm",
+      "createdAt": "2026-08-26T12:18:46.352Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787743494392",
+      "title": "Staff Profile Updated",
+      "desc": "vijay@gmail.com (Lab Technician)",
+      "time": "04:54 pm",
+      "createdAt": "2026-08-26T11:24:54.366Z",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787743158002",
+      "title": "Staff Profile Updated",
+      "desc": "Surya (Hospital Admin)",
+      "time": "11:19 AM",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787743127601",
+      "title": "Staff Profile Updated",
+      "desc": "Surya (Hospital Admin)",
+      "time": "11:18 AM",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787742216075",
+      "title": "Staff Profile Updated",
+      "desc": "suryapraks588@gmail.com (Hospital Admin)",
+      "time": "11:03 AM",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787741890468",
+      "title": "New staff user created",
+      "desc": "Vijay (Lab Technician)",
+      "time": "10:58 AM",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787740559852",
+      "title": "Staff Profile Updated",
+      "desc": "suryapraks588@gmail.com (Doctor)",
+      "time": "10:35 AM",
+      "type": "profile",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787641768994",
+      "title": "New staff user created",
+      "desc": "Dr. Hari haran (Doctor)",
+      "time": "07:09 AM",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787635500485",
+      "title": "New staff user created",
+      "desc": "Velu (Hospital Admin)",
+      "time": "10:55 am",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787635447484",
+      "title": "New staff user created",
+      "desc": "Velu (Hospital Admin)",
+      "time": "10:54 am",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787560512524",
+      "title": "New staff user created",
+      "desc": "maha (Pharmacist)",
+      "time": "08:35 AM",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787560177224",
+      "title": "Staff Member Deleted",
+      "desc": "SYNC_TEST_USER_2026 (Nurse)",
+      "time": "01:59 pm",
+      "type": "user",
+      "color": "bg-rose-50 text-rose-600 border-rose-200"
+    },
+    {
+      "id": "act-1787560177035",
+      "title": "New staff user created",
+      "desc": "SYNC_TEST_USER_2026 (Nurse)",
+      "time": "01:59 pm",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
+    {
+      "id": "act-1787560161974",
+      "title": "New staff user created",
+      "desc": "SYNC_TEST_USER_2026 (Nurse)",
+      "time": "01:50 PM",
       "type": "user",
       "color": "bg-amber-50 text-amber-600 border-amber-200"
     }
