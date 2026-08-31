@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, CheckCircle2, AlertCircle, FileText, Loader2, Sparkles } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertCircle, FileText, Loader2, Sparkles, Key, ExternalLink, Check, X, ShieldCheck } from "lucide-react";
 
 // Client-side image optimization to speed up upload & AI extraction
 async function optimizeImageBeforeUpload(file) {
@@ -71,8 +71,44 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
   const [extractedData, setExtractedData] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [showApiKeyConfig, setShowApiKeyConfig] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [hasSavedKey, setHasSavedKey] = useState(false);
   const fileInputRef = useRef(null);
   const activeUploadIdRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('gemini_api_key') || '';
+      setApiKeyInput(stored);
+      setHasSavedKey(Boolean(stored && stored.trim()));
+    }
+  }, [isOpen]);
+
+  const handleSaveApiKey = () => {
+    if (typeof window !== 'undefined') {
+      const trimmed = apiKeyInput.trim();
+      if (trimmed) {
+        localStorage.setItem('gemini_api_key', trimmed);
+        setHasSavedKey(true);
+        if (showToast) showToast("Gemini API key saved in browser storage!", "success");
+      } else {
+        localStorage.removeItem('gemini_api_key');
+        setHasSavedKey(false);
+        if (showToast) showToast("Gemini API key removed.", "info");
+      }
+      setShowApiKeyConfig(false);
+    }
+  };
+
+  const handleClearApiKey = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('gemini_api_key');
+      setApiKeyInput('');
+      setHasSavedKey(false);
+      if (showToast) showToast("Gemini API key cleared.", "info");
+    }
+  };
 
   const resetState = () => {
     setFile(null);
@@ -81,6 +117,7 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
     setExtractedData(null);
     setErrorMessage(null);
     setIsConfirming(false);
+    setShowApiKeyConfig(false);
     activeUploadIdRef.current++;
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -242,25 +279,121 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[95vw] w-[1450px] bg-slate-50 border-slate-200 shadow-2xl max-h-[92vh] overflow-hidden flex flex-col p-6">
-        <DialogHeader className="pb-3 border-b border-slate-200">
-          <DialogTitle className="flex items-center gap-2 text-indigo-700 text-xl font-serif">
-            <Sparkles className="w-5 h-5 text-indigo-600" />
-            AI-Powered Invoice Import
-          </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
-            Review and edit all extracted invoice fields. All columns are editable before saving.
-          </DialogDescription>
+        <DialogHeader className="pb-3 border-b border-slate-200 flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="flex items-center gap-2 text-indigo-700 text-xl font-serif">
+              <Sparkles className="w-5 h-5 text-indigo-600" />
+              AI-Powered Invoice Import
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Review and edit all extracted invoice fields. All columns are editable before saving.
+            </DialogDescription>
+          </div>
+          <div className="flex items-center gap-2 pr-6">
+            <button
+              type="button"
+              onClick={() => setShowApiKeyConfig(!showApiKeyConfig)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                hasSavedKey
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
+              }`}
+              title="Configure custom Google Gemini API Key"
+            >
+              <Key className={`w-3.5 h-3.5 ${hasSavedKey ? 'text-emerald-600' : 'text-amber-500'}`} />
+              <span>{hasSavedKey ? 'Gemini Key Configured' : 'Configure Gemini API Key'}</span>
+            </button>
+          </div>
         </DialogHeader>
+
+        {showApiKeyConfig && (
+          <div className="p-4 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-3 shadow-inner my-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                <h4 className="text-sm font-semibold text-indigo-950">Google Gemini API Key Configuration</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyConfig(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              If deploying on Vercel, you can set <code className="px-1 py-0.5 bg-white border rounded text-indigo-700 font-mono text-[11px]">GEMINI_API_KEY</code> in your Vercel Project Settings &rarr; Environment Variables. Alternatively, save your API key here in your browser to use directly.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="password"
+                placeholder="AIzaSy..."
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                className="bg-white border-slate-300 text-xs font-mono flex-1 h-9"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveApiKey}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 text-xs"
+                >
+                  <Check className="w-3.5 h-3.5 mr-1" /> Save Key
+                </Button>
+                {hasSavedKey && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleClearApiKey}
+                    className="border-slate-300 text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 h-9 text-xs"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+              <span>Your key is stored privately in your local browser storage.</span>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-600 hover:text-indigo-800 underline inline-flex items-center gap-0.5 font-medium"
+              >
+                Get a free API Key from Google AI Studio <ExternalLink className="w-3 h-3 ml-0.5" />
+              </a>
+            </div>
+          </div>
+        )}
 
         {!extractedData ? (
           <div className="py-6 space-y-4">
             {errorMessage && (
               <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-3 shadow-sm">
                 <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                <div className="flex-1 space-y-1">
+                <div className="flex-1 space-y-2">
                   <h4 className="font-semibold text-rose-900 text-sm">Invoice Extraction Note</h4>
                   <p className="text-rose-700 leading-relaxed font-sans">{errorMessage}</p>
-                  <p className="text-rose-600 font-mono text-[11px]">Tip: Ensure the invoice table, medicine names, batch numbers, and prices are clearly visible and well-lit.</p>
+                  
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setShowApiKeyConfig(true)}
+                      className="h-7 text-xs bg-white border-rose-300 text-rose-900 hover:bg-rose-100/70 flex items-center gap-1 shadow-sm"
+                    >
+                      <Key className="w-3 h-3 text-rose-600" />
+                      Configure Gemini API Key
+                    </Button>
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-rose-700 hover:text-rose-900 underline inline-flex items-center gap-0.5 font-medium ml-2"
+                    >
+                      Get free Google AI Studio Key <ExternalLink className="w-3 h-3 ml-0.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
             )}

@@ -66,7 +66,7 @@ export async function POST(request) {
     const GEMINI_API_KEY = getGeminiApiKey(formData, request);
     if (GEMINI_API_KEY) {
       try {
-        console.log(`[AI Invoice API] Calling Gemini Vision API for "${fileName}" with model gemini-3.6-flash...`);
+        console.log(`[AI Invoice API] Calling Gemini Vision API for "${fileName}"...`);
         const base64Data = buffer.toString('base64');
         const prompt = `You are an expert OCR and data-extraction engine specialized in Indian GST pharmaceutical/medical supply invoices for hospital and pharmacy ERP systems.
 
@@ -240,7 +240,14 @@ Return ONLY valid JSON matching the schema below. No explanations, no markdown f
   "validation_warnings": []
 }`;
 
-        const modelsToTry = ["gemini-3.6-flash", "gemini-3.7-flash"];
+        const modelsToTry = [
+          "gemini-3.6-flash",
+          "gemini-3.7-flash",
+          "gemini-3.5-flash",
+          "gemini-flash-latest",
+          "gemini-3.1-flash-lite",
+          "gemini-2.5-flash"
+        ];
         let rawExtracted = null;
         let lastErrorText = "";
 
@@ -306,10 +313,10 @@ Return ONLY valid JSON matching the schema below. No explanations, no markdown f
             }, { status: 422 });
           }
         } else if (lastErrorText) {
-          const isInvalidKey = lastErrorText.includes('API_KEY_INVALID') || lastErrorText.includes('PERMISSION_DENIED');
+          const isInvalidKey = lastErrorText.includes('API_KEY_INVALID') || lastErrorText.includes('PERMISSION_DENIED') || lastErrorText.includes('API key not valid');
           return NextResponse.json({
             error: isInvalidKey 
-              ? "Invalid Gemini API Key. Please verify your Google AI Studio API key."
+              ? "Invalid Gemini API Key. Please verify your Google AI Studio API key in Vercel settings or in the import modal."
               : `Gemini AI Vision Error: ${lastErrorText.substring(0, 150)}`
           }, { status: 400 });
         }
@@ -351,7 +358,9 @@ Return ONLY valid JSON matching the schema below. No explanations, no markdown f
 
     // Return explicit error response if no extraction succeeded (DO NOT RETURN SILENT FAKE/MOCK DATA)
     return NextResponse.json({
-      error: "Unable to extract invoice data. Please verify GEMINI_API_KEY environment variable is configured or upload a clearer invoice image."
+      error: GEMINI_API_KEY
+        ? "Unable to extract invoice data. Please ensure the invoice image is clear, well-lit, and text is readable."
+        : "Gemini API key is not configured. Please add GEMINI_API_KEY to your Vercel Project Settings > Environment Variables, or enter your API key directly in the modal settings."
     }, { status: 422 });
 
   } catch (error) {
