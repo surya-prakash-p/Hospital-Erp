@@ -117,7 +117,7 @@ export default function PharmacyPage() {
   const [newMedData, setNewMedData] = useState({
     medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
     dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
-    reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
+    reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0, hsn_code: "30049099",
     batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10,
     invoice_number: "", invoice_date: ""
   });
@@ -1144,6 +1144,9 @@ export default function PharmacyPage() {
         ...newMedData,
         generic_name: newMedData.generic_name || newMedData.medicine_name,
         brand: newMedData.brand || "",
+        hsn_code: newMedData.hsn_code || "30049099",
+        gst: parseFloat(newMedData.gst) != null ? parseFloat(newMedData.gst) : 12.0,
+        gst_percent: parseFloat(newMedData.gst) != null ? parseFloat(newMedData.gst) : 12.0,
         tablets_per_strip: parseInt(newMedData.tablets_per_strip) || 10,
         purchase_price: parseFloat(newMedData.purchase_price) || 0.0,
         selling_price: parseFloat(newMedData.mrp || newMedData.selling_price) || 0.0,
@@ -1167,6 +1170,8 @@ export default function PharmacyPage() {
            batch_number: newMedData.batch_number.trim().toUpperCase(),
            medicine: data.medicine_name,
            medicine_name: data.medicine_name,
+           hsn_code: data.hsn_code,
+           gst: data.gst,
            supplier: newMedData.supplier || "ABC Pharma",
            invoice_number: newMedData.invoice_number || "",
            invoice_date: newMedData.invoice_date || "",
@@ -1190,7 +1195,7 @@ export default function PharmacyPage() {
       setNewMedData({
         medicine_name: "", generic_name: "", brand: "", manufacturer: "", strength: "",
         dosage_form: "Tablet", category: "Regular Medicine", min_stock: 50, max_stock: 500,
-        reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0,
+        reorder_level: 100, rack_location: "Rack A-01", purchase_price: "", selling_price: "", mrp: "", gst: 12.0, hsn_code: "30049099",
         batch_number: "", supplier: "ABC Pharma", mfg_date: "", expiry_date: "", pack_size: 10, no_of_packs: 10, tablets_per_strip: 10,
         invoice_number: "", invoice_date: ""
       });
@@ -3004,6 +3009,37 @@ export default function PharmacyPage() {
                         className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                         required
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-hsn" className="text-xs text-slate-700 font-medium flex items-center justify-between">
+                        <span>HSN Code</span>
+                        <span className="text-[10px] text-slate-400 font-normal">e.g. 3004 / 30049099</span>
+                      </Label>
+                      <Input
+                        id="med-hsn"
+                        placeholder="30049099"
+                        value={newMedData.hsn_code || ""}
+                        onChange={(e) => setNewMedData(p => ({ ...p, hsn_code: e.target.value }))}
+                        className="h-10 bg-slate-50/60 border-slate-200 rounded-lg text-xs font-mono focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="med-gst" className="text-xs text-slate-700 font-medium">GST Rate (%)</Label>
+                      <select
+                        id="med-gst"
+                        value={newMedData.gst ?? 12}
+                        onChange={(e) => setNewMedData(p => ({ ...p, gst: parseFloat(e.target.value) || 0 }))}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs focus:bg-white focus:outline-none focus:border-blue-500 text-slate-800 font-medium transition"
+                      >
+                        <option value={0}>0% - Exempted / Nil Rated</option>
+                        <option value={5}>5% - Essential Drugs / Life Saving</option>
+                        <option value={12}>12% - Standard Pharma Rate (Default)</option>
+                        <option value={18}>18% - Supplements / Disinfectants</option>
+                        <option value={28}>28% - Specialty / Luxury</option>
+                      </select>
                     </div>
                   </div>
 
@@ -5350,6 +5386,10 @@ export default function PharmacyPage() {
                     <span className="text-slate-500">Dosage Form / Strength:</span>
                     <span className="font-semibold text-slate-900">{selectedMedicine.dosage_form} ({selectedMedicine.strength || "N/A"})</span>
                   </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">HSN Code:</span>
+                    <span className="font-semibold text-slate-900 font-mono">{selectedMedicine.hsn_code || "30049099"}</span>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Rack location:</span>
                     <span className="font-semibold text-slate-900 font-mono">{selectedMedicine.rack_location || "N/A"}</span>
@@ -5750,6 +5790,32 @@ export default function PharmacyPage() {
                     onChange={(e) => setEditingMed(p => ({ ...p, max_stock: parseInt(e.target.value) || 0 }))}
                     className="h-8 text-xs border-slate-200"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="font-bold text-slate-500">HSN Code</Label>
+                  <Input
+                    placeholder="30049099"
+                    value={editingMed.hsn_code || ""}
+                    onChange={(e) => setEditingMed(p => ({ ...p, hsn_code: e.target.value }))}
+                    className="h-8 text-xs border-slate-200 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="font-bold text-slate-500">GST Rate (%)</Label>
+                  <select
+                    value={editingMed.gst != null ? editingMed.gst : (editingMed.gst_percent != null ? editingMed.gst_percent : 12)}
+                    onChange={(e) => setEditingMed(p => ({ ...p, gst: parseFloat(e.target.value) || 0, gst_percent: parseFloat(e.target.value) || 0 }))}
+                    className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none text-xs"
+                  >
+                    <option value={0}>0% - Exempted</option>
+                    <option value={5}>5% - Essential</option>
+                    <option value={12}>12% - Standard (12%)</option>
+                    <option value={18}>18% - Supplements (18%)</option>
+                    <option value={28}>28% - Specialty (28%)</option>
+                  </select>
                 </div>
               </div>
 
