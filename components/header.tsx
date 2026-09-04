@@ -236,27 +236,6 @@ export function Header() {
         </div>
         
         <div className="flex items-center gap-2.5">
-          {/* Quick Access Audit Logs Button (Admin or granted staff only) */}
-          {canViewAuditLogs && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsAuditModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-              title="View Hospital Activity & Page Access Logs"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <Activity className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Audit Logs</span>
-            </button>
-          )}
-
           {/* User Account Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
