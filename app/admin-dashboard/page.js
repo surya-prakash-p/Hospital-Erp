@@ -635,18 +635,8 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* HEADER SECTION (Matching exact UI layout from photo) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Hospital Admin Dashboard</h1>
-            <CheckCircle className="w-5 h-5 text-blue-600 fill-blue-100" />
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">
-            Manage hospital operations, staff, roles, and system configuration
-          </p>
-        </div>
-
+      {/* Page actions */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs text-xs font-semibold text-slate-800">
             <span>{formattedToday}</span>

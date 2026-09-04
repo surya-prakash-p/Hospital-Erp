@@ -102,11 +102,7 @@ export default function BookAppointmentsPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Appointment Scheduler</h2>
-          <p className="text-muted-foreground mt-1">Book consultations, schedule appointments, and assign ticket tokens</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" size="sm" onClick={loadData} className="gap-1 border-slate-200">
           <RefreshCw className="w-3.5 h-3.5" /> Sync Schedule
         </Button>

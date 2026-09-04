@@ -158,11 +158,7 @@ export default function BedManagementPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Bed & Room Management</h2>
-          <p className="text-muted-foreground mt-1">Track ward lists, allocate beds, and handle patient transfers</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" size="sm" onClick={loadData} className="gap-1 border-slate-200">
           <RefreshCw className="w-3.5 h-3.5" /> Sync Wards
         </Button>

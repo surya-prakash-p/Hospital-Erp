@@ -465,28 +465,18 @@ export default function ConsultationPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Consultation</h2>
-          <p className="text-muted-foreground mt-1">
+      {/* Consultation queue and patient details */}
+      <Card>
+        <CardHeader className="bg-slate-50 border-b py-4">
+          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Stethoscope className="w-5 h-5 text-indigo-600" />
             {isDoctorUser 
-              ? `Patient queue & clinical desk for ${currentDoctorName || "Doctor"}`
-              : "Doctor's diagnosis and prescription queue"
+              ? `My Assigned Patient Queue (${activeConsultations.length} Pending)`
+              : `Doctor Consultation Queues (${activeConsultations.length} Pending Total)`
             }
-          </p>
-        </div>
-      </div>
-
-      {/* Doctor Columns Queue */}
-      <div className="space-y-3">
-        <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-          <Stethoscope className="w-5 h-5 text-indigo-600" />
-          {isDoctorUser 
-            ? `My Assigned Patient Queue (${activeConsultations.length} Pending)`
-            : `Doctor Consultation Queues (${activeConsultations.length} Pending Total)`
-          }
-        </h3>
-        
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-6">
         <div className={`grid grid-cols-1 ${renderingDoctors.length > 1 ? "md:grid-cols-3" : "md:grid-cols-1 max-w-xl"} gap-4`}>
           {renderingDoctors.map((doc) => {
             const docName = doc.name || doc.doctor_name;
@@ -551,19 +541,7 @@ export default function ConsultationPage() {
             );
           })}
         </div>
-      </div>
-
-        {/* Diagnosis & Prescription Panel */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="bg-slate-50 border-b">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-indigo-500" />
-                Diagnosis & Vitals
-              </CardTitle>
-              <CardDescription>Enter consultation details for the selected patient.</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
+          {/* Diagnosis & prescription details */}
               {selectedWalkIn ? (
                 <form onSubmit={handleSaveConsultation} className="space-y-4">
                   {/* Selected Patient Banner */}
@@ -786,9 +764,8 @@ export default function ConsultationPage() {
                   Please select a patient from the queue to start consultation.
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
+        </CardContent>
+      </Card>
       </div>
     );
   }

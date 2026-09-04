@@ -87,10 +87,6 @@ export default function OTPage() {
         ))}
       </div>
 
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Operation Theatre (OT)</h2>
-        <p className="text-muted-foreground mt-1">Schedule surgical cases, allocate OT rooms, and assign surgical staff</p>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Scheduler form */}

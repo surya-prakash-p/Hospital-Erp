@@ -1,11 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CompactStats } from "@/components/compact-stats";
 import { 
-  Wallet, 
-  TrendingUp, 
-  ArrowUpRight, 
-  ArrowDownRight, 
   PlusCircle, 
   DollarSign, 
   Calendar, 
@@ -23,6 +20,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +32,8 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState([]);
   
+  const [isTransactionOpen, setIsTransactionOpen] = useState(false);
+
   // Form state
   const [newTx, setNewTx] = useState({
     title: "",
@@ -119,6 +119,7 @@ export default function FinancePage() {
       notes: ""
     });
 
+    setIsTransactionOpen(false);
     showToast("Transaction noted successfully!", "success");
 
     try {
@@ -280,7 +281,7 @@ export default function FinancePage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-24">
       {/* Toast notifications container */}
       <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map((t) => (
@@ -299,11 +300,7 @@ export default function FinancePage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Finance Ledger</h2>
-          <p className="text-muted-foreground mt-1">Manage, note, and view revenues, expenses and profits for Thangam Hospital.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={loadAllFinanceData} className="gap-1 text-xs h-9 border-slate-200">
             <RefreshCw className="w-3.5 h-3.5" />
@@ -318,120 +315,33 @@ export default function FinancePage() {
 
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fit,10rem)] gap-2">
             <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
             <div className="h-24 bg-slate-200/80 rounded-xl" />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="h-[400px] lg:col-span-2 bg-slate-200/60 rounded-xl" />
-            <div className="h-[400px] lg:col-span-1 bg-slate-200/60 rounded-xl" />
-          </div>
+          <div className="h-[400px] bg-slate-200/60 rounded-xl" />
         </div>
       ) : (
         <>
-          {/* Summary Metrics Cards (4 Column Grid with dedicated Pharmacy Total Income card) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Revenue */}
-            <Card className="border-l-4 border-l-indigo-500 shadow-xs relative overflow-hidden">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Gross Revenue</p>
-                    <h3 className="text-2xl font-bold font-serif text-slate-900 mt-2">₹{totalRevenue.toLocaleString()}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 flex-wrap">
-                      <span className="font-semibold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded">₹{totalPharmacyIncome.toLocaleString()}</span> pharmacy &nbsp;•&nbsp;
-                      <span className="font-semibold text-teal-600 bg-teal-50 px-1 py-0.2 rounded">₹{totalClinicalIncome.toLocaleString()}</span> clinical
-                    </p>
-                  </div>
-                  <div className="p-2 bg-indigo-50 text-indigo-500 rounded-lg">
-                    <ArrowUpRight className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
-                  <Wallet className="w-24 h-24 text-indigo-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pharmacy Total Income (Interactive Card) */}
-            <Card 
-              onClick={() => {
+          <CompactStats stats={[
+            { title: "Total Gross Revenue", value: `₹${totalRevenue.toLocaleString()}` },
+            {
+              title: "Pharmacy Total Income",
+              value: `₹${totalPharmacyIncome.toLocaleString()}`,
+              onClick: () => {
                 setCategoryFilter("Pharmacy Income");
                 showToast("Filtered ledger to show Pharmacy Income", "info");
-              }}
-              className="border-l-4 border-l-emerald-500 shadow-2xs relative overflow-hidden cursor-pointer hover:shadow-md hover:border-emerald-600 transition-all group"
-            >
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">Pharmacy Total Income</p>
-                    <h3 className="text-2xl font-bold font-serif text-emerald-700 mt-2">₹{totalPharmacyIncome.toLocaleString()}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                        {totalRevenue > 0 ? ((totalPharmacyIncome / totalRevenue) * 100).toFixed(1) : 0}% of Revenue
-                      </span>
-                    </p>
-                  </div>
-                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform">
-                    <Pill className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
-                  <Pill className="w-24 h-24 text-emerald-600" />
-                </div>
-              </CardContent>
-            </Card>
+              },
+            },
+            { title: "Total Expenditures", value: `₹${totalExpenses.toLocaleString()}` },
+            { title: "Net Operating Profit", value: `₹${netProfit.toLocaleString()}` },
+          ]} />
 
-            {/* Total Expenses */}
-            <Card className="border-l-4 border-l-rose-500 shadow-xs relative overflow-hidden">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Expenditures</p>
-                    <h3 className="text-2xl font-bold font-serif text-slate-900 mt-2">₹{totalExpenses.toLocaleString()}</h3>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Includes staff salaries, restocking & utilities.
-                    </p>
-                  </div>
-                  <div className="p-2 bg-rose-50 text-rose-500 rounded-lg">
-                    <ArrowDownRight className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
-                  <ArrowDownRight className="w-24 h-24 text-rose-500" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Net Profit */}
-            <Card className={`border-l-4 ${netProfit >= 0 ? 'border-l-emerald-500' : 'border-l-rose-500'} shadow-xs relative overflow-hidden`}>
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Net Operating Profit</p>
-                    <h3 className={`text-2xl font-bold font-serif ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'} mt-2`}>
-                      ₹{netProfit.toLocaleString()}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Margin: {totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0}%
-                    </p>
-                  </div>
-                  <div className={`p-2 ${netProfit >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'} rounded-lg`}>
-                    <TrendingUp className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="absolute right-0 bottom-0 translate-x-2 translate-y-2 opacity-5 pointer-events-none">
-                  <TrendingUp className="w-24 h-24 text-slate-500" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+          <div className="grid grid-cols-1 gap-6 mt-4">
             {/* Ledger Table (Left side) */}
-            <Card className="lg:col-span-2 flex flex-col h-[580px]">
+            <Card className="flex flex-col h-[580px]">
               <CardHeader className="bg-slate-50 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 px-6 shrink-0">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -549,145 +459,148 @@ export default function FinancePage() {
               </CardContent>
             </Card>
 
-            {/* Note Transaction Form (Right side) */}
-            <Card className="lg:col-span-1 h-[580px] flex flex-col">
-              <CardHeader className="bg-slate-50 border-b py-4 px-6 shrink-0">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <PlusCircle className="w-4 h-4 text-emerald-500" />
-                  Note Transaction
-                </CardTitle>
-                <CardDescription className="text-xs">Log a manual expense or income flow here.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 overflow-y-auto flex-1">
-                <form onSubmit={handleRecordTransaction} className="space-y-4">
-                  {/* Title */}
-                  <div className="space-y-1">
-                    <Label htmlFor="tx-title" className="text-xs font-semibold block mb-1.5">Description / Title *</Label>
-                    <Input 
-                      id="tx-title" 
-                      placeholder="e.g. Rent Payment, Vendor Purchase" 
-                      value={newTx.title}
-                      onChange={(e) => setNewTx(prev => ({ ...prev, title: e.target.value }))}
-                      required
-                    />
-                  </div>
 
-                  {/* Flow Type */}
-                  <div className="space-y-1">
-                    <Label htmlFor="tx-type" className="text-xs font-semibold block mb-1.5">Transaction Type *</Label>
-                    <select 
-                      id="tx-type"
-                      value={newTx.type}
-                      onChange={(e) => {
-                        const typeVal = e.target.value;
-                        setNewTx(prev => ({ 
-                          ...prev, 
-                          type: typeVal,
-                          // auto set category defaults based on type
-                          category: typeVal === "Income" ? "Pharmacy Income" : "Salary" 
-                        }));
-                      }}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <option value="Expense">Expense (Outflow)</option>
-                      <option value="Income">Income (Inflow)</option>
-                    </select>
-                  </div>
-
-                  {/* Category */}
-                  <div className="space-y-1">
-                    <Label htmlFor="tx-category" className="text-xs font-semibold block mb-1.5">Category *</Label>
-                    <select 
-                      id="tx-category"
-                      value={newTx.category}
-                      onChange={(e) => setNewTx(prev => ({ ...prev, category: e.target.value }))}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      {newTx.type === "Expense" ? (
-                        <>
-                          <option value="Salary">Salary</option>
-                          <option value="Medical Supplies">Medical Supplies</option>
-                          <option value="Utilities">Utilities</option>
-                          <option value="Maintenance">Maintenance</option>
-                          <option value="Ambulance">Ambulance</option>
-                          <option value="Others">Others</option>
-                        </>
-                      ) : (
-                        <>
-                          <option value="Pharmacy Income">Pharmacy Income</option>
-                          <option value="Rent">Rent</option>
-                          <option value="Others">Others</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Amount */}
-                    <div className="space-y-1">
-                      <Label htmlFor="tx-amount" className="text-xs font-semibold block mb-1.5">Amount (₹) *</Label>
-                      <Input 
-                        id="tx-amount" 
-                        type="number"
-                        min="1"
-                        placeholder="e.g. 5000" 
-                        value={newTx.amount}
-                        onChange={(e) => setNewTx(prev => ({ ...prev, amount: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    {/* Method */}
-                    <div className="space-y-1">
-                      <Label htmlFor="tx-method" className="text-xs font-semibold block mb-1.5">Payment Method *</Label>
-                      <select 
-                        id="tx-method"
-                        value={newTx.method}
-                        onChange={(e) => setNewTx(prev => ({ ...prev, method: e.target.value }))}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        <option value="UPI">UPI</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div className="space-y-1">
-                    <Label htmlFor="tx-date" className="text-xs font-semibold block mb-1.5">Transaction Date *</Label>
-                    <Input 
-                      id="tx-date" 
-                      type="date"
-                      value={newTx.date}
-                      onChange={(e) => setNewTx(prev => ({ ...prev, date: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="space-y-1">
-                    <Label htmlFor="tx-notes" className="text-xs font-semibold block mb-1.5">Remarks / Notes</Label>
-                    <textarea 
-                      id="tx-notes"
-                      placeholder="Optional notes or description details..."
-                      rows="2"
-                      value={newTx.notes}
-                      onChange={(e) => setNewTx(prev => ({ ...prev, notes: e.target.value }))}
-                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9">
-                    Add Transaction Flow
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
           </div>
         </>
       )}
+      <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
+        <DialogTrigger asChild>
+          <Button className="fixed bottom-6 right-6 z-40 h-11 gap-2 rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-lg hover:bg-emerald-700">
+            <PlusCircle className="h-4 w-4" />
+            Add Transaction
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogDescription>Log a manual expense or income.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRecordTransaction} className="space-y-4">
+            {/* Title */}
+            <div className="space-y-1">
+              <Label htmlFor="tx-title" className="text-xs font-semibold block mb-1.5">Description / Title *</Label>
+              <Input
+                id="tx-title"
+                placeholder="e.g. Rent Payment, Vendor Purchase"
+                value={newTx.title}
+                onChange={(e) => setNewTx(prev => ({ ...prev, title: e.target.value }))}
+                required
+              />
+            </div>
+
+            {/* Flow Type */}
+            <div className="space-y-1">
+              <Label htmlFor="tx-type" className="text-xs font-semibold block mb-1.5">Transaction Type *</Label>
+              <select
+                id="tx-type"
+                value={newTx.type}
+                onChange={(e) => {
+                  const typeVal = e.target.value;
+                  setNewTx(prev => ({
+                    ...prev,
+                    type: typeVal,
+                    // auto set category defaults based on type
+                    category: typeVal === "Income" ? "Pharmacy Income" : "Salary"
+                  }));
+                }}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="Expense">Expense (Outflow)</option>
+                <option value="Income">Income (Inflow)</option>
+              </select>
+            </div>
+
+            {/* Category */}
+            <div className="space-y-1">
+              <Label htmlFor="tx-category" className="text-xs font-semibold block mb-1.5">Category *</Label>
+              <select
+                id="tx-category"
+                value={newTx.category}
+                onChange={(e) => setNewTx(prev => ({ ...prev, category: e.target.value }))}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {newTx.type === "Expense" ? (
+                  <>
+                    <option value="Salary">Salary</option>
+                    <option value="Medical Supplies">Medical Supplies</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Ambulance">Ambulance</option>
+                    <option value="Others">Others</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Pharmacy Income">Pharmacy Income</option>
+                    <option value="Rent">Rent</option>
+                    <option value="Others">Others</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Amount */}
+              <div className="space-y-1">
+                <Label htmlFor="tx-amount" className="text-xs font-semibold block mb-1.5">Amount (₹) *</Label>
+                <Input
+                  id="tx-amount"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 5000"
+                  value={newTx.amount}
+                  onChange={(e) => setNewTx(prev => ({ ...prev, amount: e.target.value }))}
+                  required
+                />
+              </div>
+
+              {/* Method */}
+              <div className="space-y-1">
+                <Label htmlFor="tx-method" className="text-xs font-semibold block mb-1.5">Payment Method *</Label>
+                <select
+                  id="tx-method"
+                  value={newTx.method}
+                  onChange={(e) => setNewTx(prev => ({ ...prev, method: e.target.value }))}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="UPI">UPI</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Date */}
+            <div className="space-y-1">
+              <Label htmlFor="tx-date" className="text-xs font-semibold block mb-1.5">Transaction Date *</Label>
+              <Input
+                id="tx-date"
+                type="date"
+                value={newTx.date}
+                onChange={(e) => setNewTx(prev => ({ ...prev, date: e.target.value }))}
+                required
+              />
+            </div>
+
+            {/* Remarks */}
+            <div className="space-y-1">
+              <Label htmlFor="tx-notes" className="text-xs font-semibold block mb-1.5">Remarks / Notes</Label>
+              <textarea
+                id="tx-notes"
+                placeholder="Optional notes or description details..."
+                rows="2"
+                value={newTx.notes}
+                onChange={(e) => setNewTx(prev => ({ ...prev, notes: e.target.value }))}
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+
+            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9">
+              Add Transaction
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

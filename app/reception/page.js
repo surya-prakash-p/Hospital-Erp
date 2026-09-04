@@ -1,5 +1,7 @@
 "use client";
 
+import { WALK_IN_ENABLED } from "@/lib/feature-flags";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { jsPDF } from "jspdf";
@@ -285,6 +287,7 @@ export default function ReceptionPage() {
 
   const handleRegister = async (e, type = "Doctor Consultation") => {
     e.preventDefault();
+    if (!WALK_IN_ENABLED) return;
     const { patient_name, mobile_number, doctor } = formState;
     if (!patient_name.trim())     { toast("Patient name is required", "error"); return; }
     if (mobile_number.length < 10){ toast("Enter a valid 10-digit mobile number", "error"); return; }
@@ -365,7 +368,7 @@ export default function ReceptionPage() {
       </div>
 
       {/* ── Choice Modal ──────────────────────────────────────────────────── */}
-      {showChoice && (
+      {WALK_IN_ENABLED && showChoice && (
         <div className="fixed inset-0 z-[90] bg-black/30 backdrop-blur-[2px] flex items-center justify-center"
           onClick={e => { if (e.target === e.currentTarget) { setShowChoice(false); } }}>
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md mx-4 animate-in zoom-in-95 duration-200 overflow-hidden">
@@ -419,7 +422,7 @@ export default function ReceptionPage() {
       )}
 
       {/* ── Registration Modal ──────────────────────────────────────────────── */}
-      {showReg && (
+      {WALK_IN_ENABLED && showReg && (
         <div className="fixed inset-0 z-[90] bg-black/30 backdrop-blur-[2px] flex items-start justify-center pt-8 pb-8 overflow-y-auto"
           onClick={e => { if (e.target === e.currentTarget) setShowReg(false); }}>
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-2xl mx-4 animate-in slide-in-from-top-4 duration-200">
@@ -562,17 +565,14 @@ export default function ReceptionPage() {
         </div>
       )}
 
-      {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between pt-1">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Reception Desk</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Walk-in registration &amp; patient workflow management</p>
+      {WALK_IN_ENABLED && (
+        <div className="flex items-center justify-end">
+          <Button onClick={() => setShowChoice(true)}
+            className="h-9 px-4 text-xs bg-slate-900 hover:bg-slate-700 text-white gap-2">
+            <UserPlus className="w-3.5 h-3.5"/> Register Walk-in
+          </Button>
         </div>
-        <Button onClick={() => setShowChoice(true)}
-          className="h-9 px-4 text-xs bg-slate-900 hover:bg-slate-700 text-white gap-2">
-          <UserPlus className="w-3.5 h-3.5"/> Register Walk-in
-        </Button>
-      </div>
+      )}
 
       {/* ── Summary Stats ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-6 gap-3">

@@ -417,13 +417,6 @@ export default function LabPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Lab Station</h2>
-          <p className="text-muted-foreground mt-1">Manage and process lab requests</p>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
           <div className="flex gap-4 w-full">

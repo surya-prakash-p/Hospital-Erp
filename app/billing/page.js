@@ -629,13 +629,6 @@ Status: Completed.
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Billing & Pay</h2>
-          <p className="text-muted-foreground mt-1">Manage patient invoices and payments</p>
-        </div>
-      </div>
-
 
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">

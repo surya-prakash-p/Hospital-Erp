@@ -75,10 +75,6 @@ export default function AmbulancePage() {
         ))}
       </div>
 
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Ambulance Emergency Dispatch</h2>
-        <p className="text-muted-foreground mt-1">Dispatch ER pickup vehicles, monitor GPS locations, and manage fleet drivers</p>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Dispatcher Form */}

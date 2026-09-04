@@ -1,5 +1,7 @@
 "use client";
 
+import { WALK_IN_ENABLED } from "@/lib/feature-flags";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { jsPDF } from "jspdf";
@@ -23,7 +25,7 @@ import {
   HeartPulse, 
   ClipboardList
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -159,6 +161,7 @@ export default function PatientRegistryPage() {
 
   // Trigger check-in dialog for a patient
   const handleOpenCheckin = (patient) => {
+    if (!WALK_IN_ENABLED) return;
     setSelectedPatient(patient);
     setCheckinForm({ ...EMPTY_CHECKIN_FORM });
     const availableDocs = doctors.filter(d => d.status !== "Unavailable");
@@ -313,6 +316,7 @@ export default function PatientRegistryPage() {
   // Submit patient check-in / Walk-in queue booking
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
+    if (!WALK_IN_ENABLED) return;
     if (!selectedPatient) return;
     if (!checkinForm.doctor) {
       showToast("Please select a consulting doctor", "error");
@@ -388,23 +392,6 @@ export default function PatientRegistryPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Patient Registry</h2>
-          <p className="text-muted-foreground mt-1">Master clinical record database. Search profiles, log new admissions, and schedule appointments.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={loadRegistryData} className="gap-1 text-xs h-9 border-slate-200">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </Button>
-          <Button onClick={() => setIsRegModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-9 text-xs font-semibold shadow-sm">
-            <UserPlus className="w-4 h-4" />
-            Register Patient
-          </Button>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex flex-col gap-6 w-full animate-pulse mt-6">
           <div className="h-12 bg-slate-200/80 rounded-xl" />
@@ -412,24 +399,34 @@ export default function PatientRegistryPage() {
         </div>
       ) : (
         <Card className="flex flex-col h-[650px]">
-          <CardHeader className="bg-slate-50 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 px-6 shrink-0">
+          <CardHeader className="bg-slate-50 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-4 py-4 px-6 shrink-0">
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 <Users className="w-4 h-4 text-indigo-500" />
                 Registered Patients List
               </CardTitle>
-              <CardDescription className="text-xs">Database containing {patientsList.length} total hospital accounts.</CardDescription>
             </div>
             
-            <div className="relative shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              <Input 
-                ref={searchInputRef}
-                placeholder="Search by name, mobile, email..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-[300px] pl-8 h-8 text-xs focus:ring-1 focus:ring-indigo-500"
-              />
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+              <div className="relative min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[180px] xl:w-[280px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <Input
+                  ref={searchInputRef}
+                  aria-label="Search patients"
+                  placeholder="Search by name, mobile, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 h-9 text-xs focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={loadRegistryData} className="gap-1 text-xs h-9 border-slate-200 shrink-0">
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh
+              </Button>
+              <Button onClick={() => setIsRegModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-9 text-xs font-semibold shadow-sm shrink-0">
+                <UserPlus className="w-4 h-4" />
+                Register Patient
+              </Button>
             </div>
           </CardHeader>
           
@@ -477,7 +474,7 @@ export default function PatientRegistryPage() {
                       >
                         Profile
                       </Button>
-                      {!queue.some(q => q.mobile_number === p.mobile_number && q.appointment_status !== "Completed") && (
+                      {WALK_IN_ENABLED && !queue.some(q => q.mobile_number === p.mobile_number && q.appointment_status !== "Completed") && (
                         <Button 
                           onClick={() => handleOpenCheckin(p)}
                           className="h-7 text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-semibold flex items-center gap-1"
@@ -607,7 +604,7 @@ export default function PatientRegistryPage() {
       </Dialog>
 
       {/* ── Active Check-in Modal ─────────────────────────────────────────── */}
-      <Dialog open={isCheckinModalOpen} onOpenChange={setIsCheckinModalOpen}>
+      <Dialog open={WALK_IN_ENABLED && isCheckinModalOpen} onOpenChange={setIsCheckinModalOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Patient Walk-in Book in</DialogTitle>

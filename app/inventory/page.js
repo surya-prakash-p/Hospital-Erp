@@ -1,5 +1,7 @@
 "use client";
 
+import { CompactStats } from "@/components/compact-stats";
+
 import { useState } from "react";
 import { Box, Plus, CheckCircle, AlertCircle, Info, RefreshCw, ShoppingBag, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,10 +82,13 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Logistics & Equipment Inventory</h2>
-        <p className="text-muted-foreground mt-1">Monitor consumables stock alerts, medical equipment logs, and purchase orders</p>
-      </div>
+
+      <CompactStats stats={[
+        { title: "Total Items", value: items.length },
+        { title: "Inventory Valuation", value: `₹${items.reduce((total, item) => total + item.qty * item.price, 0).toLocaleString("en-IN")}` },
+        { title: "Low Stock", value: items.filter(item => item.qty > 0 && item.qty <= item.alertLimit).length },
+        { title: "Out Of Stock", value: items.filter(item => item.qty === 0).length },
+      ]} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Inventory Entry Form */}

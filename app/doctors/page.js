@@ -253,11 +253,7 @@ export default function DoctorsCatalogPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Doctors Registry</h2>
-          <p className="text-muted-foreground mt-1">Manage clinical staff, credentials, and availability</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {!isAdding && (
           <Button
             onClick={() => {

@@ -98,10 +98,6 @@ export default function BloodBankPage() {
         ))}
       </div>
 
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Blood Bank Inventory</h2>
-        <p className="text-muted-foreground mt-1">Manage blood unit storage capacity, donor registrations, and issues</p>
-      </div>
 
       {/* Grid of Blood Types Stock */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">

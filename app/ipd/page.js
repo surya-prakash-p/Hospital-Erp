@@ -152,11 +152,7 @@ export default function InpatientPortalPage() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Inpatient Portal (IPD)</h2>
-          <p className="text-muted-foreground mt-1">Manage ward admissions, bed mappings, nursing logs, and diets</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-2">
           {["registry", "admit", "nursing"].map((tab) => (
             <Button

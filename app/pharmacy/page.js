@@ -1,5 +1,7 @@
 "use client";
 
+import { CompactStats } from "@/components/compact-stats";
+
 import { useState, useEffect, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from "recharts";
 import { 
@@ -2677,19 +2679,8 @@ export default function PharmacyPage() {
         ))}
       </div>
 
-      {/* Main Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600">
-              <Pill className="w-5 h-5" />
-            </span>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight font-serif">Pharmacy Compliance & Inventory</h2>
-          </div>
-          <p className="text-slate-500 text-xs mt-1">
-            Drugs & Cosmetics Act Compliance (FEFO Batches, Schedule Registers, Automated Logistics replenishment)
-          </p>
-        </div>
+      {/* Page actions */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
             <Button 
@@ -3283,56 +3274,24 @@ export default function PharmacyPage() {
             ======================================================== */}
                 <TabsContent value="dashboard" className="space-y-6 focus-visible:outline-none">
           
-          {/* Top Tier: KPI Hero Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <Card onClick={() => { setStatusFilter("All"); setCategoryFilter("All"); setSearchQuery(""); setActiveTab("inventory"); }} className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all duration-300 shadow-sm border-slate-200/80 bg-linear-to-br from-white to-indigo-50/30 overflow-hidden relative group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-indigo-500/10 rounded-full group-hover:scale-110 transition-transform duration-500" />
-              <CardHeader className="p-5 pb-2 flex flex-row items-center justify-between space-y-0 relative z-10">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Inventory Valuation</span>
-                <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600"><DollarSign className="w-5 h-5" /></div>
-              </CardHeader>
-              <CardContent className="p-5 pt-0 relative z-10">
-                <div className="text-3xl font-black text-slate-800 tracking-tight">₹{metrics.inventoryValuation.toLocaleString("en-IN")}</div>
-                <div className="text-xs text-slate-500 mt-1.5 flex items-center"><Activity className="w-3.5 h-3.5 mr-1 text-emerald-500"/> Healthy at cost</div>
-              </CardContent>
-            </Card>
-
-            <Card onClick={() => setActiveTab("registers")} className="cursor-pointer hover:shadow-md hover:border-emerald-200 transition-all duration-300 shadow-sm border-slate-200/80 bg-linear-to-br from-white to-emerald-50/30 overflow-hidden relative group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full group-hover:scale-110 transition-transform duration-500" />
-              <CardHeader className="p-5 pb-2 flex flex-row items-center justify-between space-y-0 relative z-10">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Today's Dispensed</span>
-                <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600"><CheckCircle className="w-5 h-5" /></div>
-              </CardHeader>
-              <CardContent className="p-5 pt-0 relative z-10">
-                <div className="text-3xl font-black text-slate-800 tracking-tight">{metrics.todayDispensing}</div>
-                <div className="text-xs text-slate-500 mt-1.5 flex items-center">Units logged today</div>
-              </CardContent>
-            </Card>
-
-            <Card onClick={() => { setQueueFilterTab("Waiting"); setActiveTab("dispensing"); }} className="cursor-pointer hover:shadow-md hover:border-sky-200 transition-all duration-300 shadow-sm border-slate-200/80 bg-linear-to-br from-white to-sky-50/30 overflow-hidden relative group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-sky-500/10 rounded-full group-hover:scale-110 transition-transform duration-500" />
-              <CardHeader className="p-5 pb-2 flex flex-row items-center justify-between space-y-0 relative z-10">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Prescriptions</span>
-                <div className="p-2 bg-sky-100 rounded-lg text-sky-600"><ClipboardList className="w-5 h-5" /></div>
-              </CardHeader>
-              <CardContent className="p-5 pt-0 relative z-10">
-                <div className="text-3xl font-black text-slate-800 tracking-tight">{metrics.pendingPrescriptions}</div>
-                <div className="text-xs text-slate-500 mt-1.5 flex items-center">Patients waiting in queue</div>
-              </CardContent>
-            </Card>
-
-            <Card onClick={() => { setStatusFilter("Out Of Stock"); setActiveTab("inventory"); }} className="cursor-pointer hover:shadow-md hover:border-rose-200 transition-all duration-300 shadow-sm border-slate-200/80 bg-linear-to-br from-white to-rose-50/30 overflow-hidden relative group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-rose-500/10 rounded-full group-hover:scale-110 transition-transform duration-500" />
-              <CardHeader className="p-5 pb-2 flex flex-row items-center justify-between space-y-0 relative z-10">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Out Of Stock</span>
-                <div className="p-2 bg-rose-100 rounded-lg text-rose-600"><AlertCircle className="w-5 h-5" /></div>
-              </CardHeader>
-              <CardContent className="p-5 pt-0 relative z-10">
-                <div className="text-3xl font-black text-slate-800 tracking-tight">{metrics.outOfStock}</div>
-                <div className="text-xs text-rose-600 font-medium mt-1.5 flex items-center">{metrics.lowStock} additional low stock</div>
-              </CardContent>
-            </Card>
-          </div>
+          <CompactStats stats={[
+            {
+              title: "Inventory Valuation",
+              value: `₹${metrics.inventoryValuation.toLocaleString("en-IN")}`,
+              onClick: () => { setStatusFilter("All"); setCategoryFilter("All"); setSearchQuery(""); setActiveTab("inventory"); },
+            },
+            { title: "Today's Dispensed", value: metrics.todayDispensing, onClick: () => setActiveTab("registers") },
+            {
+              title: "Pending Prescriptions",
+              value: metrics.pendingPrescriptions,
+              onClick: () => { setQueueFilterTab("Waiting"); setActiveTab("dispensing"); },
+            },
+            {
+              title: "Out Of Stock",
+              value: metrics.outOfStock,
+              onClick: () => { setStatusFilter("Out Of Stock"); setActiveTab("inventory"); },
+            },
+          ]} />
 
           {/* Middle & Bottom Tiers: Charts and Lists */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

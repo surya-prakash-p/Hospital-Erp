@@ -1,5 +1,7 @@
 "use client";
 
+import { WALK_IN_ENABLED } from "@/lib/feature-flags";
+
 import React, { useState, useEffect } from "react";
 import { 
   RefreshCw, 
@@ -16,9 +18,14 @@ import {
   Activity,
   PhoneCall,
   Camera,
-  Lock
+  Lock,
+  PlusCircle,
+  UserRound,
+  Pill,
+  Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname, useRouter } from "next/navigation";
 import { AuditLogModal } from "@/components/audit-log-modal";
@@ -141,12 +148,6 @@ export function Header() {
     return null;
   }
 
-  const hospitalRoles = ["Hospital Admin", "System Manager", "Doctor", "Pharmacist", "Lab Technician", "Receptionist", "Billing Clerk"];
-  const displayRoles = (user?.roles || []).filter(r => hospitalRoles.includes(r));
-  if (displayRoles.length === 0 && user?.roles?.length) {
-    displayRoles.push(user.roles[0]);
-  }
-
   const handleRefresh = () => {
     window.location.reload();
   };
@@ -187,21 +188,6 @@ export function Header() {
     }
   };
 
-  const routeTitles: Record<string, string> = {
-    "/": "Overview Dashboard",
-    "/reception": "Reception Desk",
-    "/patient-registry": "Patient Registry",
-    "/consultation": "Doctor Consultation",
-    "/lab": "Lab Station & Diagnostics",
-    "/pharmacy": "Pharmacy Station",
-    "/billing": "Billing & Invoicing",
-    "/finance": "Financial Ledger",
-    "/doctors": "Doctors Registry",
-    "/ai-assistant": "AI Copilot Workspace",
-  };
-
-  const activeTitle = routeTitles[pathname] || "Hospital ERP";
-
   return (
     <>
       {/* Toast Notification */}
@@ -212,30 +198,32 @@ export function Header() {
         </div>
       )}
 
-      <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-6 shrink-0 z-20 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-            <span>Portal</span>
-            <span className="text-slate-300">/</span>
-            <span className="text-sm font-semibold text-slate-900 tracking-tight font-sans">
-              {activeTitle}
-            </span>
-          </div>
-          <div className="h-4 w-px bg-slate-200 mx-1" />
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {displayRoles.map((role) => (
-              <span
-                key={role}
-                className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 uppercase tracking-wider shadow-2xs"
-              >
-                <ShieldCheck className="w-3 h-3 text-blue-600" />
-                {role}
-              </span>
-            ))}
-          </div>
-        </div>
-        
+      <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-end px-6 shrink-0 z-20 shadow-2xs">
         <div className="flex items-center gap-2.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2 text-xs border-slate-200">
+                Quick Actions
+                <ChevronDown className="w-3.5 h-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={6} className="w-64 rounded-xl p-1.5 border-slate-200">
+              {[
+                ...(WALK_IN_ENABLED ? [{ label: "Register Patient Walk-In", href: "/patient-registry", icon: PlusCircle }] : []),
+                { label: "Manage Doctors Registry", href: "/doctors", icon: UserRound },
+                { label: "Pharmacy & Stock Levels", href: "/pharmacy", icon: Pill },
+                { label: "Invoices & Checkout Desk", href: "/billing", icon: Receipt },
+              ].map(({ label, href, icon: Icon }) => (
+                <DropdownMenuItem key={href} asChild className="rounded-lg px-3 py-2.5 text-xs cursor-pointer">
+                  <Link href={href} className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-indigo-600" />
+                    {label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* User Account Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -21,25 +21,10 @@ export default function RAGAIAssistantPage() {
 
   return (
     <div className="flex flex-col gap-5 max-w-7xl mx-auto h-[calc(100vh-4.5rem)]">
-      {/* Top Copilot Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 shadow-xl flex justify-between items-center shrink-0 relative overflow-hidden">
+      {/* Copilot controls */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-3 shadow-xl flex justify-end items-center shrink-0 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="flex items-center gap-4 z-10">
-          <img src="/thangam_logo.png" alt="Thangam Hospital Logo" className="w-11 h-11 object-contain bg-white/10 rounded-2xl p-1 border border-white/20 shadow-inner shrink-0" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight font-serif text-white">Thangam Hospital AI Copilot</h2>
-              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Enterprise Copilot
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Smart ERP Actions • Global Search • Patient Summary Dashboards • Proactive Insights
-            </p>
-          </div>
-        </div>
-
         <div className="flex items-center gap-3 z-10">
           <Button
             variant="outline"

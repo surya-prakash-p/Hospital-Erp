@@ -167,11 +167,7 @@ export default function RoomsPage() {
       )}
 
       {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <h2 className="text-3xl font-extrabold tracking-tight font-serif">Room Management</h2>
-          <p className="text-slate-300 text-xs font-medium mt-1">Manage ward rooms, bed capacity, patient allocation, and room status</p>
-        </div>
+      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-2xl p-3 text-white shadow-xl flex items-center gap-3">
         <div className="flex gap-3 flex-wrap">
           <div className="bg-white/10 px-4 py-2.5 rounded-xl border border-white/10 text-center backdrop-blur-md">
             <p className="text-[9px] text-slate-300 font-bold uppercase tracking-wider">Total Rooms</p>

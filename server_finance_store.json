@@ -1,0 +1,115 @@
+{
+  "transactions": [
+    {
+      "id": "tx-init-7",
+      "title": "Pharmacy Sale — demo",
+      "type": "Income",
+      "category": "Pharmacy Income",
+      "amount": 150,
+      "method": "Cash",
+      "date": "2026-08-03",
+      "notes": "Invoice: INV-PH-46551 | Doctor: Dr. Vignesh | Items: Paracetamol 650mg ×2",
+      "createdAt": "2026-08-03T11:00:00.000Z"
+    },
+    {
+      "id": "tx-init-8",
+      "title": "rent",
+      "type": "Income",
+      "category": "Rent",
+      "amount": 99,
+      "method": "UPI",
+      "date": "2026-07-31",
+      "notes": "Facility space rent",
+      "createdAt": "2026-07-31T15:30:00.000Z"
+    },
+    {
+      "id": "tx-init-9",
+      "title": "Patient Billing — Nikhil",
+      "type": "Income",
+      "category": "Clinical Services",
+      "amount": 450,
+      "method": "UPI",
+      "date": "2026-07-27",
+      "notes": "Settled at Billing desk. Doctor: Dr. Vignesh. Lab included: No. Pharmacy: No.",
+      "createdAt": "2026-07-27T17:20:00.000Z"
+    },
+    {
+      "id": "tx-init-10",
+      "title": "OPD Consultation — Nikhil",
+      "type": "Income",
+      "category": "Clinical Services",
+      "amount": 600,
+      "method": "UPI",
+      "date": "2026-07-27",
+      "notes": "Payment received at booking. Doctor: Dr. Vignesh.",
+      "createdAt": "2026-07-27T10:15:00.000Z"
+    },
+    {
+      "id": "tx-init-1",
+      "title": "Staff Nurse Salaries (July)",
+      "type": "Expense",
+      "category": "Salary",
+      "amount": 65000,
+      "method": "Bank Transfer",
+      "date": "2026-07-25",
+      "notes": "Monthly salary disbursement for 3 nurses",
+      "createdAt": "2026-07-25T10:00:00.000Z"
+    },
+    {
+      "id": "tx-init-2",
+      "title": "Ambulance Fuel & Service",
+      "type": "Expense",
+      "category": "Ambulance",
+      "amount": 4800,
+      "method": "Cash",
+      "date": "2026-07-24",
+      "notes": "Fuel refill and minor engine tuning",
+      "createdAt": "2026-07-24T11:30:00.000Z"
+    },
+    {
+      "id": "tx-init-3",
+      "title": "ECG Machine Maintenance",
+      "type": "Expense",
+      "category": "Maintenance",
+      "amount": 8500,
+      "method": "Card",
+      "date": "2026-07-22",
+      "notes": "Biomedical engineer routine check & calibration",
+      "createdAt": "2026-07-22T14:15:00.000Z"
+    },
+    {
+      "id": "tx-init-4",
+      "title": "Electricity & Power Utilities",
+      "type": "Expense",
+      "category": "Utilities",
+      "amount": 12400,
+      "method": "Bank Transfer",
+      "date": "2026-07-20",
+      "notes": "TNEB monthly power utility bill",
+      "createdAt": "2026-07-20T09:45:00.000Z"
+    },
+    {
+      "id": "tx-init-5",
+      "title": "Pharmacy Drug Re-stocking",
+      "type": "Expense",
+      "category": "Medical Supplies",
+      "amount": 22000,
+      "method": "Bank Transfer",
+      "date": "2026-07-18",
+      "notes": "Bulk purchase of paracetamol, pantocid, amoxicillin",
+      "createdAt": "2026-07-18T16:00:00.000Z"
+    },
+    {
+      "id": "tx-init-6",
+      "title": "In-house Cafeteria Lease Rent",
+      "type": "Income",
+      "category": "Rent",
+      "amount": 15000,
+      "method": "UPI",
+      "date": "2026-07-15",
+      "notes": "Monthly lease rent received from vendor",
+      "createdAt": "2026-07-15T12:00:00.000Z"
+    }
+  ],
+  "updatedAt": 1788497755771
+}
