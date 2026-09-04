@@ -73,8 +73,8 @@ export default function DashboardPage() {
       const isToday = i === 0;
 
       // Filter queue / walk-ins that match this date
-      const dayQueue = queue.filter(item => {
-        const itemDate = item.creation ? item.creation.split(" ")[0] : (item.date || dateStr);
+      const dayQueue = (queue || []).filter(item => {
+        const itemDate = item.creation ? item.creation.split(" ")[0] : (item.date || "");
         return itemDate === dateStr;
       });
 
@@ -82,20 +82,11 @@ export default function DashboardPage() {
       let ipdVal = 0;
 
       if (isToday) {
-        opdVal = queue.filter(q => q.appointment_status !== "IPD Admission").length;
-        ipdVal = queue.filter(q => q.appointment_status === "IPD Admission" || q.need_ipd).length;
-        // If queue is completely fresh today, default to queue length
-        if (opdVal === 0 && queue.length > 0) opdVal = queue.length;
+        opdVal = (queue || []).filter(q => q.appointment_status !== "IPD Admission").length;
+        ipdVal = (queue || []).filter(q => q.appointment_status === "IPD Admission" || q.need_ipd).length;
       } else {
         opdVal = dayQueue.filter(q => q.appointment_status !== "IPD Admission").length;
-        ipdVal = dayQueue.filter(q => q.appointment_status === "IPD Admission").length;
-
-        // Realistic seed historical curve for previous days of current week so chart is informative
-        if (opdVal === 0) {
-          const pseudo = (d.getDate() * 4 + d.getDay() * 3) % 16 + 10;
-          opdVal = pseudo;
-          ipdVal = Math.max(2, Math.floor(pseudo * 0.3));
-        }
+        ipdVal = dayQueue.filter(q => q.appointment_status === "IPD Admission" || q.need_ipd).length;
       }
 
       days.push({
@@ -109,10 +100,14 @@ export default function DashboardPage() {
       });
     }
 
-    const maxVal = Math.max(...days.map(d => Math.max(d.opd, d.ipd)), 20) + 5;
+    const currentMax = Math.max(...days.map(d => Math.max(d.opd, d.ipd)));
+    const maxVal = currentMax > 0 ? currentMax + 5 : 10;
     const totalWeeklyOPD = days.reduce((acc, d) => acc + d.opd, 0);
     const totalWeeklyIPD = days.reduce((acc, d) => acc + d.ipd, 0);
-    const peakDay = days.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), days[0]);
+    const totalAll = totalWeeklyOPD + totalWeeklyIPD;
+    const peakDay = totalAll > 0 
+      ? days.reduce((prev, curr) => (curr.total > prev.total ? curr : prev), days[0])
+      : null;
 
     // Construct SVG coordinates (viewBox 0 0 500 130, padding left/right 35, top 15, bottom 25)
     const svgWidth = 500;
@@ -151,6 +146,7 @@ export default function DashboardPage() {
       maxVal,
       totalWeeklyOPD,
       totalWeeklyIPD,
+      totalAll,
       peakDay,
       opdPath,
       ipdPath,
@@ -260,7 +256,11 @@ export default function DashboardPage() {
                 </span>
               </div>
               <CardDescription className="text-xs">
-                Real-time 7-day volume: <strong>{weeklyFlow.totalWeeklyOPD}</strong> OPD • <strong>{weeklyFlow.totalWeeklyIPD}</strong> IPD • Peak: <strong>{weeklyFlow.peakDay?.day}</strong> ({weeklyFlow.peakDay?.total} pts)
+                {weeklyFlow.totalAll > 0 ? (
+                  <>Real-time 7-day volume: <strong>{weeklyFlow.totalWeeklyOPD}</strong> OPD • <strong>{weeklyFlow.totalWeeklyIPD}</strong> IPD • Peak: <strong>{weeklyFlow.peakDay?.day}</strong> ({weeklyFlow.peakDay?.total} pts)</>
+                ) : (
+                  <>Real-time 7-day volume: <strong>0</strong> OPD • <strong>0</strong> IPD • Queue is clear</>
+                )}
               </CardDescription>
             </div>
             
