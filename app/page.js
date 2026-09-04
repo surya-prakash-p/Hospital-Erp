@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Calendar, Heart, BedDouble, UserRound, DollarSign, Receipt, AlertCircle, FlaskConical, Clock, ArrowUpRight, ArrowDownRight, RefreshCw, Activity, PlusCircle, CheckCircle, Pill } from "lucide-react";
+import Link from "next/link";
+import { UserRound, Receipt, Clock, PlusCircle, CheckCircle, Pill } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getQueue, getPatients, getDoctors, getMedicines } from "@/lib/hospital-service";
@@ -53,21 +54,21 @@ export default function DashboardPage() {
   const emergencyCases = 0;
 
   const dashboardStats = [
-    { title: "Total Patients", value: patientsCount, icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100", trend: "+8% this week", isTrendUp: true, href: "/reception" },
-    { title: "Today's Appointments", value: todaysAppointments, icon: Calendar, color: "text-indigo-600 bg-indigo-50 border-indigo-100", trend: "+3 pending", isTrendUp: true, href: "/consultation" },
-    { title: "OP Patients (OPD)", value: opCount, icon: Activity, color: "text-emerald-600 bg-emerald-50 border-emerald-100", trend: "Active queue", isTrendUp: true, href: "/consultation" },
-    { title: "Doctors Available", value: `${doctorsAvailable}/${doctorsList.length}`, icon: UserRound, color: "text-purple-600 bg-purple-50 border-purple-100", trend: "On-duty logs", isTrendUp: true, href: "/doctors" },
-    { title: "Today's Revenue", value: todaysRevenue, icon: DollarSign, color: "text-amber-600 bg-amber-50 border-amber-100", trend: "Settle completed", isTrendUp: true, href: "/billing" },
-    { title: "Pending Bills", value: pendingBillsCount, icon: Receipt, color: "text-slate-600 bg-slate-50 border-slate-100", trend: "Needs checkout", isTrendUp: false, href: "/billing" },
-    { title: "Lab Reports Pending", value: labReportsPending, icon: FlaskConical, color: "text-violet-600 bg-violet-50 border-violet-100", trend: "Diagnostic panel", isTrendUp: true, href: "/lab" },
+    { title: "Total Patients", value: patientsCount, href: "/reception" },
+    { title: "Today's Appointments", value: todaysAppointments, href: "/consultation" },
+    { title: "OP Patients (OPD)", value: opCount, href: "/consultation" },
+    { title: "Doctors Available", value: `${doctorsAvailable}/${doctorsList.length}`, href: "/doctors" },
+    { title: "Today's Revenue", value: todaysRevenue, href: "/billing" },
+    { title: "Pending Bills", value: pendingBillsCount, href: "/billing" },
+    { title: "Lab Reports Pending", value: labReportsPending, href: "/lab" },
   ];
 
   if (loading) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto animate-pulse">
         {/* Skeleton Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[...Array(10)].map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+          {dashboardStats.map((_, i) => (
             <div key={i} className="h-24 bg-slate-200/80 rounded-xl" />
           ))}
         </div>
@@ -82,39 +83,18 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-300">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 font-serif">Hospital Overview Dashboard</h2>
-          <p className="text-muted-foreground mt-1">Real-time clinical metrics, queue loads, and billing logs</p>
-        </div>
-      </div>
-
       {/* Stats Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {dashboardStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card 
-              key={stat.title} 
-              onClick={() => stat.href && router.push(stat.href)}
-              className={`hover:shadow-md transition-all duration-300 border border-slate-200/60 flex flex-col justify-between ${stat.href ? 'cursor-pointer hover:border-indigo-200' : ''}`}
-            >
-              <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.title}</span>
-                <div className={`p-1.5 rounded-lg border ${stat.color} shrink-0`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="text-xl font-bold text-slate-800 tracking-tight font-serif mt-1">{stat.value}</div>
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-semibold mt-1">
-                  {stat.isTrendUp ? <ArrowUpRight className="w-3 h-3 text-emerald-500" /> : <ArrowDownRight className="w-3 h-3 text-slate-400" />}
-                  <span>{stat.trend}</span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        {dashboardStats.map((stat) => (
+          <Link
+            key={stat.title}
+            href={stat.href}
+            className="flex min-w-0 flex-col justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3 transition-colors hover:border-indigo-300 hover:bg-indigo-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <span className="text-xs font-medium leading-4 text-slate-500">{stat.title}</span>
+            <span className="break-words text-2xl font-semibold leading-7 tracking-tight text-slate-900 tabular-nums">{stat.value}</span>
+          </Link>
+        ))}
       </div>
 
       {/* Middle row: Interactive actions and simulated analytics */}
