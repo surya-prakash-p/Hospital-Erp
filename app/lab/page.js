@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { getQueue, updateWalkIn, getLabTests, saveInvoiceToProfile } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getLabTests, saveInvoiceToProfile, recordFinanceTransaction } from "@/lib/hospital-service";
 import { jsPDF } from "jspdf";
 
 export default function LabPage() {
@@ -352,10 +352,10 @@ export default function LabPage() {
     });
     localStorage.setItem("hospital_dept_payments", JSON.stringify(deptPayments));
 
-    // Also record in finance ledger
+    // Also record in centralized finance ledger
     const storedFinance = localStorage.getItem("hospital_custom_finance");
     const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
-    financeEntries.unshift({
+    const labTx = {
       id: `tx-lab-${now}`,
       title: `Lab Diagnostics — ${selectedWalkIn.patient_name}`,
       type: "Income",
@@ -364,8 +364,10 @@ export default function LabPage() {
       method: "UPI",
       date: new Date().toISOString().split("T")[0],
       notes: `Payment received at Lab desk. Tests: ${testNamesStr}. Walk-in: ${selectedWalkIn.name}`
-    });
+    };
+    financeEntries.unshift(labTx);
     localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+    recordFinanceTransaction(labTx).catch(() => null);
 
     // Save lab invoice to profile
     saveInvoiceToProfile(selectedWalkIn.mobile_number, {
