@@ -64,6 +64,7 @@ const PERMISSION_OPTIONS = [
   { id: "Register Patients", label: "Patient Registration & Walk-Ins" },
   { id: "Manage Invoices", label: "Billing, Receipts & Invoicing" },
   { id: "View Financials", label: "Financial Ledger & Reports" },
+  { id: "Audit Logs", label: "View Hospital Audit & Access Logs" },
   { id: "Manage Roles & Staff", label: "Manage Hospital Roles & Permissions" },
   { id: "Full System Access", label: "Full System Super-Admin Privileges" }
 ];

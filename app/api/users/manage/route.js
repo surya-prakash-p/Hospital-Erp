@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '@/lib/auth-guard';
 import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
+import { recordAuditLog } from '@/lib/audit-logger';
 
 let frappeConfig = null;
 try {
@@ -96,6 +97,21 @@ export async function DELETE(req) {
     await deleteServerUser(cleanIdentifier);
     await addCloudActivity("Staff Member Deleted", `Identifier: ${cleanIdentifier}`, "user");
 
+    // Audit log deletion event
+    await recordAuditLog({
+      type: "user_mgmt",
+      action: "Staff Member Deleted",
+      description: `${authResult.user?.full_name || authResult.user?.name || 'Admin'} deleted staff account (${cleanIdentifier})`,
+      actor: {
+        employeeId: authResult.user?.employeeId || authResult.user?.id || "TH-ADM-001",
+        name: authResult.user?.full_name || authResult.user?.name || "Hospital Admin",
+        role: authResult.user?.role || "Hospital Admin",
+        email: authResult.user?.email || ""
+      },
+      target: cleanIdentifier,
+      metadata: { deletedIdentifier: cleanIdentifier }
+    }).catch(() => null);
+
     if (apiKey && apiSecret) {
       try {
         await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanIdentifier)}`, {
@@ -120,6 +136,7 @@ export async function POST(req) {
 
     const currentUser = authResult.user;
     const adminEmployeeId = currentUser?.employeeId || currentUser?.employee_id || currentUser?.id || 'TH-ADM-001';
+    const adminName = currentUser?.full_name || currentUser?.name || 'Hospital Admin';
 
     const body = await req.json();
     const { id, email, password, full_name, mobile_no, roles, permissions, department, designation, employee_id, employeeId } = body;
@@ -175,24 +192,54 @@ export async function POST(req) {
         `Old: ${oldEmpId} | New: ${savedUser.employeeId} | Changed By: ${adminEmployeeId}`,
         "user"
       );
+      await recordAuditLog({
+        type: "user_mgmt",
+        action: "Employee ID Changed",
+        description: `${adminName} changed Employee ID for ${savedUser.full_name} (Old: ${oldEmpId} -> New: ${savedUser.employeeId})`,
+        actor: { employeeId: adminEmployeeId, name: adminName, role: "Hospital Admin", email: currentUser?.email || "" },
+        target: savedUser.full_name,
+        metadata: { oldEmpId, newEmpId: savedUser.employeeId }
+      }).catch(() => null);
     } else if (!existingUser) {
       await addCloudActivity(
         "New staff user created",
         `${savedUser.full_name} (${savedUser.employeeId} - ${primaryRole})`,
         "user"
       );
+      await recordAuditLog({
+        type: "user_mgmt",
+        action: "Staff User Created",
+        description: `${adminName} created new staff member ${savedUser.full_name} (${savedUser.employeeId} - ${primaryRole})`,
+        actor: { employeeId: adminEmployeeId, name: adminName, role: "Hospital Admin", email: currentUser?.email || "" },
+        target: `${savedUser.full_name} (${savedUser.employeeId})`,
+        metadata: { role: primaryRole, department: savedUser.department }
+      }).catch(() => null);
     } else if (password) {
       await addCloudActivity(
         "Staff Password Reset",
         `Password reset for ${savedUser.full_name} (${savedUser.employeeId}) by Admin`,
         "user"
       );
+      await recordAuditLog({
+        type: "user_mgmt",
+        action: "Staff Password Reset",
+        description: `${adminName} reset password for ${savedUser.full_name} (${savedUser.employeeId})`,
+        actor: { employeeId: adminEmployeeId, name: adminName, role: "Hospital Admin", email: currentUser?.email || "" },
+        target: `${savedUser.full_name} (${savedUser.employeeId})`
+      }).catch(() => null);
     } else {
       await addCloudActivity(
         "Staff Profile Updated",
         `${savedUser.full_name} (${savedUser.employeeId})`,
         "profile"
       );
+      await recordAuditLog({
+        type: "user_mgmt",
+        action: "Staff Profile Updated",
+        description: `${adminName} updated profile details for ${savedUser.full_name} (${savedUser.employeeId} - ${primaryRole})`,
+        actor: { employeeId: adminEmployeeId, name: adminName, role: "Hospital Admin", email: currentUser?.email || "" },
+        target: `${savedUser.full_name} (${savedUser.employeeId})`
+      }).catch(() => null);
     }
 
     let frappeUser = null;

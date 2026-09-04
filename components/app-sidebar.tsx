@@ -18,7 +18,8 @@ import {
   Bot,
   Wallet,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  Activity
 } from "lucide-react"
 
 // Core main menu items with role & granular permission requirements

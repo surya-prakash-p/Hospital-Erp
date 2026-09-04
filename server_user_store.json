@@ -162,6 +162,26 @@
       "frappeStaffId": "TH-ADM-003",
       "role": "Hospital Admin",
       "active": true
+    },
+    {
+      "id": "STAFF-3847",
+      "employeeId": "TH011",
+      "employee_id": "TH011",
+      "frappeStaffId": "TH011",
+      "email": "sdivakar998@gamil.com",
+      "mobile_no": "",
+      "password": "Admin@2026",
+      "full_name": "DR. DIWAKAR",
+      "roles": [
+        "Doctor"
+      ],
+      "role": "Doctor",
+      "permissions": [],
+      "department": "General physician",
+      "designation": "Doctor",
+      "sessionVersion": 1,
+      "active": true,
+      "updatedAt": "2026-09-02T13:19:11.903Z"
     }
   ],
   "deleted": [
@@ -180,6 +200,15 @@
     "vijay"
   ],
   "activities": [
+    {
+      "id": "act-1788355152041",
+      "title": "New staff user created",
+      "desc": "DR. DIWAKAR (TH011 - Doctor)",
+      "time": "06:49 pm",
+      "createdAt": "2026-09-02T13:19:12.018Z",
+      "type": "user",
+      "color": "bg-amber-50 text-amber-600 border-amber-200"
+    },
     {
       "id": "act-1787901409131",
       "title": "Staff Member Deleted",

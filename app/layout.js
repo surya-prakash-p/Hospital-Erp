@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import { AppSidebar } from "@/components/app-sidebar";
 import { Header } from "@/components/header";
 import { AuthProvider } from "@/lib/auth-context";
+import { AuditTracker } from "@/components/audit-tracker";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className={`${jakarta.variable} font-sans antialiased`}>
         <AuthProvider>
+          <AuditTracker />
           <MainLayoutContent>{children}</MainLayoutContent>
         </AuthProvider>
       </body>

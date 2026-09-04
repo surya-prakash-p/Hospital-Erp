@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname, useRouter } from "next/navigation";
+import { AuditLogModal } from "@/components/audit-log-modal";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,9 +32,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function Header() {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, hasRole, hasPermission } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+
+  // Audit Logs modal state
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+
+  // Permission check: Only Admin can view by default, unless Admin gave 'Audit Logs' permission
+  const canViewAuditLogs = Boolean(
+    hasRole?.('Hospital Admin') || 
+    hasRole?.('System Manager') || 
+    hasPermission?.('Audit Logs') || 
+    hasPermission?.('Audit') || 
+    user?.permissions?.includes('*') ||
+    user?.roles?.includes('Hospital Admin') ||
+    user?.roles?.includes('System Manager')
+  );
 
   // Profile modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -220,7 +235,28 @@ export function Header() {
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Quick Access Audit Logs Button (Admin or granted staff only) */}
+          {canViewAuditLogs && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsAuditModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+              title="View Hospital Activity & Page Access Logs"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Activity className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Audit Logs</span>
+            </button>
+          )}
+
           {/* User Account Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -256,6 +292,16 @@ export function Header() {
                 <div className="font-bold text-slate-900 text-sm">My Account</div>
                 <div className="text-[11px] font-normal text-slate-500 mt-0.5 truncate">{user?.email}</div>
               </DropdownMenuLabel>
+
+              {canViewAuditLogs && (
+                <DropdownMenuItem 
+                  onClick={() => setIsAuditModalOpen(true)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-blue-900 font-bold hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition-colors"
+                >
+                  <Activity className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Audit & Access Logs</span>
+                </DropdownMenuItem>
+              )}
 
               {(user?.roles?.includes('Hospital Admin') || user?.roles?.includes('System Manager')) && (
                 <DropdownMenuItem 
@@ -638,6 +684,12 @@ export function Header() {
           </div>
         </div>
       )}
+
+      {/* Audit & Activity Logs Slide-Over Modal */}
+      <AuditLogModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+      />
     </>
   );
 }
