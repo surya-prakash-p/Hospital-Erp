@@ -26,9 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue } from "@/lib/hospital-service";
-
-const MOCK_FINANCE_ENTRIES = [];
+import { getQueue, getFinanceTransactions, recordFinanceTransaction, deleteFinanceTransaction } from "@/lib/hospital-service";
 
 export default function FinancePage() {
   const [queue, setQueue] = useState([]);
@@ -62,33 +60,34 @@ export default function FinancePage() {
 
   useEffect(() => {
     loadAllFinanceData();
+    const interval = setInterval(() => {
+      loadAllFinanceData(true);
+    }, 8000);
+    return () => clearInterval(interval);
   }, []);
 
-  async function loadAllFinanceData() {
-    setLoading(true);
+  async function loadAllFinanceData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       // Load completed queue patients
       const q = await getQueue();
       setQueue(q.filter(item => item.payment_received === 1));
 
-      // Load custom transactions from local storage
-      const stored = localStorage.getItem("hospital_custom_finance");
-      if (stored) {
-        setCustomTx(JSON.parse(stored));
-      } else {
-        localStorage.setItem("hospital_custom_finance", JSON.stringify(MOCK_FINANCE_ENTRIES));
-        setCustomTx(MOCK_FINANCE_ENTRIES);
+      // Load centralized transactions from server store
+      const txs = await getFinanceTransactions();
+      if (Array.isArray(txs) && txs.length > 0) {
+        setCustomTx(txs);
       }
     } catch (e) {
-      showToast("Error loading finance records", "error");
+      if (!silent) showToast("Error loading finance records", "error");
       console.error(e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   // Handle transaction recording
-  const handleRecordTransaction = (e) => {
+  const handleRecordTransaction = async (e) => {
     e.preventDefault();
     if (!newTx.title.trim() || !newTx.amount || parseFloat(newTx.amount) <= 0) {
       showToast("Please provide a valid Title and Amount", "error");
@@ -106,9 +105,8 @@ export default function FinancePage() {
       notes: newTx.notes.trim()
     };
 
-    const updated = [txEntry, ...customTx];
+    const updated = [txEntry, ...customTx.filter(t => t.id !== txEntry.id)];
     setCustomTx(updated);
-    localStorage.setItem("hospital_custom_finance", JSON.stringify(updated));
 
     // Reset Form
     setNewTx({
@@ -122,14 +120,31 @@ export default function FinancePage() {
     });
 
     showToast("Transaction noted successfully!", "success");
+
+    try {
+      const serverTxs = await recordFinanceTransaction(txEntry);
+      if (Array.isArray(serverTxs) && serverTxs.length > 0) {
+        setCustomTx(serverTxs);
+      }
+    } catch (err) {
+      console.warn("Central finance sync notice:", err);
+    }
   };
 
   // Handle transaction deletion
-  const handleDeleteTransaction = (id) => {
+  const handleDeleteTransaction = async (id) => {
     const updated = customTx.filter(tx => tx.id !== id);
     setCustomTx(updated);
-    localStorage.setItem("hospital_custom_finance", JSON.stringify(updated));
     showToast("Transaction entry deleted", "info");
+
+    try {
+      const serverTxs = await deleteFinanceTransaction(id);
+      if (Array.isArray(serverTxs) && serverTxs.length > 0) {
+        setCustomTx(serverTxs);
+      }
+    } catch (err) {
+      console.warn("Central finance delete sync notice:", err);
+    }
   };
 
   // Combine clinical revenue and custom transactions

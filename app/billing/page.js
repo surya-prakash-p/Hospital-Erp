@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getPatient, updatePatientHistory, getLabTests } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getPatient, updatePatientHistory, getLabTests, recordFinanceTransaction } from "@/lib/hospital-service";
 import { jsPDF } from "jspdf";
 
 const DOCTOR_FEES = {
@@ -136,7 +136,7 @@ export default function BillingPage() {
         const deptPaidNote = deptAlreadyPaid > 0
           ? ` (Gross ₹${grandTotal} − Dept Paid ₹${deptAlreadyPaid})`
           : "";
-        financeEntries.unshift({
+        const billTx = {
           id: `tx-billing-${Date.now()}`,
           title: `Patient Billing — ${targetWalkIn.patient_name}`,
           type: "Income",
@@ -145,8 +145,10 @@ export default function BillingPage() {
           method: paymentMethod,
           date: new Date().toISOString().split("T")[0],
           notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Lab included: ${targetWalkIn.need_lab_test === 1 ? "Yes" : "No"}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? "Yes" : "No"}.${deptPaidNote}`
-        });
+        };
+        financeEntries.unshift(billTx);
         localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+        recordFinanceTransaction(billTx).catch(() => null);
       }
 
       // Save persistent patient invoice to patient profile documents tab

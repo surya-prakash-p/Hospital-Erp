@@ -26,7 +26,8 @@ import {
   getQueue, updateWalkIn, getMedicines, createMedicine, updateMedicine, 
   saveInvoiceToProfile, getDrugRegister, createDrugRegisterEntry, 
   dispenseMedicineFEFO, getPurchaseOrders, createPurchaseOrder, 
-  receiveGoods, getMedicineHistory, adjustStock, deactivateMedicine, executeDirectSale, getStockMovementLogs, createPharmacyAuditLog
+  receiveGoods, getMedicineHistory, adjustStock, deactivateMedicine, executeDirectSale, getStockMovementLogs, createPharmacyAuditLog,
+  recordFinanceTransaction
 } from "@/lib/hospital-service";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -1088,17 +1089,19 @@ export default function PharmacyPage() {
         if (typeof window !== 'undefined' && billAmt > 0) {
           const storedFinance = localStorage.getItem("hospital_custom_finance");
           const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
-          financeEntries.unshift({
+          const rxTx = {
             id: `tx-rx-${response.invoiceNumber}`,
             title: `Pharmacy Sale — ${selectedWalkIn.patient_name}`,
             type: "Income",
-            category: "Pharmacy",
+            category: "Pharmacy Income",
             amount: billAmt,
             method: otcPaymentMethod || "Cash",
             date: new Date().toISOString().split("T")[0],
             notes: `Invoice: ${response.invoiceNumber} | Doctor: ${docName} | Items: ${dispenseItems.filter(i=>i.source!=="Outside Purchase").map(i=>`${i.medicine_name} ×${i.dispense_status==="Partially Dispensed"?i.dispensed_qty:i.qty}`).join(", ")}`
-          });
+          };
+          financeEntries.unshift(rxTx);
           localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+          recordFinanceTransaction(rxTx).catch(() => null);
         }
       }
 
@@ -2060,7 +2063,7 @@ export default function PharmacyPage() {
         const now = Date.now();
         const storedFinance = localStorage.getItem("hospital_custom_finance");
         const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
-        financeEntries.unshift({
+        const grnTx = {
           id: `tx-grn-${now}`,
           title: `Medicine Purchase — GRN for PO ${selectedPO.name}`,
           type: "Expense",
@@ -2069,8 +2072,10 @@ export default function PharmacyPage() {
           method: "Credit",
           date: new Date().toISOString().split("T")[0],
           notes: `Supplier: ${selectedPO.supplier} | Items: ${grnItems.map(i => `${i.medicine} (×${i.quantity})`).join(", ")}`
-        });
+        };
+        financeEntries.unshift(grnTx);
         localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+        recordFinanceTransaction(grnTx).catch(() => null);
 
         // ---- Compliance Audit: log GRN in drug register for controlled items ----
         const reg = localStorage.getItem('hospital_drug_register');

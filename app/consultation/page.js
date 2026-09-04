@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors, recordFinanceTransaction } from "@/lib/hospital-service";
 import { useAuth } from "@/lib/auth-context";
 import { jsPDF } from "jspdf";
 
@@ -379,10 +379,10 @@ export default function ConsultationPage() {
     });
     localStorage.setItem("hospital_dept_payments", JSON.stringify(deptPayments));
 
-    // Also record in finance ledger
+    // Also record in centralized finance ledger
     const storedFinance = localStorage.getItem("hospital_custom_finance");
     const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
-    financeEntries.unshift({
+    const consultTx = {
       id: `tx-consult-${now}`,
       title: `OPD Consultation — ${selectedWalkIn.patient_name}`,
       type: "Income",
@@ -391,8 +391,10 @@ export default function ConsultationPage() {
       method: "UPI",
       date: new Date().toISOString().split("T")[0],
       notes: `Payment received at Consultation desk. Doctor: ${selectedWalkIn.doctor}. Walk-in: ${selectedWalkIn.name}`
-    });
+    };
+    financeEntries.unshift(consultTx);
     localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
+    recordFinanceTransaction(consultTx).catch(() => null);
 
     showToast(`Payment of ₹${docFee} received & recorded!`, "success");
   };
