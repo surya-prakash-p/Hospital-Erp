@@ -1,21 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Stethoscope, CheckCircle, AlertCircle, Info, Activity, History, Send, FlaskConical, Printer, BadgeCheck, FileText } from "lucide-react";
+import {
+  Stethoscope, CheckCircle, AlertCircle, Info, Activity, History, Send,
+  Printer, BadgeCheck, FileText, Sun, Moon, Clock, Utensils, Calendar, Plus, X, Pill
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getLabTests, getPatient, getMedicines, getDoctors, recordFinanceTransaction } from "@/lib/hospital-service";
 import { useAuth } from "@/lib/auth-context";
-import { jsPDF } from "jspdf";
+import { getQueue, getDoctors, getMedicines, getPatient, updateWalkIn } from "@/lib/hospital-service";
 
 export default function ConsultationPage() {
   const { user, hasRole } = useAuth();
   const [queue, setQueue] = useState([]);
   const [doctorsList, setDoctorsList] = useState([]);
-  const [labTestsList, setLabTestsList] = useState([]);
   const [selectedWalkIn, setSelectedWalkIn] = useState(null);
   const [selectedPatientHistory, setSelectedPatientHistory] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,8 +26,6 @@ export default function ConsultationPage() {
   const [symptoms, setSymptoms] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [prescription, setPrescription] = useState("");
-  const [needLabTest, setNeedLabTest] = useState(false);
-  const [labTestName, setLabTestName] = useState("");
   const [needMedicines, setNeedMedicines] = useState(false);
   const [nextCheckupDate, setNextCheckupDate] = useState("");
   
@@ -34,6 +33,14 @@ export default function ConsultationPage() {
   const [searchMedQuery, setSearchMedQuery] = useState("");
   const [inventoryMeds, setInventoryMeds] = useState([]);
   const [matchingMeds, setMatchingMeds] = useState([]);
+
+  // Dosage Builder States (Days, Timings Checkboxes, Food relation)
+  const [selectedMedForDose, setSelectedMedForDose] = useState(null);
+  const [doseDays, setDoseDays] = useState(5);
+  const [doseMorning, setDoseMorning] = useState(true);
+  const [doseAfternoon, setDoseAfternoon] = useState(false);
+  const [doseNight, setDoseNight] = useState(true);
+  const [doseFoodTiming, setDoseFoodTiming] = useState("After Food");
 
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -47,23 +54,17 @@ export default function ConsultationPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const q = await getQueue();
-        setQueue(q);
+        const [q, docs, meds] = await Promise.all([
+          getQueue(),
+          getDoctors(),
+          getMedicines()
+        ]);
 
-        const docs = await getDoctors();
+        setQueue(q || []);
         if (docs && docs.length > 0) {
           setDoctorsList(docs);
         }
-
-        const tests = await getLabTests();
-        setLabTestsList(tests);
-        if (tests.length > 0) {
-          setLabTestName(tests[0].test_name);
-        }
-
-        // Load inventory medicines list
-        const meds = await getMedicines();
-        setInventoryMeds(meds);
+        setInventoryMeds(meds || []);
       } catch (err) {
         showToast("Error loading consultation data", "error");
         console.error(err);
@@ -100,16 +101,11 @@ export default function ConsultationPage() {
     setSymptoms("");
     setDiagnosis(item.diagnosis || "");
     setPrescription(item.prescription || "");
-    setNeedLabTest(item.need_lab_test === 1);
-    if (item.lab_test_name) {
-      setLabTestName(item.lab_test_name);
-    } else {
-      setLabTestName("");
-    }
-    setNeedMedicines(item.need_medicines === 1);
+    setNeedMedicines(item.need_medicines === 1 || Boolean(item.prescription));
     setNextCheckupDate(item.next_checkup_date || "");
     setSearchMedQuery("");
     setMatchingMeds([]);
+    setSelectedMedForDose(null);
   };
 
   const handleMedSearchChange = (query) => {
@@ -124,12 +120,42 @@ export default function ConsultationPage() {
     setMatchingMeds(filtered);
   };
 
-  const handleAddMedToPrescription = (med) => {
-    const newLine = `${med.medicine_name} - 10 tabs (Dosage: 1-0-1 daily after food)`;
-    setPrescription(prev => prev ? `${prev}\n${newLine}` : newLine);
+  const handleOpenDoseBuilder = (med) => {
+    setSelectedMedForDose(med);
+    setDoseDays(5);
+    setDoseMorning(true);
+    setDoseAfternoon(false);
+    setDoseNight(true);
+    setDoseFoodTiming("After Food");
     setSearchMedQuery("");
     setMatchingMeds([]);
-    showToast(`Added ${med.medicine_name} to prescription list!`, "success");
+  };
+
+  const handleConfirmAddDose = () => {
+    if (!selectedMedForDose) return;
+
+    const timings = [];
+    let dosesPerDay = 0;
+    if (doseMorning) { timings.push("Morning (காலை)"); dosesPerDay += 1; }
+    if (doseAfternoon) { timings.push("Afternoon (மதியம்)"); dosesPerDay += 1; }
+    if (doseNight) { timings.push("Night (இரவு)"); dosesPerDay += 1; }
+
+    if (timings.length === 0) {
+      showToast("Please select at least one timing option (Morning, Afternoon, or Night)", "error");
+      return;
+    }
+
+    const daysCount = parseInt(doseDays) || 1;
+    const totalQty = dosesPerDay * daysCount;
+    const timingLabels = timings.join(" - ");
+    const timingCode = `${doseMorning ? "1" : "0"}-${doseAfternoon ? "1" : "0"}-${doseNight ? "1" : "0"}`;
+
+    const newLine = `${selectedMedForDose.medicine_name} — ${totalQty} units (${daysCount} days: ${timingLabels} [${timingCode}] | ${doseFoodTiming})`;
+
+    setPrescription(prev => prev ? `${prev}\n${newLine}` : newLine);
+    setNeedMedicines(true);
+    setSelectedMedForDose(null);
+    showToast(`Added ${selectedMedForDose.medicine_name} (${totalQty} units for ${daysCount} days) to prescription!`, "success");
   };
 
   const handleSaveConsultation = async (e) => {
@@ -147,13 +173,9 @@ export default function ConsultationPage() {
     const originalQueue = [...queue];
     const targetWalkInName = selectedWalkIn.name;
 
-    // Determine next queue status
-    let nextStatus = "Billing";
-    if (needLabTest) {
-      nextStatus = "Lab Test";
-    } else if (needMedicines) {
-      nextStatus = "Pharmacy";
-    }
+    // Determine next queue status: Pharmacy if medicines prescribed, otherwise Billing
+    const hasMedicines = needMedicines || Boolean(prescription.trim());
+    const nextStatus = hasMedicines ? "Pharmacy" : "Billing";
 
     const savedDiagnosis = diagnosis.trim();
     const savedPrescription = prescription.trim();
@@ -169,17 +191,17 @@ export default function ConsultationPage() {
     setSymptoms("");
     setDiagnosis("");
     setPrescription("");
-    setNeedLabTest(false);
     setNeedMedicines(false);
+    setSelectedMedForDose(null);
     setNextCheckupDate("");
 
     try {
       await updateWalkIn(targetWalkInName, {
         diagnosis: savedDiagnosis,
         prescription: savedPrescription,
-        need_lab_test: needLabTest ? 1 : 0,
-        lab_test_name: needLabTest ? labTestName : "",
-        need_medicines: needMedicines ? 1 : 0,
+        need_lab_test: 0,
+        lab_test_name: "",
+        need_medicines: hasMedicines ? 1 : 0,
         appointment_status: nextStatus,
         next_checkup_date: savedNextCheckupDate
       });
@@ -197,10 +219,11 @@ export default function ConsultationPage() {
     }
   };
   
-  const handlePrintConsultationInvoice = () => {
+  const handlePrintConsultationInvoice = async () => {
     if (!selectedWalkIn) return;
     
     try {
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -270,7 +293,7 @@ export default function ConsultationPage() {
       doc.setFont("helvetica", "bold");
       doc.text("Consulting Doctor:", 20, posY);
       doc.setFont("helvetica", "normal");
-      doc.text(selectedWalkIn.doctor || "", 55, posY);
+      doc.text(selectedWalkIn.doctor || "General OPD", 55, posY);
       posY += 6;
 
       if (diagnosis) {
@@ -304,10 +327,10 @@ export default function ConsultationPage() {
       const docFee = selectedDocObj?.consultation_fee || 500;
 
       doc.setFont("helvetica", "normal");
-      doc.text(`Doctor OPD Consultation Fee (${selectedWalkIn.doctor})`, 22, posY);
+      doc.text(`Doctor OPD Consultation Fee (${selectedWalkIn.doctor || "General OPD"})`, 22, posY);
       doc.text("1", 120, posY, { align: "center" });
-      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
-      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      doc.text(`INR ${Number(docFee).toFixed(2)}`, 145, posY, { align: "right" });
+      doc.text(`INR ${Number(docFee).toFixed(2)}`, 185, posY, { align: "right" });
       posY += 7;
 
       // Totals Area
@@ -318,7 +341,7 @@ export default function ConsultationPage() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("GRAND TOTAL (CONSULTATION):", 110, posY);
-      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
+      doc.text(`INR ${Number(docFee).toFixed(2)}`, 185, posY, { align: "right" });
       posY += 12;
 
       // Stamp
@@ -337,22 +360,11 @@ export default function ConsultationPage() {
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text("Generated digitally via Thangam Hospital OPD Desk. No signature required.", 105, posY + 10, { align: "center" });
 
-      // Open PDF in new tab for viewing and printing
-      const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.focus();
-          printWindow.print();
-        };
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-
-      showToast("Consultation invoice opened for printing!", "success");
+      doc.save(`consultation_invoice_${selectedWalkIn.name || "receipt"}.pdf`);
+      showToast("Consultation invoice downloaded successfully!", "success");
     } catch (err) {
       console.error(err);
-      showToast("Failed to print invoice", "error");
+      showToast("Failed to download invoice", "error");
     }
   };
 
@@ -595,9 +607,12 @@ export default function ConsultationPage() {
                   </div>
 
                   {/* Prescription */}
-                  <div className="space-y-2 relative">
+                  <div className="space-y-3 relative">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="prescription" className="font-semibold">Prescription / Medication Regimen</Label>
+                      <Label htmlFor="prescription" className="font-semibold flex items-center gap-1.5 text-slate-800">
+                        <Pill className="w-4 h-4 text-indigo-600" />
+                        Prescription / Medication Regimen
+                      </Label>
                       <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full select-none">
                         Connected to Pharmacy Inventory
                       </span>
@@ -607,7 +622,7 @@ export default function ConsultationPage() {
                     <div className="relative">
                       <Input
                         type="text"
-                        placeholder="🔍 Type to search & add medicine from inventory..."
+                        placeholder="🔍 Type to search & configure medicine dosage (Days, Morning, Afternoon, Night)..."
                         value={searchMedQuery}
                         onChange={(e) => handleMedSearchChange(e.target.value)}
                         className="h-9 text-xs mb-2 border-indigo-100 focus:border-indigo-400"
@@ -622,12 +637,15 @@ export default function ConsultationPage() {
                             return (
                               <div
                                 key={med.medicine_name}
-                                onClick={() => handleAddMedToPrescription(med)}
-                                className={`px-4 py-2.5 hover:bg-indigo-50/30 cursor-pointer flex justify-between items-center transition-colors ${
+                                onClick={() => handleOpenDoseBuilder(med)}
+                                className={`px-4 py-2.5 hover:bg-indigo-50/40 cursor-pointer flex justify-between items-center transition-colors ${
                                   isOut ? "bg-rose-50/20 text-slate-400" : ""
                                 }`}
                               >
-                                <div className="font-semibold text-slate-800">{med.medicine_name}</div>
+                                <div>
+                                  <div className="font-semibold text-slate-800">{med.medicine_name}</div>
+                                  <div className="text-[10px] text-slate-400">{med.generic_name || med.category}</div>
+                                </div>
                                 <div className="flex gap-2.5 items-center">
                                   <span className="text-[10px] text-slate-500 font-medium">₹{med.price}/tab</span>
                                   <span
@@ -641,6 +659,9 @@ export default function ConsultationPage() {
                                   >
                                     {isOut ? "Out of Stock" : `${med.stock} units`}
                                   </span>
+                                  <span className="text-[10px] text-indigo-600 font-bold ml-1 bg-indigo-50 px-2 py-0.5 rounded">
+                                    + Set Dose
+                                  </span>
                                 </div>
                               </div>
                             );
@@ -649,10 +670,195 @@ export default function ConsultationPage() {
                       )}
                     </div>
 
+                    {/* Interactive Medication Dosage Builder Box */}
+                    {selectedMedForDose && (
+                      <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3.5 animate-in fade-in zoom-in-95 duration-200 shadow-xs">
+                        <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                              💊
+                            </span>
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-xs">{selectedMedForDose.medicine_name}</h4>
+                              <p className="text-[10px] text-slate-500">
+                                Stock: {selectedMedForDose.stock || 0} units • Rate: ₹{selectedMedForDose.price || 0}/unit
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMedForDose(null)}
+                            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Dosage parameters grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {/* 1. Duration in Days */}
+                          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                            <Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              Duration (Days)
+                            </Label>
+                            <div className="flex items-center gap-1.5">
+                              <Input
+                                type="number"
+                                min="1"
+                                max="180"
+                                value={doseDays}
+                                onChange={(e) => setDoseDays(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="h-8 text-xs font-bold text-slate-800"
+                              />
+                              <span className="text-xs text-slate-500 font-medium shrink-0">days</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {[3, 5, 7, 10, 14, 30].map(d => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => setDoseDays(d)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                                    doseDays === d
+                                      ? "bg-indigo-600 text-white font-bold"
+                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  }`}
+                                >
+                                  {d}d
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 2. Timing Checkboxes (Morning / Afternoon / Night) */}
+                          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                            <Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              When to take (Tick)
+                            </Label>
+                            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                              <label className={`flex flex-col items-center justify-center p-1.5 rounded-md border cursor-pointer select-none transition-all ${
+                                doseMorning ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold shadow-2xs" : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={doseMorning}
+                                  onChange={(e) => setDoseMorning(e.target.checked)}
+                                  className="sr-only"
+                                />
+                                <Sun className={`w-3.5 h-3.5 mb-0.5 ${doseMorning ? "text-amber-500" : "text-slate-400"}`} />
+                                <span className="text-[10px]">Morning</span>
+                                <span className="text-[8px] text-slate-400 font-normal">காலை</span>
+                              </label>
+
+                              <label className={`flex flex-col items-center justify-center p-1.5 rounded-md border cursor-pointer select-none transition-all ${
+                                doseAfternoon ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold shadow-2xs" : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={doseAfternoon}
+                                  onChange={(e) => setDoseAfternoon(e.target.checked)}
+                                  className="sr-only"
+                                />
+                                <Sun className={`w-3.5 h-3.5 mb-0.5 ${doseAfternoon ? "text-orange-500" : "text-slate-400"}`} />
+                                <span className="text-[10px]">Afternoon</span>
+                                <span className="text-[8px] text-slate-400 font-normal">மதியம்</span>
+                              </label>
+
+                              <label className={`flex flex-col items-center justify-center p-1.5 rounded-md border cursor-pointer select-none transition-all ${
+                                doseNight ? "border-indigo-500 bg-indigo-50/80 text-indigo-950 font-bold shadow-2xs" : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={doseNight}
+                                  onChange={(e) => setDoseNight(e.target.checked)}
+                                  className="sr-only"
+                                />
+                                <Moon className={`w-3.5 h-3.5 mb-0.5 ${doseNight ? "text-indigo-600" : "text-slate-400"}`} />
+                                <span className="text-[10px]">Night</span>
+                                <span className="text-[8px] text-slate-400 font-normal">இரவு</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* 3. Meal Instruction */}
+                          <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                            <Label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                              <Utensils className="w-3 h-3 text-slate-400" />
+                              Meal Instruction
+                            </Label>
+                            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                              <label className={`flex flex-col items-center justify-center p-1.5 rounded-md border cursor-pointer select-none transition-all ${
+                                doseFoodTiming === "After Food" ? "border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold shadow-2xs" : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="foodTiming"
+                                  checked={doseFoodTiming === "After Food"}
+                                  onChange={() => setDoseFoodTiming("After Food")}
+                                  className="sr-only"
+                                />
+                                <span className="text-[10px]">After Food</span>
+                                <span className="text-[8px] text-slate-400 font-normal">உணவுக்கு பின்</span>
+                              </label>
+
+                              <label className={`flex flex-col items-center justify-center p-1.5 rounded-md border cursor-pointer select-none transition-all ${
+                                doseFoodTiming === "Before Food" ? "border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold shadow-2xs" : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="foodTiming"
+                                  checked={doseFoodTiming === "Before Food"}
+                                  onChange={() => setDoseFoodTiming("Before Food")}
+                                  className="sr-only"
+                                />
+                                <span className="text-[10px]">Before Food</span>
+                                <span className="text-[8px] text-slate-400 font-normal">உணவுக்கு முன்</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Summary and Confirmation */}
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="text-xs text-slate-600">
+                            <span>Total Prescription Qty: </span>
+                            <strong className="text-indigo-700 font-bold font-mono">
+                              {((doseMorning ? 1 : 0) + (doseAfternoon ? 1 : 0) + (doseNight ? 1 : 0)) * (parseInt(doseDays) || 1)} units
+                            </strong>
+                            <span className="text-slate-400 text-[11px] ml-1">
+                              ({(doseMorning ? 1 : 0) + (doseAfternoon ? 1 : 0) + (doseNight ? 1 : 0)}/day × {doseDays} days)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedMedForDose(null)}
+                              className="h-8 text-xs border-slate-200 text-slate-600"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleConfirmAddDose}
+                              className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5 shadow-xs"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add to Prescription
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <textarea
                       id="prescription"
                       className="flex min-h-[90px] w-full rounded-md border border-slate-200 bg-transparent px-3 py-2 text-xs shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 font-mono"
-                      placeholder="Selected medicines will appear here automatically. You can also customize dosage details..."
+                      placeholder="Prescription items configured with days & timing will appear here. You can also customize notes..."
                       value={prescription}
                       onChange={(e) => setPrescription(e.target.value)}
                     />
@@ -664,67 +870,20 @@ export default function ConsultationPage() {
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          id="need-lab"
-                          checked={needLabTest}
-                          onChange={(e) => setNeedLabTest(e.target.checked)}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                        />
-                        <Label htmlFor="need-lab" className="cursor-pointer select-none">Order Lab Diagnostic Test?</Label>
-                      </div>
-
-                      {needLabTest && (
-                        <div className="space-y-2 pl-6">
-                          <Label className="text-xs font-semibold text-slate-700">Select Lab Tests (Multiple)</Label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-lg p-3 bg-slate-50/50">
-                            {labTestsList.map((t) => {
-                              const selectedArray = labTestName ? labTestName.split(",").map(x => x.trim()).filter(Boolean) : [];
-                              const isChecked = selectedArray.includes(t.test_name);
-                              return (
-                                <label key={t.test_name} className={`flex items-start gap-2 border p-2 rounded-md cursor-pointer transition-all duration-200 ${isChecked ? 'bg-indigo-50/60 border-indigo-200 text-indigo-900 font-medium' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      let updatedArray;
-                                      if (isChecked) {
-                                        updatedArray = selectedArray.filter(name => name !== t.test_name);
-                                      } else {
-                                        updatedArray = [...selectedArray, t.test_name];
-                                      }
-                                      setLabTestName(updatedArray.join(", "));
-                                    }}
-                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer mt-0.5"
-                                  />
-                                  <div className="text-[11px] leading-tight">
-                                    <div>{t.test_name}</div>
-                                    <div className="text-[9px] text-muted-foreground font-normal mt-0.5">₹{t.fee}</div>
-                                  </div>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
                           id="need-med"
                           checked={needMedicines}
                           onChange={(e) => setNeedMedicines(e.target.checked)}
                           className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
                         />
-                        <Label htmlFor="need-med" className="cursor-pointer select-none">Send to Pharmacy for Medicines?</Label>
+                        <Label htmlFor="need-med" className="cursor-pointer select-none font-medium">Send to Pharmacy for Dispensing?</Label>
                       </div>
                       <p className="text-[11px] text-muted-foreground pl-6">
-                        Routes the patient directly to the pharmacy stage before billing.
+                        Routes the patient directly to the pharmacy stage for medicine fulfillment before final billing.
                       </p>
                     </div>
 
                     <div className="space-y-3">
-                      <Label htmlFor="next-checkup" className="font-semibold text-slate-700">Next Checkup Date (Optional)</Label>
+                      <Label htmlFor="next-checkup" className="font-semibold text-slate-700">Next Follow-up / Checkup Date (Optional)</Label>
                       <Input
                         type="date"
                         id="next-checkup"

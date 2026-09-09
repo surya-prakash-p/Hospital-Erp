@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getQueue, updateWalkIn, getPatient, updatePatientHistory, getLabTests, recordFinanceTransaction } from "@/lib/hospital-service";
-import { jsPDF } from "jspdf";
 
 const DOCTOR_FEES = {
   "Dr. Rajesh": 500,
@@ -37,10 +36,9 @@ export default function BillingPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const q = await getQueue();
-        setQueue(q);
-        const labs = await getLabTests();
-        setLabTests(labs);
+        const [q, labs] = await Promise.all([getQueue(), getLabTests()]);
+        setQueue(q || []);
+        setLabTests(labs || []);
       } catch (err) {
         showToast("Error loading billing queue", "error");
         console.error(err);
@@ -216,10 +214,11 @@ Status: Completed.
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!settledInvoice) return;
     
     try {
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",

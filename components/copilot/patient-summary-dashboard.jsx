@@ -139,7 +139,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
                 <Button 
                   size="sm" 
                   variant="ghost" 
-                  onClick={() => onButtonClick?.({ url: "/lab" })} 
+                  onClick={() => onButtonClick?.({ url: "/consultation" })} 
                   className="h-6 text-[10px] text-purple-700 hover:bg-purple-50 px-2"
                 >
                   View Scan

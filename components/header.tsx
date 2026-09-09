@@ -209,7 +209,7 @@ export function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={6} className="w-64 rounded-xl p-1.5 border-slate-200">
               {[
-                ...(WALK_IN_ENABLED ? [{ label: "Register Patient Walk-In", href: "/patient-registry", icon: PlusCircle }] : []),
+                ...(WALK_IN_ENABLED ? [{ label: "Register Patient Walk-In", href: "/reception", icon: PlusCircle }] : []),
                 { label: "Manage Doctors Registry", href: "/doctors", icon: UserRound },
                 { label: "Pharmacy & Stock Levels", href: "/pharmacy", icon: Pill },
                 { label: "Invoices & Checkout Desk", href: "/billing", icon: Receipt },

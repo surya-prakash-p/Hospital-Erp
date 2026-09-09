@@ -119,7 +119,6 @@ class CopilotActionExecutor:
         url_map = {
             "patient": f"/patient/{record_id}",
             "consultation": "/consultation",
-            "lab": "/lab",
             "pharmacy": "/pharmacy",
             "billing": "/billing",
             "doctor": "/doctors"

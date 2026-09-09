@@ -28,7 +28,6 @@ const mainNavigation = [
   { name: "Reception Desk", href: "/reception", icon: ClipboardList, role: "Receptionist", permission: "Patient Registration" },
   { name: "Patient Registry", href: "/patient-registry", icon: Users, role: "Receptionist", permission: "Patient Registration" },
   { name: "Consultation", href: "/consultation", icon: Stethoscope, role: "Doctor", permission: "Doctor Consultations" },
-  { name: "Lab Station", href: "/lab", icon: FlaskConical, role: "Lab Technician", permission: "Lab Diagnostic" },
   { name: "Pharmacy", href: "/pharmacy", icon: Pill, role: "Pharmacist", permission: "Pharmacy Dispensing" },
   { name: "Billing & Pay", href: "/billing", icon: Receipt, role: "Billing Clerk", permission: "Billing & Invoicing" },
   { name: "Finance Ledger", href: "/finance", icon: Wallet, role: "Billing Clerk", permission: "Billing & Invoicing" },

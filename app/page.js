@@ -14,15 +14,16 @@ export default function DashboardPage() {
   const [medicinesList, setMedicinesList] = useState([]);
 
   async function loadDashboardData() {
-    setLoading(true);
     try {
-      const q = await getQueue();
+      const [q, pts, docs, meds] = await Promise.all([
+        getQueue(),
+        getPatients(),
+        getDoctors(),
+        getMedicines()
+      ]);
       setQueue(q || []);
-      const pts = await getPatients();
       setPatientsCount(Object.keys(pts || {}).length);
-      const docs = await getDoctors();
       setDoctorsList(docs || []);
-      const meds = await getMedicines();
       setMedicinesList(meds || []);
     } catch (e) {
       console.error(e);
@@ -44,7 +45,7 @@ export default function DashboardPage() {
   const opCount = queue.filter(q => q.appointment_status === "Doctor Consultation").length;
   const ipCount = queue.filter(q => q.appointment_status === "IPD Admission" || q.appointment_status === "Pharmacy").length;
   const doctorsAvailable = doctorsList.filter(d => d.status === "Available" || !d.status).length;
-  const labReportsPending = queue.filter(q => q.need_lab_test === 1 && q.lab_test_status !== "Completed").length;
+  const pharmacyPending = queue.filter(q => q.appointment_status === "Pharmacy").length;
 
   // Compute metrics dynamically from state
   const todaysAppointments = queue.length;
@@ -58,7 +59,7 @@ export default function DashboardPage() {
     { title: "Today's Appointments", value: todaysAppointments, href: "/consultation" },
     { title: "OP Patients (OPD)", value: opCount, href: "/consultation" },
     { title: "Doctors Available", value: `${doctorsAvailable}/${doctorsList.length}`, href: "/doctors" },
-    { title: "Lab Reports Pending", value: labReportsPending, href: "/lab" },
+    { title: "Pharmacy Queue", value: pharmacyPending, href: "/pharmacy" },
   ];
 
   if (loading && queue.length === 0) {

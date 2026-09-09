@@ -345,6 +345,19 @@ export default function DoctorsCatalogPage() {
                   />
                 </div>
                 <div className="space-y-1">
+                  <Label htmlFor="consultFee" className="text-xs font-semibold text-slate-700">Consultation Fee (₹) *</Label>
+                  <Input
+                    id="consultFee"
+                    type="number"
+                    min="0"
+                    step="50"
+                    placeholder="e.g. 500"
+                    value={consultFee}
+                    onChange={(e) => setConsultFee(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label htmlFor="qualifications" className="text-xs font-semibold text-slate-700">Qualifications</Label>
                   <Input
                     id="qualifications"
@@ -522,10 +535,9 @@ export default function DoctorsCatalogPage() {
                     </div>
                     <div>
                       <div className="flex items-center justify-center gap-0.5 font-bold text-emerald-600">
-                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>{doc.consultation_fee}</span>
+                        <span>₹{doc.consultation_fee !== undefined && doc.consultation_fee !== null && doc.consultation_fee !== "" ? doc.consultation_fee : 500}</span>
                       </div>
-                      <p className="text-[9px] text-slate-400 uppercase font-semibold mt-0.5">Fee (₹)</p>
+                      <p className="text-[9px] text-slate-400 uppercase font-semibold mt-0.5">Consult Fee</p>
                     </div>
                   </div>
                 </CardContent>

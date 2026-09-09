@@ -4,20 +4,13 @@ import { WALK_IN_ENABLED } from "@/lib/feature-flags";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { jsPDF } from "jspdf";
 import { 
   Users, 
   Search, 
-  UserPlus, 
-  RefreshCw, 
   CheckCircle, 
   AlertCircle, 
   Info, 
   Loader2, 
-  User, 
-  Phone, 
-  Mail, 
-  Calendar, 
   Activity, 
   Thermometer, 
   Ruler, 
@@ -89,27 +82,40 @@ export default function PatientRegistryPage() {
 
   useEffect(() => {
     loadRegistryData();
+    const interval = setInterval(() => {
+      loadRegistryDataSilently();
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!loading && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current.focus();
-      }, 50);
+  async function loadRegistryDataSilently() {
+    try {
+      const [pts, docs, q] = await Promise.all([
+        getPatients(),
+        getDoctors(),
+        getQueue()
+      ]);
+      setPatients(pts || {});
+      setDoctors(docs || []);
+      setQueue(q || []);
+    } catch (e) {
+      console.warn("Silent refresh failed:", e);
     }
-  }, [loading]);
+  }
 
   async function loadRegistryData() {
     setLoading(true);
     try {
-      const pts = await getPatients();
+      const [pts, docs, q] = await Promise.all([
+        getPatients(),
+        getDoctors(),
+        getQueue()
+      ]);
       setPatients(pts || {});
-      const docs = await getDoctors();
       setDoctors(docs || []);
-      const q = await getQueue();
       setQueue(q || []);
       
-      const availableDocs = docs.filter(d => d.status !== "Unavailable");
+      const availableDocs = (docs || []).filter(d => d.status !== "Unavailable");
       if (availableDocs.length > 0) {
         setCheckinForm(prev => ({ ...prev, doctor: availableDocs[0].name }));
       }
@@ -171,147 +177,7 @@ export default function PatientRegistryPage() {
     setIsCheckinModalOpen(true);
   };
 
-  const printConsultationInvoice = (walkIn, docFee) => {
-    try {
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-      });
 
-      let posY = 20;
-
-      // Header
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(20);
-      doc.text("THANGAM HOSPITAL", 105, posY, { align: "center" });
-      posY += 6;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.text("123 Health City Road, Coimbatore - 641012", 105, posY, { align: "center" });
-      posY += 5;
-      doc.text("Phone: +91 422 2345678 | Email: billing@thangam.org", 105, posY, { align: "center" });
-      posY += 8;
-
-      // Line separator
-      doc.setDrawColor(226, 232, 240); // slate-200
-      doc.setLineWidth(0.5);
-      doc.line(20, posY, 190, posY);
-      posY += 8;
-
-      // Invoice Title
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(79, 70, 229); // indigo-600
-      doc.text("CLINICAL CONSULTATION INVOICE", 20, posY);
-      posY += 8;
-
-      // Meta Info Table
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(15, 23, 42);
-      doc.text("Visit/Walk-in ID:", 20, posY);
-      doc.setFont("helvetica", "normal");
-      doc.text(walkIn.name || "N/A", 50, posY);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Patient Name:", 115, posY);
-      doc.setFont("helvetica", "normal");
-      doc.text(walkIn.patient_name || "", 145, posY);
-      posY += 6;
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Date & Time:", 20, posY);
-      doc.setFont("helvetica", "normal");
-      doc.text(new Date().toLocaleString(), 50, posY);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Mobile Number:", 115, posY);
-      doc.setFont("helvetica", "normal");
-      doc.text(walkIn.mobile_number || "", 145, posY);
-      posY += 8;
-
-      // Line separator
-      doc.line(20, posY, 190, posY);
-      posY += 8;
-
-      // Doctor
-      doc.setFont("helvetica", "bold");
-      doc.text("Consulting Doctor:", 20, posY);
-      doc.setFont("helvetica", "normal");
-      doc.text(walkIn.doctor || "", 55, posY);
-      posY += 8;
-
-      // Line separator
-      doc.line(20, posY, 190, posY);
-      posY += 8;
-
-      // Table Headers
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setFillColor(248, 250, 252); // slate-50
-      doc.rect(20, posY - 4, 170, 7, "F");
-      doc.text("Description", 22, posY);
-      doc.text("Qty", 120, posY, { align: "center" });
-      doc.text("Unit Price", 145, posY, { align: "right" });
-      doc.text("Amount", 185, posY, { align: "right" });
-      posY += 8;
-
-      doc.setFont("helvetica", "normal");
-      doc.text(`Doctor OPD Consultation Fee (${walkIn.doctor})`, 22, posY);
-      doc.text("1", 120, posY, { align: "center" });
-      doc.text(`INR ${docFee.toFixed(2)}`, 145, posY, { align: "right" });
-      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
-      posY += 7;
-
-      // Totals Area
-      posY += 3;
-      doc.line(20, posY, 190, posY);
-      posY += 8;
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("GRAND TOTAL (CONSULTATION):", 110, posY);
-      doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
-      posY += 12;
-
-      // Stamp
-      doc.setDrawColor(79, 70, 229); // indigo-600
-      doc.setLineWidth(0.8);
-      doc.rect(75, posY, 60, 12);
-      doc.setTextColor(79, 70, 229);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("CONSULTATION INVOICED", 105, posY + 7, { align: "center" });
-      posY += 20;
-
-      // Footer
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184); // slate-400
-      doc.text("Generated digitally via Thangam Hospital Reception Desk. No signature required.", 105, posY + 10, { align: "center" });
-
-      // Open PDF in new tab for viewing and printing
-      const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.focus();
-          printWindow.print();
-        };
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-
-      showToast("Consultation invoice opened for printing!", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to print invoice", "error");
-    }
-  };
 
   // Submit patient check-in / Walk-in queue booking
   const handleCheckinSubmit = async (e) => {
@@ -345,12 +211,9 @@ export default function PatientRegistryPage() {
         diagnosis: checkinForm.symptoms.trim() || "Consultation Checkup"
       };
 
-      const created = await createWalkIn(walkInData);
-      const DOCTOR_FEES = { "Dr. Rajesh": 500, "Dr. Priya": 1000, "Dr. Vignesh": 600 };
-      const docFee = DOCTOR_FEES[checkinForm.doctor] || 500;
-      printConsultationInvoice(created, docFee);
+      await createWalkIn(walkInData);
 
-      showToast(`${selectedPatient.patient_name} successfully booked in to active queue!`, "success");
+      showToast(`${selectedPatient.patient_name} checked in successfully!`, "success");
       setIsCheckinModalOpen(false);
       setSelectedPatient(null);
       router.push("/reception"); // Route to reception to see them in today's active visitors queue
@@ -407,8 +270,8 @@ export default function PatientRegistryPage() {
               </CardTitle>
             </div>
             
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-              <div className="relative min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[180px] xl:w-[280px]">
+            <div className="flex items-center gap-2 w-full xl:w-auto">
+              <div className="relative min-w-0 flex-1 sm:min-w-[240px] xl:w-[320px]">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <Input
                   ref={searchInputRef}
@@ -419,14 +282,6 @@ export default function PatientRegistryPage() {
                   className="w-full pl-8 h-9 text-xs focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={loadRegistryData} className="gap-1 text-xs h-9 border-slate-200 shrink-0">
-                <RefreshCw className="w-3.5 h-3.5" />
-                Refresh
-              </Button>
-              <Button onClick={() => setIsRegModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 h-9 text-xs font-semibold shadow-sm shrink-0">
-                <UserPlus className="w-4 h-4" />
-                Register Patient
-              </Button>
             </div>
           </CardHeader>
           

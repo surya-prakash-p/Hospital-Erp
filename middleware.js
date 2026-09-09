@@ -7,7 +7,6 @@ const ROUTE_PERMISSIONS = [
   { path: '/doctors', allowed: ['Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/pharmacy', allowed: ['Pharmacist', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/inventory', allowed: ['Pharmacist', 'Store Manager', 'Doctor', 'Hospital Admin', 'System Manager'] },
-  { path: '/lab', allowed: ['Lab Technician', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/reception', allowed: ['Receptionist', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/appointments', allowed: ['Receptionist', 'Doctor', 'Hospital Admin', 'System Manager'] },
   { path: '/patient-registry', allowed: ['Receptionist', 'Doctor', 'Nurse', 'Hospital Admin', 'System Manager'] },

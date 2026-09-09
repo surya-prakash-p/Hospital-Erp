@@ -60,7 +60,16 @@ async function handle(req) {
       console.log(`[Next.js Proxy] Body:`, options.body);
     }
 
-    const response = await fetch(targetUrl, options);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    options.signal = controller.signal;
+
+    let response;
+    try {
+      response = await fetch(targetUrl, options);
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {

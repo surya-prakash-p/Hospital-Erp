@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getPatient, updatePatient, getDoctors, createWalkIn, getQueue, getLabTests } from "@/lib/hospital-service";
-import { jsPDF } from "jspdf";
 
 const DOCTOR_FEES = {
   "Dr. Rajesh": 500,
@@ -150,8 +149,9 @@ export default function PatientProfilePage() {
     }
   };
 
-  const printConsultationInvoice = (walkIn, docFee) => {
+  const printConsultationInvoice = async (walkIn, docFee) => {
     try {
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -273,17 +273,8 @@ export default function PatientProfilePage() {
       doc.setTextColor(148, 163, 184); // slate-400
       doc.text("Generated digitally via Thangam Hospital Reception Desk. No signature required.", 105, posY + 10, { align: "center" });
 
-      // Open PDF in new tab for viewing and printing
-      const blob = doc.output("blob");
-      const url = URL.createObjectURL(blob);
-      const printWindow = window.open(url, "_blank");
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.focus();
-          printWindow.print();
-        };
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      // Direct PDF download without opening new tabs
+      doc.save(`Consultation_Invoice_${walkIn.name || "OPD"}.pdf`);
     } catch (err) {
       console.error("Failed to print consultation invoice", err);
     }
@@ -380,9 +371,10 @@ export default function PatientProfilePage() {
     }
   };
 
-  const handleDownloadActiveInvoicePDF = () => {
+  const handleDownloadActiveInvoicePDF = async () => {
     if (!activeInvoice) return;
     try {
+      const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",

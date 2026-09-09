@@ -31,9 +31,6 @@ import {
   receiveGoods, getMedicineHistory, adjustStock, deactivateMedicine, executeDirectSale, getStockMovementLogs, createPharmacyAuditLog,
   recordFinanceTransaction
 } from "@/lib/hospital-service";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { AIInvoiceImportModal } from "@/components/pharmacy/AIInvoiceImportModal";
 
 export default function PharmacyPage() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -74,9 +71,6 @@ export default function PharmacyPage() {
   const [showWorkdeskPartialModal, setShowWorkdeskPartialModal] = useState(false);
   const [workdeskPartialIndex, setWorkdeskPartialIndex] = useState(null);
   const [workdeskPartialQty, setWorkdeskPartialQty] = useState("");
-  
-  // AI Import State
-  const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
 
   // OTC Sale States
   const [showOTCSaleModal, setShowOTCSaleModal] = useState(false);
@@ -316,14 +310,16 @@ export default function PharmacyPage() {
   async function loadAllData() {
     try {
       setLoading(true);
-      const meds = await getMedicines();
-      setMedicines(meds);
-      const q = await getQueue();
-      setQueue(q);
-      const reg = await getDrugRegister();
-      setDrugRegister(reg);
-      const pos = await getPurchaseOrders();
-      setPurchaseOrders(pos);
+      const [meds, q, reg, pos] = await Promise.all([
+        getMedicines(),
+        getQueue(),
+        getDrugRegister(),
+        getPurchaseOrders()
+      ]);
+      setMedicines(meds || []);
+      setQueue(q || []);
+      setDrugRegister(reg || []);
+      setPurchaseOrders(pos || []);
     } catch (err) {
       showToast("Error loading data from Frappe", "error");
       console.error(err);
@@ -1822,226 +1818,6 @@ export default function PharmacyPage() {
     e.target.value = ""; // Reset input so same file can be uploaded again if needed
   };
 
-  const handleAIImportSuccess = (extractedData) => {
-    if (!extractedData || !extractedData.items) return;
-    
-    const newMeds = [...medicines];
-    const newBatches = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('hospital_batches')) || []) : [];
-    const newRegisters = [...drugRegister];
-    const existingGRNs = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('hospital_goods_receipts')) || []) : [];
-    
-    const now = new Date().toISOString();
-    const today = now.split('T')[0];
-    let updatedCount = 0;
-    const grnLineItems = [];
-
-    const supplierName = extractedData.supplier || extractedData.seller?.seller_name || "Supplier";
-    const invNo = extractedData.invoice_number || extractedData.invoice_meta?.invoice_no || `INV-${Date.now()}`;
-    const invDate = extractedData.invoice_date || extractedData.invoice_meta?.invoice_date || today;
-    
-    extractedData.items.forEach((item, i) => {
-      const qty = parseInt(item.qty || item.quantity) || 0;
-      const freeQty = parseInt(item.free || item.free_qty) || 0;
-      const totalQtyReceived = qty + freeQty;
-      if (totalQtyReceived <= 0 && qty <= 0) return;
-      
-      const medName = (item.medicine || item.product_name || "Unknown Medicine").trim();
-      const batchNo = (item.batch || item.batch_no || item.batch_number || `BATCH-${Date.now()}-${i}`).trim().toUpperCase();
-      const pPrice = parseFloat(item.rate ?? item.ptr ?? item.purchase_price) || 0;
-      const sPrice = parseFloat(item.mrp ?? item.selling_price) || (pPrice > 0 ? pPrice * 1.2 : 0);
-      const expDate = (item.exp_date || item.expiry || item.expiry_date || "12-2028").trim();
-      const rackLoc = item.rack || item.rack_location || "A-1";
-      const mfrCode = item.mfr || "";
-      const hsnCode = item.hsn || item.hsn_code || "30049099";
-      const packUnit = item.pack || item.pack_size || "10'S";
-      const pDis = parseFloat(item.p_dis || item.disc_percent) || 0;
-      const sDis = parseFloat(item.s_dis) || 0;
-      const gstPct = parseFloat(item.gst || item.gst_percent) || 5;
-      const lineVal = parseFloat(item.amount || item.value) || (qty * pPrice);
-
-      // Auto Detect Dosage Form
-      let detectedForm = "Tablet";
-      const upperName = medName.toUpperCase();
-      if (upperName.includes("INJ") || upperName.includes("AMP") || upperName.includes("VIAL") || upperName.includes("INJECTION")) {
-        detectedForm = "Injection";
-      } else if (upperName.includes("TAB")) {
-        detectedForm = "Tablet";
-      } else if (upperName.includes("CAP")) {
-        detectedForm = "Capsule";
-      } else if (upperName.includes("SYRUP") || upperName.includes("LIQUID") || upperName.includes("ML") || upperName.includes("SOLUTION")) {
-        detectedForm = "Syrup";
-      } else if (upperName.includes("OINT") || upperName.includes("CREAM")) {
-        detectedForm = "Ointment";
-      } else if (upperName.includes("DROP")) {
-        detectedForm = "Drops";
-      }
-      
-      const newBatchObj = {
-        name: `BATCH-${batchNo}`,
-        medicine: medName,
-        medicine_name: medName,
-        batch_number: batchNo,
-        current_stock: totalQtyReceived > 0 ? totalQtyReceived : qty,
-        total_units: totalQtyReceived > 0 ? totalQtyReceived : qty,
-        pack_size: parseInt(packUnit) || 10,
-        no_of_packs: (parseInt(packUnit) || 10) > 0 ? Math.ceil((totalQtyReceived > 0 ? totalQtyReceived : qty) / (parseInt(packUnit) || 10)) : 1,
-        exp_date: expDate,
-        expiry_date: expDate,
-        purchase_price: pPrice,
-        mrp: sPrice,
-        selling_price: sPrice,
-        supplier: supplierName,
-        invoice_number: invNo,
-        invoice_date: invDate,
-        rack_location: rackLoc,
-        hsn_code: hsnCode,
-        mfr: mfrCode
-      };
-
-      // 1. Update/Create Medicine Record
-      let medIndex = newMeds.findIndex(m => (m.medicine_name || "").toLowerCase() === medName.toLowerCase());
-      if (medIndex === -1) {
-        const medObj = {
-          name: `MED-${10000 + newMeds.length}`,
-          medicine_name: medName,
-          generic_name: medName,
-          brand: mfrCode || medName,
-          manufacturer: mfrCode || supplierName,
-          hsn_code: hsnCode,
-          category: detectedForm === "Injection" ? "Schedule H" : "Regular Medicine",
-          dosage_form: detectedForm,
-          tablets_per_strip: (detectedForm === "Tablet" || detectedForm === "Capsule") ? 10 : null,
-          pack_size: packUnit,
-          stock: totalQtyReceived > 0 ? totalQtyReceived : qty,
-          min_stock: 50,
-          max_stock: 500,
-          purchase_price: pPrice,
-          selling_price: sPrice,
-          mrp: sPrice,
-          gst: gstPct,
-          rack_location: rackLoc,
-          batch_number: batchNo,
-          exp_date: expDate,
-          expiry_date: expDate,
-          invoice_number: invNo,
-          invoice_date: invDate,
-          supplier: supplierName,
-          disabled: 0,
-          batches: [newBatchObj]
-        };
-        newMeds.push(medObj);
-        medIndex = newMeds.length - 1;
-      } else {
-        newMeds[medIndex].stock = (newMeds[medIndex].stock || 0) + (totalQtyReceived > 0 ? totalQtyReceived : qty);
-        newMeds[medIndex].selling_price = sPrice > 0 ? sPrice : newMeds[medIndex].selling_price;
-        newMeds[medIndex].mrp = sPrice > 0 ? sPrice : newMeds[medIndex].mrp;
-        newMeds[medIndex].batch_number = batchNo;
-        newMeds[medIndex].exp_date = expDate;
-        newMeds[medIndex].expiry_date = expDate;
-        newMeds[medIndex].rack_location = rackLoc;
-        newMeds[medIndex].pack_size = packUnit;
-        newMeds[medIndex].invoice_number = invNo;
-        newMeds[medIndex].invoice_date = invDate;
-        newMeds[medIndex].supplier = supplierName;
-        if (mfrCode) newMeds[medIndex].brand = mfrCode;
-        if (hsnCode) newMeds[medIndex].hsn_code = hsnCode;
-
-        if (!newMeds[medIndex].batches) newMeds[medIndex].batches = [];
-        const existingBatchInMed = newMeds[medIndex].batches.findIndex(b => (b.batch_number || "").toLowerCase() === batchNo.toLowerCase());
-        if (existingBatchInMed >= 0) {
-          newMeds[medIndex].batches[existingBatchInMed].current_stock += (totalQtyReceived > 0 ? totalQtyReceived : qty);
-          newMeds[medIndex].batches[existingBatchInMed].total_units = newMeds[medIndex].batches[existingBatchInMed].current_stock;
-          newMeds[medIndex].batches[existingBatchInMed].exp_date = expDate;
-        } else {
-          newMeds[medIndex].batches.push(newBatchObj);
-        }
-      }
-      
-      // 2. Update/Create Batch Entry with Deduplication in Global Batches
-      const existingGlobalBatchIdx = newBatches.findIndex(b => 
-        (b.batch_number || "").toLowerCase() === batchNo.toLowerCase() && 
-        ((b.medicine_name || "").toLowerCase() === medName.toLowerCase() || (b.medicine || "").toLowerCase() === medName.toLowerCase())
-      );
-
-      if (existingGlobalBatchIdx >= 0) {
-        newBatches[existingGlobalBatchIdx].current_stock += (totalQtyReceived > 0 ? totalQtyReceived : qty);
-        newBatches[existingGlobalBatchIdx].total_units = newBatches[existingGlobalBatchIdx].current_stock;
-        newBatches[existingGlobalBatchIdx].exp_date = expDate;
-        newBatches[existingGlobalBatchIdx].expiry_date = expDate;
-        if (sPrice > 0) newBatches[existingGlobalBatchIdx].mrp = sPrice;
-        if (pPrice > 0) newBatches[existingGlobalBatchIdx].purchase_price = pPrice;
-      } else {
-        newBatches.push(newBatchObj);
-      }
-
-      // Add to GRN line item list
-      grnLineItems.push({
-        rack: rackLoc,
-        mfr: mfrCode,
-        hsn: hsnCode,
-        medicine: medName,
-        pack: packUnit,
-        batch_number: batchNo,
-        exp_date: expDate,
-        quantity: qty,
-        free_qty: freeQty,
-        purchase_price: pPrice,
-        mrp: sPrice,
-        p_dis: pDis,
-        s_dis: sDis,
-        gst: gstPct,
-        line_value: lineVal
-      });
-      
-      // 3. Log to Government Drug Register
-      newRegisters.unshift({
-        name: `GRN-AI-${Date.now()}-${i}`,
-        date: invDate,
-        dispensing_date: invDate,
-        medicine: medName,
-        batch_number: batchNo || "-",
-        type: "PURCHASE_IN",
-        qty_in: totalQtyReceived > 0 ? totalQtyReceived : qty,
-        qty_out: 0,
-        balance: newMeds[medIndex].stock,
-        reference: invNo,
-        supplier: supplierName,
-        user: "Admin",
-        pharmacist: typeof pharmacistName !== 'undefined' ? pharmacistName : "Admin",
-        category: newMeds[medIndex].category || "Regular Medicine"
-      });
-      
-      updatedCount++;
-    });
-    
-    if (updatedCount > 0) {
-      // Save Goods Receipt record with Invoice Number
-      const newGRN = {
-        name: `GRN-${Date.now()}`,
-        invoice_number: invNo,
-        invoice_date: invDate,
-        supplier: supplierName,
-        items: grnLineItems,
-        received_date: today,
-        total_amount: grnLineItems.reduce((acc, it) => acc + (it.line_value || (it.quantity * it.purchase_price)), 0)
-      };
-      existingGRNs.unshift(newGRN);
-
-      if (typeof window !== 'undefined') {
-        const medsObj = {};
-        newMeds.forEach(m => { medsObj[m.medicine_name || m.name] = m; });
-        localStorage.setItem('hospital_medicines', JSON.stringify(medsObj));
-        localStorage.setItem('hospital_batches', JSON.stringify(newBatches));
-        localStorage.setItem('hospital_drug_register', JSON.stringify(newRegisters));
-        localStorage.setItem('hospital_goods_receipts', JSON.stringify(existingGRNs));
-      }
-      setMedicines(newMeds);
-      setDrugRegister(newRegisters);
-      showToast(`Successfully extracted & saved ${updatedCount} medicines with Invoice ${invNo}!`, "success");
-      loadAllData();
-    }
-  };
-
   const handleLogGRN = async () => {
     if (grnItems.length === 0) {
       showToast("Please add at least one medicine item before logging the receipt", "error");
@@ -2118,146 +1894,144 @@ export default function PharmacyPage() {
   };
 
   // PDF Generation - Invoice Print Format
-  const generatePDFInvoice = (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Card") => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
-    let posY = 15;
+  const generatePDFInvoice = async (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Card") => {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+      let posY = 15;
 
-    doc.setTextColor(15, 23, 42); // slate-900
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("THANGAM HOSPITAL", 74, posY, { align: "center" });
-    posY += 5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105); // slate-600
-    doc.text("123 Health City Road, Coimbatore - 641012", 74, posY, { align: "center" });
-    posY += 4;
-    doc.text("Phone: +91 422 2345678 | GSTIN: 33AAAAA1111A1Z1", 74, posY, { align: "center" });
-    posY += 6;
-
-    // Divider
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.line(10, posY, 138, posY);
-    posY += 6;
-
-    // Invoice Title
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(79, 70, 229); // indigo-600
-    doc.text("PHARMACY DISPENSING INVOICE", 10, posY);
-    posY += 6;
-
-    // Metadata
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Invoice No: ${invNo}`, 10, posY);
-    doc.text(`Date: ${new Date().toLocaleString("en-IN")}`, 85, posY);
-    posY += 4;
-    doc.text(`Patient Name: ${pName}`, 10, posY);
-    doc.text(`ID/Mobile: ${pMobile}`, 85, posY);
-    posY += 4;
-    doc.text(`Prescribed By: Dr. ${docName.replace("Dr. ", "")}`, 10, posY);
-    doc.text(`Payment Method: ${paymentMethod}`, 85, posY);
-    posY += 6;
-
-    doc.line(10, posY, 138, posY);
-    posY += 5;
-
-    // Items table header
-    doc.setFont("helvetica", "bold");
-    doc.setFillColor(248, 250, 252);
-    doc.rect(10, posY - 3, 128, 5, "F");
-    doc.text("Medicine / Batch Details", 12, posY);
-    doc.text("Qty", 80, posY, { align: "center" });
-    doc.text("Deducted Batch", 100, posY, { align: "center" });
-    doc.text("Total", 135, posY, { align: "right" });
-    posY += 5;
-    doc.line(10, posY - 2, 138, posY - 2);
-
-    doc.setFont("helvetica", "normal");
-    items.forEach(item => {
-      const medName = item.medicine_name;
-      const totalQty = item.requested_qty;
-      const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
-      const isPartial = item.dispense_status === "Partially Dispensed";
-      
-      let batchNames = "";
-      let price = 0;
-      let lineTotal = 0;
-      let qtyStr = String(totalQty);
-
-      if (isOutside) {
-        batchNames = "Outside Purchase";
-        qtyStr = `${totalQty} (Outside)`;
-        lineTotal = 0;
-      } else {
-        batchNames = (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ");
-        const medsLocal = JSON.parse(localStorage.getItem('hospital_medicines')) || INITIAL_MOCK_MEDICINES;
-        price = medsLocal[medName]?.selling_price || 0;
-        
-        if (isPartial) {
-          const dispensedQty = item.dispensed_qty;
-          qtyStr = `${dispensedQty} / ${totalQty}`;
-          lineTotal = dispensedQty * price;
-        } else {
-          lineTotal = totalQty * price;
-        }
-      }
-
+      doc.setTextColor(15, 23, 42); // slate-900
       doc.setFont("helvetica", "bold");
-      doc.text(medName, 12, posY);
+      doc.setFontSize(16);
+      doc.text("THANGAM HOSPITAL", 74, posY, { align: "center" });
+      posY += 5;
+
       doc.setFont("helvetica", "normal");
-      doc.text(qtyStr, 80, posY, { align: "center" });
-      doc.text(batchNames || "N/A", 100, posY, { align: "center", maxWidth: 32 });
-      doc.text(isOutside ? "Outside (₹0)" : `₹${lineTotal.toFixed(2)}`, 135, posY, { align: "right" });
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text("123 Health City Road, Coimbatore - 641012", 74, posY, { align: "center" });
+      posY += 4;
+      doc.text("Phone: +91 422 2345678 | GSTIN: 33AAAAA1111A1Z1", 74, posY, { align: "center" });
       posY += 6;
-      
-      if (isOutside) {
-        doc.setFont("helvetica", "italic");
-        doc.setFontSize(7);
-        doc.setTextColor(156, 163, 175);
-        doc.text("Medicine Purchased Outside Hospital - Dispensing Fee: ₹0", 12, posY - 2);
+
+      // Divider
+      doc.setDrawColor(226, 232, 240); // slate-200
+      doc.line(10, posY, 138, posY);
+      posY += 6;
+
+      // Invoice Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(79, 70, 229); // indigo-600
+      doc.text("PHARMACY DISPENSING INVOICE", 10, posY);
+      posY += 6;
+
+      // Metadata
+      doc.setFontSize(8);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Invoice No: ${invNo}`, 10, posY);
+      doc.text(`Date: ${new Date().toLocaleString("en-IN")}`, 85, posY);
+      posY += 4;
+      doc.text(`Patient Name: ${pName}`, 10, posY);
+      doc.text(`ID/Mobile: ${pMobile}`, 85, posY);
+      posY += 4;
+      doc.text(`Prescribed By: Dr. ${docName.replace("Dr. ", "")}`, 10, posY);
+      doc.text(`Payment Method: ${paymentMethod}`, 85, posY);
+      posY += 6;
+
+      doc.line(10, posY, 138, posY);
+      posY += 5;
+
+      // Items table header
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(248, 250, 252);
+      doc.rect(10, posY - 3, 128, 5, "F");
+      doc.text("Medicine / Batch Details", 12, posY);
+      doc.text("Qty", 80, posY, { align: "center" });
+      doc.text("Deducted Batch", 100, posY, { align: "center" });
+      doc.text("Total", 135, posY, { align: "right" });
+      posY += 5;
+      doc.line(10, posY - 2, 138, posY - 2);
+
+      doc.setFont("helvetica", "normal");
+      items.forEach(item => {
+        const medName = item.medicine_name;
+        const totalQty = item.requested_qty;
+        const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
+        const isPartial = item.dispense_status === "Partially Dispensed";
+        
+        let batchNames = "";
+        let price = 0;
+        let lineTotal = 0;
+        let qtyStr = String(totalQty);
+
+        if (isOutside) {
+          batchNames = "Outside Purchase";
+          qtyStr = `${totalQty} (Outside)`;
+          lineTotal = 0;
+        } else {
+          batchNames = (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ");
+          const medsLocal = JSON.parse(localStorage.getItem('hospital_medicines')) || INITIAL_MOCK_MEDICINES;
+          price = medsLocal[medName]?.selling_price || 0;
+          
+          if (isPartial) {
+            const dispensedQty = item.dispensed_qty;
+            qtyStr = `${dispensedQty} / ${totalQty}`;
+            lineTotal = dispensedQty * price;
+          } else {
+            lineTotal = totalQty * price;
+          }
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.text(medName, 12, posY);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(15, 23, 42);
-        posY += 3;
-      }
-    });
+        doc.text(qtyStr, 80, posY, { align: "center" });
+        doc.text(batchNames || "N/A", 100, posY, { align: "center", maxWidth: 32 });
+        doc.text(isOutside ? "Outside (₹0)" : `₹${lineTotal.toFixed(2)}`, 135, posY, { align: "right" });
+        posY += 6;
+        
+        if (isOutside) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(7);
+          doc.setTextColor(156, 163, 175);
+          doc.text("Medicine Purchased Outside Hospital - Dispensing Fee: ₹0", 12, posY - 2);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+          doc.setTextColor(15, 23, 42);
+          posY += 3;
+        }
+      });
 
-    doc.line(10, posY, 138, posY);
-    posY += 6;
+      doc.line(10, posY, 138, posY);
+      posY += 6;
 
-    // Grand total
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("GRAND TOTAL (incl. GST):", 65, posY);
-    doc.text(`INR ${totalVal.toFixed(2)}`, 135, posY, { align: "right" });
-    posY += 10;
+      // Grand total
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("GRAND TOTAL (incl. GST):", 65, posY);
+      doc.text(`INR ${totalVal.toFixed(2)}`, 135, posY, { align: "right" });
+      posY += 10;
 
-    // Bottom Stamp
-    doc.setDrawColor(16, 185, 129); // emerald-500
-    doc.setLineWidth(0.5);
-    doc.rect(50, posY, 48, 10);
-    doc.setTextColor(16, 185, 129);
-    doc.setFontSize(9);
-    doc.text("PAID & DISPENSED", 74, posY + 6, { align: "center" });
+      // Bottom Stamp
+      doc.setDrawColor(16, 185, 129); // emerald-500
+      doc.setLineWidth(0.5);
+      doc.rect(50, posY, 48, 10);
+      doc.setTextColor(16, 185, 129);
+      doc.setFontSize(9);
+      doc.text("PAID & DISPENSED", 74, posY + 6, { align: "center" });
 
-    // Output PDF to iframe print dialog
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, "_blank");
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
-      };
+      doc.save(`pharmacy_invoice_${invNo}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed", err);
     }
   };
 
   // PDF Generation - GRN / Purchase Bill
-  const downloadGRNInvoice = (po) => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+  const downloadGRNInvoice = async (po) => {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     let posY = 15;
 
     doc.setTextColor(15, 23, 42); // slate-900
@@ -2330,6 +2104,9 @@ export default function PharmacyPage() {
 
     // Download
     doc.save(`GRN_Bill_${po.name}.pdf`);
+    } catch (e) {
+      console.error("GRN PDF error", e);
+    }
   };
 
   // ============================================================================
@@ -2381,7 +2158,7 @@ export default function PharmacyPage() {
     setShowBulkPOModal(true);
   };
 
-  const handleConfirmAndDownloadBulkPOs = () => {
+  const handleConfirmAndDownloadBulkPOs = async () => {
     const bySupplier = {};
     bulkPOItems.forEach(rec => {
       // Only include items where suggested > 0
@@ -2424,57 +2201,62 @@ export default function PharmacyPage() {
     }
     
     // Generate PDF for the bulk PO request
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    let posY = 20;
+    try {
+      const { jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      let posY = 20;
 
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("Bulk Purchase Order Request", 105, posY, { align: "center" });
-    posY += 10;
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 105, posY, { align: "center" });
-    posY += 15;
-
-    newPOs.forEach((po, idx) => {
-      if (posY > 250) { doc.addPage(); posY = 20; }
-      
-      doc.setFontSize(12);
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text(`Supplier: ${po.supplier}`, 14, posY);
+      doc.text("Bulk Purchase Order Request", 105, posY, { align: "center" });
+      posY += 10;
+      
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(`PO Ref: ${po.name} (Draft)`, 140, posY);
-      posY += 8;
+      doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 105, posY, { align: "center" });
+      posY += 15;
 
-      const tableData = po.items.map((item, i) => [
-        i + 1,
-        item.medicine,
-        item.supplier,
-        item.current_stock,
-        item.quantity
-      ]);
+      newPOs.forEach((po) => {
+        if (posY > 250) { doc.addPage(); posY = 20; }
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Supplier: ${po.supplier}`, 14, posY);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`PO Ref: ${po.name} (Draft)`, 140, posY);
+        posY += 8;
 
-      autoTable(doc, {
-        startY: posY,
-        head: [["#", "Medicine", "Supplier", "Current Stock", "Order Qty"]],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229] },
-        styles: { fontSize: 8 }
+        const tableData = po.items.map((item, i) => [
+          i + 1,
+          item.medicine,
+          item.supplier,
+          item.current_stock,
+          item.quantity
+        ]);
+
+        autoTable(doc, {
+          startY: posY,
+          head: [["#", "Medicine", "Supplier", "Current Stock", "Order Qty"]],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [79, 70, 229] },
+          styles: { fontSize: 8 }
+        });
+        
+        posY = doc.lastAutoTable.finalY + 15;
       });
-      
-      posY = doc.lastAutoTable.finalY + 15;
-    });
 
-    doc.save(`Bulk_Purchase_Orders_${new Date().toISOString().split("T")[0]}.pdf`);
-    
-    showToast(`Successfully generated ${newPOs.length} Draft Purchase Orders and downloaded PDF`, "success");
+      doc.save(`Bulk_Purchase_Orders_${new Date().toISOString().split("T")[0]}.pdf`);
+      showToast(`Successfully generated ${newPOs.length} Draft Purchase Orders and downloaded PDF`, "success");
+    } catch (e) {
+      console.error("Bulk PO PDF failed", e);
+    }
     setShowBulkPOModal(false);
   };
 
-  const handleDownloadExpiringReport = () => {
+  const handleDownloadExpiringReport = async () => {
     const { type, value } = expiringReportTimeframe;
     const thresholdDays = type === 'Months' ? value * 30 : value;
     const today = new Date();
@@ -2511,48 +2293,56 @@ export default function PharmacyPage() {
     // Sort by days left ascending
     expiringItems.sort((a, b) => a.daysLeft - b.daysLeft);
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    let posY = 20;
+    try {
+      const { jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      let posY = 20;
 
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("Expiring Medicines Report", 105, posY, { align: "center" });
-    posY += 10;
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Timeframe: Expiring within ${value} ${type}`, 105, posY, { align: "center" });
-    posY += 5;
-    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 105, posY, { align: "center" });
-    posY += 15;
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Expiring Medicines Report", 105, posY, { align: "center" });
+      posY += 10;
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Timeframe: Expiring within ${value} ${type}`, 105, posY, { align: "center" });
+      posY += 5;
+      doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 105, posY, { align: "center" });
+      posY += 15;
 
-    const tableData = expiringItems.map((item, i) => [
-      i + 1,
-      item.medicine,
-      item.batch,
-      item.qty,
-      new Date(item.expiry).toLocaleDateString(),
-      item.daysLeft < 0 ? "Expired" : `${item.daysLeft} days`
-    ]);
+      const tableData = expiringItems.map((item, i) => [
+        i + 1,
+        item.medicine,
+        item.batch,
+        item.qty,
+        new Date(item.expiry).toLocaleDateString(),
+        item.daysLeft < 0 ? "Expired" : `${item.daysLeft} days`
+      ]);
 
-    autoTable(doc, {
-      startY: posY,
-      head: [["#", "Medicine", "Batch No", "Stock Qty", "Expiry Date", "Status"]],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [249, 115, 22] }, // Orange theme for expiring
-      styles: { fontSize: 9 }
-    });
+      autoTable(doc, {
+        startY: posY,
+        head: [["#", "Medicine", "Batch No", "Stock Qty", "Expiry Date", "Status"]],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [249, 115, 22] }, // Orange theme for expiring
+        styles: { fontSize: 9 }
+      });
 
-    doc.save(`Expiring_Medicines_Report_${new Date().toISOString().split("T")[0]}.pdf`);
-    showToast("Expiring report generated successfully", "success");
+      doc.save(`Expiring_Medicines_Report_${new Date().toISOString().split("T")[0]}.pdf`);
+      showToast("Expiring report generated successfully", "success");
+    } catch (e) {
+      console.error("Expiring report PDF failed", e);
+    }
     setShowExpiringReportModal(false);
   };
 
   // PDF Export for Government Compliance Registers
-  const exportRegisterPDF = () => {
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    let posY = 20;
+  const exportRegisterPDF = async () => {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      let posY = 20;
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
@@ -2628,6 +2418,9 @@ export default function PharmacyPage() {
     doc.text("Stamp & Date: _________________________", 220, posY);
 
     doc.save(`${selectedRegister.replace(" ", "_")}_Register_${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (e) {
+      console.error("Export register PDF failed", e);
+    }
   };
 
   // CSV Export for Government Compliance Registers
@@ -2718,15 +2511,6 @@ export default function PharmacyPage() {
             >
               <ShoppingBag className="w-3.5 h-3.5" /> + Direct Medicine Sale
             </Button>
-
-            <Button 
-              onClick={() => setIsAIImportModalOpen(true)}
-              size="sm" 
-              className="bg-linear-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white gap-1.5 font-semibold shadow-xs h-8 text-xs"
-            >
-              <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice
-            </Button>
-
             
             <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 rounded-2xl bg-white border border-slate-200 shadow-2xl">
               {/* Header */}
@@ -4402,22 +4186,6 @@ export default function PharmacyPage() {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Button 
-                    onClick={() => setIsAIImportModalOpen(true)}
-                    size="xs" 
-                    variant="outline" 
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 font-semibold text-[10px] px-2.5 py-1 shadow-xs gap-1"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> AI Invoice Import
-                  </Button>
-
-                  <AIInvoiceImportModal 
-                    isOpen={isAIImportModalOpen} 
-                    onOpenChange={setIsAIImportModalOpen} 
-                    onImportSuccess={handleAIImportSuccess}
-                    showToast={showToast}
-                  />
-
                   <Dialog open={isPOModalOpen} onOpenChange={setIsPOModalOpen}>
                     <DialogTrigger asChild>
                       <Button size="xs" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-2.5 py-1 shadow-sm">
@@ -5221,19 +4989,12 @@ export default function PharmacyPage() {
                 >
                   <Eye className="w-3.5 h-3.5" /> Full Invoices Modal
                 </Button>
-                <Button
-                  onClick={() => setIsAIImportModalOpen(true)}
-                  size="xs"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-3 py-1.5 shadow-xs gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {importedInvoices.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs">
-                  No supplier invoices imported yet. Click &quot;AI Import Invoice&quot; to upload your pharmaceutical bills.
+                  No supplier invoices recorded yet.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100 text-xs overflow-x-auto">
@@ -6550,14 +6311,8 @@ export default function PharmacyPage() {
                   </div>
                   <h4 className="font-bold text-slate-800 text-sm">No Imported Invoices Found Yet</h4>
                   <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    Upload purchase bills, GST invoices, or distributor receipts using AI Invoice Import to view them categorized by Invoice ID.
+                    Supplier invoices and purchase receipts will appear here once recorded in the system.
                   </p>
-                  <Button 
-                    onClick={() => { setShowImportedInvoicesModal(false); setIsAIImportModalOpen(true); }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shadow-sm"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" /> AI Import Invoice Now
-                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -6703,15 +6458,7 @@ export default function PharmacyPage() {
               )}
             </div>
 
-            <div className="px-6 py-3.5 border-t bg-slate-50 flex justify-between items-center">
-              <Button 
-                onClick={() => { setShowImportedInvoicesModal(false); setIsAIImportModalOpen(true); }}
-                variant="outline"
-                className="text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> AI Import Another Invoice
-              </Button>
-
+            <div className="px-6 py-3.5 border-t bg-slate-50 flex justify-end items-center">
               <Button 
                 onClick={() => { setShowImportedInvoicesModal(false); setSelectedInvoiceDetail(null); }}
                 className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4"

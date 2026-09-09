@@ -9,7 +9,6 @@ const ROUTE_LABELS: Record<string, string> = {
   "/reception": "Reception Desk & Queue",
   "/patient-registry": "Patient Registry",
   "/consultation": "Doctor Consultation Chamber",
-  "/lab": "Lab Station & Diagnostics",
   "/pharmacy": "Pharmacy Station & Stock",
   "/billing": "Billing & Invoicing Desk",
   "/finance": "Financial Ledger & Accounts",

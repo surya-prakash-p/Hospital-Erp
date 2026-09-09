@@ -35,3 +35,16 @@ Follow the observed Conventional Commit pattern: `feat(pharmacy): add invoice va
 ## Security & Configuration
 
 Keep credentials server-side through environment variables such as `FRAPPE_SITE_URL`, `FRAPPE_API_KEY`, `FRAPPE_API_SECRET`, and `BETTER_AUTH_SECRET`. Never add secrets or patient records to commits, logs, or screenshots. Enforce permissions in server handlers and Frappe, alongside UI access controls.
+
+## Core Engineering Rules
+
+Strictly adhere to these 4 engineering rules for every task:
+
+1. **Dev vs Prod Isolation**: Do not hardcode test scripts, reset buttons, or mock bypasses into production code. Keep all debug/seed tools strictly in local development environments.
+2. **No Unintended Triggers**: If a feature involves notifications, emails, payments, SMS, or bulk DB operations, do NOT execute or trigger them automatically. Require explicit confirmation flags and use mock modes locally.
+3. **Explain Code Diffs**: After making changes, summarize the exact diff, explain what was changed, and check for type/lint errors.
+4. **Pre-Push Audit**: Before finalizing any task, run a 3-step audit:
+   - (a) **Code & Types validation**: run linter (`npm run lint`), check builds/types.
+   - (b) **UI/Asset & Data consistency**: ensure no missing assets or broken data formats.
+   - (c) **Git diff review**: review diffs for clean, production-grade code without leftover debug/test logs.
+
