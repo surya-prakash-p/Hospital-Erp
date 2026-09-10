@@ -84,7 +84,7 @@ class CopilotActionExecutor:
         return {
             "status": "success",
             "action": "book_appointment",
-            "title": "✅ Appointment Successfully Booked",
+            "title": "Appointment Successfully Booked",
             "details": f"Appointment created for **{patient_name}** with **{doctor}**.",
             "record_id": record_id,
             "navigation_url": f"/consultation?patient={mobile}",
@@ -102,7 +102,7 @@ class CopilotActionExecutor:
         return {
             "status": "success",
             "action": "create_invoice",
-            "title": "💳 Invoice Generated",
+            "title": "Invoice Generated",
             "details": f"Billing invoice generated for **{patient_name}**.",
             "navigation_url": f"/billing?mobile={mobile}",
             "smart_buttons": [
@@ -128,7 +128,7 @@ class CopilotActionExecutor:
         return {
             "status": "success",
             "action": "open_record",
-            "title": f"🔗 Navigating to {doc_type}",
+            "title": f"Navigating to {doc_type}",
             "details": f"Opening {doc_type} record: `{record_id}`",
             "navigation_url": target_url
         }
@@ -139,7 +139,7 @@ class CopilotActionExecutor:
         return {
             "status": "success",
             "action": "generate_summary",
-            "title": "📄 Medical Clinical Summary Generated",
+            "title": "Medical Clinical Summary Generated",
             "details": f"Clinical summary & discharge note compiled for **{patient_name}**.",
             "smart_buttons": [
                 {"label": "Download PDF Report", "action": "download_summary"},

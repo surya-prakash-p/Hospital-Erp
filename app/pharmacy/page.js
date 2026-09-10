@@ -8,7 +8,7 @@ import {
   Pill, CheckCircle, AlertCircle, Info, Activity, PackageCheck, Plus, Layers, 
   PlusCircle, RefreshCw, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Archive, Calendar,
-  ArrowRight, X, Loader2, ArrowUpRight, HelpCircle, Truck, ChevronDown, Edit3, Sliders, Power, Users, ShoppingBag, Upload, MoreHorizontal, Sparkles
+  ArrowRight, X, Loader2, ArrowUpRight, HelpCircle, Truck, ChevronDown, Edit3, Sliders, Power, Users, ShoppingBag, Upload, MoreHorizontal, Sparkles, RotateCcw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import {
   saveInvoiceToProfile, getDrugRegister, createDrugRegisterEntry, 
   dispenseMedicineFEFO, getPurchaseOrders, createPurchaseOrder, 
   receiveGoods, getMedicineHistory, adjustStock, deactivateMedicine, executeDirectSale, getStockMovementLogs, createPharmacyAuditLog,
-  recordFinanceTransaction
+  recordFinanceTransaction, executeSalesReturn, getSalesReturns
 } from "@/lib/hospital-service";
 
 export default function PharmacyPage() {
@@ -84,9 +84,23 @@ export default function PharmacyPage() {
   const [otcBasket, setOtcBasket] = useState([]);
   const [otcPaymentMethod, setOtcPaymentMethod] = useState("Cash");
 
+  // Sales Return (Medicine Return) States
+  const [showSalesReturnModal, setShowSalesReturnModal] = useState(false);
+  const [salesReturnsList, setSalesReturnsList] = useState([]);
+  const [returnSearchQuery, setReturnSearchQuery] = useState("");
+  const [returnSelectedSale, setReturnSelectedSale] = useState(null);
+  const [returnItems, setReturnItems] = useState([]);
+  const [returnReason, setReturnReason] = useState("Doctor Changed Prescription");
+  const [returnMethod, setReturnMethod] = useState("Cash");
+  const [returnRestock, setReturnRestock] = useState(true);
+  const [returnNotes, setReturnNotes] = useState("");
+  const [showReturnReceiptModal, setShowReturnReceiptModal] = useState(false);
+  const [latestReturnRecord, setLatestReturnRecord] = useState(null);
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
   // Queue sub-filters
   const [queueSearchQuery, setQueueSearchQuery] = useState("");
-  const [queueFilterTab, setQueueFilterTab] = useState("All");
+  const [queueFilterTab, setQueueFilterTab] = useState("Waiting");
 
   // Slide-over active tab
   const [detailActiveTab, setDetailActiveTab] = useState("batches");
@@ -108,6 +122,9 @@ export default function PharmacyPage() {
   const [customAddMedName, setCustomAddMedName] = useState("");
   const [customAddQty, setCustomAddQty] = useState(10);
   const [pharmacistName, setPharmacistName] = useState("Rahul Sharma, RPh");
+  const [dispensePaymentMode, setDispensePaymentMode] = useState("Pay at Pharmacy Desk"); // "Pay at Pharmacy Desk" or "Forward to Central Billing"
+  const [showDispenseReceiptModal, setShowDispenseReceiptModal] = useState(false);
+  const [latestDispenseRecord, setLatestDispenseRecord] = useState(null);
 
   // Add Medicine Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -310,16 +327,18 @@ export default function PharmacyPage() {
   async function loadAllData() {
     try {
       setLoading(true);
-      const [meds, q, reg, pos] = await Promise.all([
+      const [meds, q, reg, pos, returns] = await Promise.all([
         getMedicines(),
         getQueue(),
         getDrugRegister(),
-        getPurchaseOrders()
+        getPurchaseOrders(),
+        getSalesReturns()
       ]);
       setMedicines(meds || []);
       setQueue(q || []);
       setDrugRegister(reg || []);
       setPurchaseOrders(pos || []);
+      setSalesReturnsList(returns || []);
     } catch (err) {
       showToast("Error loading data from Frappe", "error");
       console.error(err);
@@ -411,7 +430,7 @@ export default function PharmacyPage() {
       }
     });
 
-    const pendingPrescriptions = queue.filter(q => q.pharmacy_status === "Pending" && q.appointment_status === "Pharmacy" && q.prescription).length;
+    const pendingPrescriptions = queue.filter(q => q.pharmacy_status !== "Completed" && q.appointment_status !== "Billing" && q.appointment_status !== "Completed" && q.prescription && q.prescription.trim().length > 0).length;
 
     // Chart Data calculations
     const healthyStock = totalMeds - lowStock - outOfStock;
@@ -720,28 +739,37 @@ export default function PharmacyPage() {
         
       if (!matchesSearch) return false;
 
+      const isCompleted = q.pharmacy_status === "Completed" || q.appointment_status === "Billing" || q.appointment_status === "Completed";
+
       if (queueFilterTab === "Waiting") {
-        return q.pharmacy_status === "Pending" && q.appointment_status === "Pharmacy";
+        return !isCompleted;
       }
       if (queueFilterTab === "Dispensing") {
-        return q.pharmacy_status === "Pending" && selectedWalkIn?.name === q.name;
+        return !isCompleted && selectedWalkIn?.name === q.name;
       }
       if (queueFilterTab === "Completed") {
-        return q.pharmacy_status === "Completed";
+        return isCompleted;
       }
       if (queueFilterTab === "Priority") {
         const text = (q.prescription || "").toLowerCase();
         const hasControlled = text.includes("alprazolam") || text.includes("fentanyl") || text.includes("zolpidem") || text.includes("schedule");
-        return q.pharmacy_status === "Pending" && hasControlled;
+        return !isCompleted && hasControlled;
+      }
+      if (queueFilterTab === "All Records") {
+        return true;
       }
       
-      return true;
+      // Default: show only active pending prescriptions
+      return !isCompleted;
     });
   }, [queue, queueSearchQuery, queueFilterTab, selectedWalkIn]);
 
   // Live drug registers
   const activeRegisterLogs = useMemo(() => {
     const filtered = drugRegister.filter(log => {
+      if (selectedRegister === "Sales Returns") {
+        return Number(log.quantity) < 0 || log.doctor === "Sales Return" || (log.invoice_number && log.invoice_number.includes("RET-"));
+      }
       if (selectedRegister === "All Categories") return true;
       if (selectedRegister === "Schedule H") return log.drug_category === "Schedule H";
       if (selectedRegister === "Schedule H1") return log.drug_category === "Schedule H1" || log.drug_category === "Sleeping Pill";
@@ -979,7 +1007,7 @@ export default function PharmacyPage() {
   };
 
   // Dispensing execution with compliance validation
-  const executeDispensing = async () => {
+  const executeDispensing = async (overrideMode = null) => {
     if (userRole === "Store Manager") {
       showToast("Access Denied: Store Managers cannot dispense medicines.", "error");
       return;
@@ -988,6 +1016,9 @@ export default function PharmacyPage() {
       showToast("No medicines added to dispense", "error");
       return;
     }
+
+    const activePaymentMode = overrideMode || dispensePaymentMode;
+    const isPayAtPharmacy = activePaymentMode === "Pay at Pharmacy Desk";
 
     // Verify stock availability (only for hospital pharmacy items)
     const outOfStockMeds = dispenseItems.filter(item => {
@@ -1062,8 +1093,11 @@ export default function PharmacyPage() {
           pharmacy_status: nextWalkInStatus,
           appointment_status: nextAppointmentStatus,
           prescription: newPrescriptionText,
-          bill_amount: selectedWalkIn.bill_amount + billAmt,
+          bill_amount: (selectedWalkIn.bill_amount || 0) + (isPayAtPharmacy ? 0 : billAmt),
           pharmacy_bill_amount: billAmt,
+          pharmacy_payment_status: isPayAtPharmacy ? "Paid" : "ForwardedToBilling",
+          pharmacy_paid_amount: isPayAtPharmacy ? billAmt : 0,
+          pharmacy_due_amount: isPayAtPharmacy ? 0 : billAmt,
           dispensed_medicines: dispenseItems
         });
 
@@ -1071,20 +1105,40 @@ export default function PharmacyPage() {
         saveInvoiceToProfile(selectedWalkIn.mobile_number, {
           name: `Pharmacy Dispensation - ${dispenseItems.map(i=> `${i.medicine_name} (x${i.source === 'Outside Purchase' ? 0 : (i.dispense_status === 'Partially Dispensed' ? i.dispensed_qty : i.qty)})`).join(", ")}`,
           bill_amount: billAmt,
-          payment_method: otcPaymentMethod || "Cash",
+          payment_method: isPayAtPharmacy ? (otcPaymentMethod || "Cash") : "Pending at Central Billing",
           walkinData: {
             name: selectedWalkIn.name,
             patient_name: selectedWalkIn.patient_name,
             mobile_number: selectedWalkIn.mobile_number,
             doctor: selectedWalkIn.doctor,
             pharmacy_bill_amount: billAmt,
+            pharmacy_payment_status: isPayAtPharmacy ? "Paid" : "ForwardedToBilling",
+            pharmacy_paid_amount: isPayAtPharmacy ? billAmt : 0,
             dispensed_medicines: dispenseItems,
-            netBalance: billAmt
+            netBalance: isPayAtPharmacy ? 0 : billAmt
           }
         });
 
-        // Record pharmacy sale revenue in Finance ledger
-        if (typeof window !== 'undefined' && billAmt > 0) {
+        // Record department payment and finance income ONLY if paid at pharmacy desk
+        if (typeof window !== 'undefined' && isPayAtPharmacy && billAmt > 0) {
+          // Log into dept payments for Central Billing reconciliation
+          const storedPayments = localStorage.getItem("hospital_dept_payments");
+          const deptPayments = storedPayments ? JSON.parse(storedPayments) : [];
+          deptPayments.unshift({
+            id: `dp-pharm-${Date.now()}`,
+            walkInId: selectedWalkIn.name,
+            patientName: pName,
+            mobile: pMobile,
+            department: "Pharmacy",
+            description: `Pharmacy Dispensed Medicines (${dispenseItems.filter(i=>i.source!=="Outside Purchase").map(i=>i.medicine_name).join(", ")})`,
+            amount: billAmt,
+            method: otcPaymentMethod || "Cash",
+            date: new Date().toISOString().split("T")[0],
+            status: "Paid"
+          });
+          localStorage.setItem("hospital_dept_payments", JSON.stringify(deptPayments));
+
+          // Log into Finance Ledger
           const storedFinance = localStorage.getItem("hospital_custom_finance");
           const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
           const rxTx = {
@@ -1095,7 +1149,7 @@ export default function PharmacyPage() {
             amount: billAmt,
             method: otcPaymentMethod || "Cash",
             date: new Date().toISOString().split("T")[0],
-            notes: `Invoice: ${response.invoiceNumber} | Doctor: ${docName} | Items: ${dispenseItems.filter(i=>i.source!=="Outside Purchase").map(i=>`${i.medicine_name} ×${i.dispense_status==="Partially Dispensed"?i.dispensed_qty:i.qty}`).join(", ")}`
+            notes: `Invoice: ${response.invoiceNumber} | Paid at Pharmacy Counter | Doctor: ${docName} | Items: ${dispenseItems.filter(i=>i.source!=="Outside Purchase").map(i=>`${i.medicine_name} ×${i.dispense_status==="Partially Dispensed"?i.dispensed_qty:i.qty}`).join(", ")}`
           };
           financeEntries.unshift(rxTx);
           localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
@@ -1105,8 +1159,35 @@ export default function PharmacyPage() {
 
       showToast(`Transaction completed. Invoice ${response.invoiceNumber} generated!`, "success");
       
-      // Auto-trigger invoice print format
-      generatePDFInvoice(response.invoiceNumber, pName, pMobile, docName, response.dispensedReceipt, billAmt, otcPaymentMethod || "Cash");
+      // Enrich receipt items with unit_price and line_total from dispenseItems (authoritative price source)
+      const enrichedReceiptItems = (response.dispensedReceipt || []).map(receiptItem => {
+        const srcItem = dispenseItems.find(
+          d => (d.medicine_name || "").toLowerCase() === (receiptItem.medicine_name || "").toLowerCase()
+        );
+        const unitPrice = srcItem?.price || 0;
+        const dispQty = receiptItem.dispensed_qty || receiptItem.requested_qty || 0;
+        return {
+          ...receiptItem,
+          unit_price: unitPrice,
+          line_total: receiptItem.source === "Outside Purchase" ? 0 : (dispQty * unitPrice)
+        };
+      });
+
+      setLatestDispenseRecord({
+        invoiceNumber: response.invoiceNumber,
+        patientName: pName,
+        patientMobile: pMobile,
+        doctorName: docName,
+        items: enrichedReceiptItems,
+        dispenseItems: dispenseItems,
+        totalVal: billAmt,
+        paymentMethod: isPayAtPharmacy ? (otcPaymentMethod || "Cash") : "Pending at Central Billing",
+        paymentMode: isPayAtPharmacy ? "Paid at Pharmacy Desk" : "Forwarded to Central Billing Desk",
+        isPaidAtPharmacy: isPayAtPharmacy,
+        pharmacistName: pharmacistName,
+        date: new Date().toLocaleString("en-IN")
+      });
+      setShowDispenseReceiptModal(true);
 
       setSelectedWalkIn(null);
       setDispenseItems([]);
@@ -1115,6 +1196,329 @@ export default function PharmacyPage() {
       console.error(e);
       showToast("Dispensation failed", "error");
     }
+  };
+
+  // Group past sales from drug register for easy return selection
+  const pastSalesGroups = useMemo(() => {
+    const groups = {};
+    for (const log of drugRegister) {
+      if (!log.invoice_number || Number(log.quantity) <= 0) continue;
+      const inv = log.invoice_number;
+      if (!groups[inv]) {
+        groups[inv] = {
+          invoice_number: inv,
+          patient_name: log.patient_name || "Direct Customer",
+          patient_id: log.patient_id || "N/A",
+          doctor: log.doctor || "Direct Sale",
+          dispensing_date: log.dispensing_date,
+          logs: []
+        };
+      }
+      groups[inv].logs.push(log);
+    }
+
+    const list = Object.values(groups);
+    if (!returnSearchQuery.trim()) return list.slice(0, 10);
+    const q = returnSearchQuery.toLowerCase().trim();
+    return list.filter(g => 
+      g.invoice_number.toLowerCase().includes(q) ||
+      g.patient_name.toLowerCase().includes(q) ||
+      (g.patient_id && g.patient_id.toLowerCase().includes(q)) ||
+      g.logs.some(l => l.medicine.toLowerCase().includes(q))
+    ).slice(0, 15);
+  }, [drugRegister, returnSearchQuery]);
+
+  // Open Sales Return Modal (prefilled or blank)
+  const handleOpenSalesReturn = (prefillLog = null) => {
+    if (userRole === "Store Manager") {
+      showToast("Access Denied: Store Managers cannot process sales returns.", "error");
+      return;
+    }
+    setReturnNotes("");
+    setReturnReason("Doctor Changed Prescription");
+    setReturnMethod("Cash");
+    setReturnRestock(true);
+
+    if (prefillLog) {
+      setReturnSearchQuery(prefillLog.invoice_number || "");
+      const med = medicines.find(m => m.medicine_name === prefillLog.medicine);
+      const unitPrice = med ? (Number(med.selling_price) || Number(med.mrp) || 20) : 20;
+      const soldQty = Math.abs(Number(prefillLog.quantity) || 1);
+
+      setReturnSelectedSale({
+        invoice_number: prefillLog.invoice_number || "INV-MANUAL",
+        patient_name: prefillLog.patient_name || "Patient",
+        patient_id: prefillLog.patient_id || "N/A",
+        doctor: prefillLog.doctor || "Direct Sale",
+        date: prefillLog.dispensing_date
+      });
+
+      setReturnItems([{
+        medicine_name: prefillLog.medicine,
+        batch_number: prefillLog.batch_number || "RETURN",
+        sold_qty: soldQty,
+        return_qty: soldQty,
+        unit_price: unitPrice,
+        refund_amount: soldQty * unitPrice,
+        reason: "Doctor Changed Prescription",
+        selected: true
+      }]);
+    } else {
+      setReturnSearchQuery("");
+      setReturnSelectedSale(null);
+      setReturnItems([]);
+    }
+    setShowSalesReturnModal(true);
+  };
+
+  // Select past sale for return
+  const handleSelectSaleForReturn = (saleGroup) => {
+    setReturnSelectedSale({
+      invoice_number: saleGroup.invoice_number,
+      patient_name: saleGroup.patient_name,
+      patient_id: saleGroup.patient_id,
+      doctor: saleGroup.doctor,
+      date: saleGroup.dispensing_date
+    });
+
+    const items = saleGroup.logs.map(log => {
+      const med = medicines.find(m => m.medicine_name === log.medicine);
+      const unitPrice = med ? (Number(med.selling_price) || Number(med.mrp) || 20) : 20;
+      const soldQty = Math.abs(Number(log.quantity) || 1);
+      return {
+        medicine_name: log.medicine,
+        batch_number: log.batch_number,
+        sold_qty: soldQty,
+        return_qty: soldQty,
+        unit_price: unitPrice,
+        refund_amount: soldQty * unitPrice,
+        reason: returnReason || "Doctor Changed Prescription",
+        selected: true
+      };
+    });
+
+    setReturnItems(items);
+  };
+
+  // Update return qty for an item (strictly constrained between 0 and sold_qty)
+  const handleUpdateReturnQty = (idx, newQty) => {
+    setReturnItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const parsed = parseInt(newQty, 10);
+      let validQty = isNaN(parsed) ? 0 : parsed;
+      if (validQty > item.sold_qty) {
+        showToast(`Return quantity cannot exceed purchased quantity (${item.sold_qty})`, "warning");
+        validQty = item.sold_qty;
+      }
+      validQty = Math.max(0, Math.min(item.sold_qty, validQty));
+      return {
+        ...item,
+        return_qty: validQty,
+        refund_amount: parseFloat((validQty * item.unit_price).toFixed(2))
+      };
+    }));
+  };
+
+  // Toggle item selection
+  const handleToggleReturnItem = (idx) => {
+    setReturnItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      return {
+        ...item,
+        selected: !item.selected
+      };
+    }));
+  };
+
+  // Execute Sales Return
+  const handleExecuteSalesReturn = async () => {
+    const selectedItems = returnItems.filter(i => i.selected && i.return_qty > 0);
+    if (selectedItems.length === 0) {
+      showToast("Please select at least one item with a valid return quantity > 0", "error");
+      return;
+    }
+
+    // Validate that no item exceeds the purchased quantity
+    for (const item of selectedItems) {
+      if (item.return_qty > item.sold_qty) {
+        showToast(`Return quantity for ${item.medicine_name} (${item.return_qty}) cannot exceed purchased quantity (${item.sold_qty})`, "error");
+        return;
+      }
+      if (item.return_qty <= 0) {
+        showToast(`Return quantity for ${item.medicine_name} must be greater than 0`, "error");
+        return;
+      }
+    }
+
+    const totalRefund = selectedItems.reduce((acc, curr) => acc + curr.refund_amount, 0);
+
+    try {
+      setIsSubmittingReturn(true);
+
+      const returnPayload = {
+        invoice_number: returnSelectedSale?.invoice_number || "N/A",
+        patient_name: returnSelectedSale?.patient_name || "Direct Customer",
+        patient_id: returnSelectedSale?.patient_id || "N/A",
+        items: selectedItems.map(i => ({
+          medicine_name: i.medicine_name,
+          batch_number: i.batch_number,
+          sold_qty: i.sold_qty,
+          return_qty: Math.min(i.return_qty, i.sold_qty),
+          unit_price: i.unit_price,
+          refund_amount: i.refund_amount,
+          reason: i.reason || returnReason
+        })),
+        total_refund: totalRefund,
+        refund_method: returnMethod,
+        restock_inventory: returnRestock,
+        pharmacist: pharmacistName || "Rahul Sharma, RPh",
+        notes: returnNotes
+      };
+
+      const result = await executeSalesReturn(returnPayload);
+
+      // Record financial refund
+      try {
+        const refId = `tx-ret-${result.return_id}`;
+        const refundTx = {
+          id: refId,
+          title: `Medicine Return Refund — ${returnSelectedSale?.patient_name || "Customer"}`,
+          type: "Refund",
+          category: "Pharmacy Refund",
+          patient: returnSelectedSale?.patient_name || "Customer",
+          patient_name: returnSelectedSale?.patient_name || "Customer",
+          date: new Date().toISOString().split("T")[0],
+          amount: Math.abs(totalRefund),
+          method: returnMethod || "Cash",
+          status: "Processed",
+          reference_id: result.return_id,
+          notes: `Sales return (${result.return_id}) for invoice ${returnSelectedSale?.invoice_number || 'N/A'}. Reason: ${returnReason}`
+        };
+        const currentCustom = JSON.parse(localStorage.getItem("hospital_custom_finance") || "[]");
+        const updatedCustom = [refundTx, ...currentCustom.filter(t => t.id !== refId)];
+        localStorage.setItem("hospital_custom_finance", JSON.stringify(updatedCustom));
+        recordFinanceTransaction(refundTx).catch(() => null);
+      } catch (fe) {
+        console.warn("Finance refund record warning:", fe);
+      }
+
+      showToast(`Sales return completed! Refund of INR ${totalRefund.toLocaleString('en-IN')} processed.`, "success");
+      setLatestReturnRecord(result);
+      setShowSalesReturnModal(false);
+      setShowReturnReceiptModal(true);
+      await loadAllData();
+    } catch (e) {
+      console.error(e);
+      showToast("Sales return processing failed", "error");
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
+
+  // Print Return Receipt
+  const printReturnReceipt = (record) => {
+    if (!record) return;
+    const printWin = window.open("", "_blank", "width=800,height=900");
+    if (!printWin) {
+      showToast("Pop-up blocked. Please allow popups to print return receipts.", "error");
+      return;
+    }
+
+    const itemsHtml = (record.items || []).map((item, idx) => `
+      <tr>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0;"><strong>${item.medicine_name}</strong><br><small style="color: #64748b;">Batch: ${item.batch_number || 'N/A'}</small></td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.return_qty}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">INR ${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #0f172a;">INR ${Number(item.refund_amount).toFixed(2)}</td>
+        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">${item.reason || record.notes || 'N/A'}</td>
+      </tr>
+    `).join("");
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Sales Return Voucher - ${record.return_id}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #1e293b; }
+          .header { text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+          .title { font-size: 22px; font-weight: bold; color: #0369a1; margin: 0; }
+          .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
+          .doc-type { display: inline-block; background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-top: 10px; border: 1px solid #fecaca; }
+          .grid { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
+          .col { flex: 1; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+          th { background: #f8fafc; padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: left; font-size: 11px; text-transform: uppercase; color: #475569; }
+          .total-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: right; margin-bottom: 30px; }
+          .total-amount { font-size: 20px; font-weight: bold; color: #059669; }
+          .footer { display: flex; justify-content: space-between; margin-top: 60px; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+          .sign-box { text-align: center; width: 200px; }
+          .sign-line { border-top: 1px dashed #94a3b8; margin-top: 40px; padding-top: 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">THANGAM HOSPITAL</div>
+          <div class="subtitle">Central Pharmacy Department • Medicine Sales Return & Refund Voucher</div>
+          <div class="doc-type">OFFICIAL CREDIT NOTE / SALES RETURN RECEIPT</div>
+        </div>
+
+        <div class="grid">
+          <div class="col">
+            <div><strong>Return Voucher #:</strong> ${record.return_id}</div>
+            <div><strong>Original Invoice #:</strong> ${record.invoice_number}</div>
+            <div><strong>Return Date:</strong> ${new Date(record.return_date).toLocaleString('en-IN')}</div>
+            <div><strong>Restocked to Inventory:</strong> ${record.restock_inventory ? 'Yes (Returned to Batch Stock)' : 'No (Scrapped/Quarantine)'}</div>
+          </div>
+          <div class="col" style="text-align: right;">
+            <div><strong>Patient / Customer:</strong> ${record.patient_name}</div>
+            <div><strong>Patient ID / Mobile:</strong> ${record.patient_id}</div>
+            <div><strong>Refund Method:</strong> ${record.refund_method}</div>
+            <div><strong>Authorized Pharmacist:</strong> ${record.pharmacist}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 40px;">#</th>
+              <th>Medicine Name & Batch</th>
+              <th style="text-align: center; width: 80px;">Return Qty</th>
+              <th style="text-align: right; width: 100px;">Unit Rate</th>
+              <th style="text-align: right; width: 120px;">Refund Total</th>
+              <th style="width: 140px;">Return Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div class="total-box">
+          <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">TOTAL REFUND PROCESSED (${record.refund_method.toUpperCase()})</div>
+          <div class="total-amount">INR ${Number(record.total_refund).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+        </div>
+
+        <div class="footer">
+          <div class="sign-box">
+            <div class="sign-line">Customer Signature / Acknowledgment</div>
+          </div>
+          <div class="sign-box">
+            <div class="sign-line">Authorized Pharmacist Signature</div>
+            <div style="font-size: 10px; color: #64748b;">${record.pharmacist}</div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   // Add new medicine record with mandatory Batch Number & Pack Size calculation
@@ -1488,7 +1892,7 @@ export default function PharmacyPage() {
             <div>
               <h1 class="hospital-title">THANGAM HOSPITAL</h1>
               <div class="pharmacy-subtitle">Central Pharmacy & Statutory Drug Store</div>
-              <div class="report-title">📋 ${reportTitle}</div>
+              <div class="report-title">${reportTitle}</div>
             </div>
             <div class="meta-info">
               <div><strong>Print Date:</strong> ${dateStr}</div>
@@ -1894,7 +2298,7 @@ export default function PharmacyPage() {
   };
 
   // PDF Generation - Invoice Print Format
-  const generatePDFInvoice = async (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Card") => {
+  const generatePDFInvoice = async (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Cash", isPaidAtCounter = true) => {
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
@@ -1954,9 +2358,9 @@ export default function PharmacyPage() {
       doc.line(10, posY - 2, 138, posY - 2);
 
       doc.setFont("helvetica", "normal");
-      items.forEach(item => {
+      (items || []).forEach(item => {
         const medName = item.medicine_name;
-        const totalQty = item.requested_qty;
+        const totalQty = item.requested_qty || item.qty || 1;
         const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
         const isPartial = item.dispense_status === "Partially Dispensed";
         
@@ -1971,15 +2375,22 @@ export default function PharmacyPage() {
           lineTotal = 0;
         } else {
           batchNames = (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ");
-          const medsLocal = JSON.parse(localStorage.getItem('hospital_medicines')) || INITIAL_MOCK_MEDICINES;
-          price = medsLocal[medName]?.selling_price || 0;
-          
-          if (isPartial) {
-            const dispensedQty = item.dispensed_qty;
-            qtyStr = `${dispensedQty} / ${totalQty}`;
-            lineTotal = dispensedQty * price;
+          // Use pre-computed line_total if available; fallback to unit_price * qty; then 0
+          if (item.line_total !== undefined) {
+            lineTotal = item.line_total;
+          } else if (item.unit_price !== undefined) {
+            lineTotal = totalQty * item.unit_price;
           } else {
+            // Prescription items: lookup from medicine catalog
+            const medsLocal = JSON.parse(localStorage.getItem('hospital_medicines')) || INITIAL_MOCK_MEDICINES;
+            const price = medsLocal[medName]?.selling_price || 0;
             lineTotal = totalQty * price;
+          }
+
+          if (isPartial) {
+            const dispensedQty = item.dispensed_qty || totalQty;
+            qtyStr = `${dispensedQty} / ${totalQty}`;
+            lineTotal = isPartial ? (dispensedQty * (item.unit_price || 0)) : lineTotal;
           }
         }
 
@@ -2010,21 +2421,140 @@ export default function PharmacyPage() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("GRAND TOTAL (incl. GST):", 65, posY);
-      doc.text(`INR ${totalVal.toFixed(2)}`, 135, posY, { align: "right" });
+      doc.text(`INR ${Number(totalVal || 0).toFixed(2)}`, 135, posY, { align: "right" });
       posY += 10;
 
       // Bottom Stamp
-      doc.setDrawColor(16, 185, 129); // emerald-500
-      doc.setLineWidth(0.5);
-      doc.rect(50, posY, 48, 10);
-      doc.setTextColor(16, 185, 129);
-      doc.setFontSize(9);
-      doc.text("PAID & DISPENSED", 74, posY + 6, { align: "center" });
+      if (isPaidAtCounter) {
+        doc.setDrawColor(16, 185, 129); // emerald-500
+        doc.setLineWidth(0.5);
+        doc.rect(45, posY, 58, 10);
+        doc.setTextColor(16, 185, 129);
+        doc.setFontSize(9);
+        doc.text("PAID & DISPENSED", 74, posY + 6, { align: "center" });
+      } else {
+        doc.setDrawColor(245, 158, 11); // amber-500
+        doc.setLineWidth(0.5);
+        doc.rect(36, posY, 76, 10);
+        doc.setTextColor(217, 119, 6);
+        doc.setFontSize(8.5);
+        doc.text("FORWARDED TO BILLING DESK", 74, posY + 6, { align: "center" });
+      }
 
       doc.save(`pharmacy_invoice_${invNo}.pdf`);
     } catch (err) {
       console.error("PDF generation failed", err);
     }
+  };
+
+  // Print Dispensation Receipt
+  const printDispenseReceipt = (record) => {
+    if (!record) return;
+    const printWin = window.open("", "_blank", "width=750,height=850");
+    if (!printWin) {
+      showToast("Pop-up blocked. Please allow popups to print receipt.", "error");
+      return;
+    }
+    const isPaid = record.isPaidAtPharmacy;
+    const rowsHtml = (record.items || []).map(item => {
+      const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
+      const totalQty = item.requested_qty || item.qty || 1;
+      const batchNames = isOutside ? "Outside Purchase" : (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ") || "Batch Stored";
+      // Use pre-computed line_total if available; fallback to unit_price * qty
+      const lineTotal = isOutside ? 0 : (item.line_total !== undefined ? item.line_total : (totalQty * (item.unit_price || 0)));
+
+      return `
+        <tr>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${item.medicine_name}</td>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${totalQty}</td>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b;">${batchNames}</td>
+          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${isOutside ? 'Outside (₹0)' : '₹' + lineTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join("");
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Thangam Hospital - Pharmacy Invoice ${record.invoiceNumber}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #0f172a; max-width: 600px; margin: 0 auto; }
+            .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
+            .hosp-name { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+            .hosp-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-top: 8px; }
+            .badge-paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+            .badge-fwd { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 16px; }
+            .label { color: #64748b; font-size: 11px; font-weight: 500; }
+            .val { font-weight: 600; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+            th { background: #f8fafc; padding: 8px; text-align: left; font-size: 11px; color: #475569; border-bottom: 2px solid #cbd5e1; }
+            .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 800; padding: 10px 0; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; margin-bottom: 16px; }
+            .stamp { text-align: center; margin: 16px auto; padding: 8px 16px; width: fit-content; border-radius: 6px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+            .stamp-paid { border: 2px dashed #16a34a; color: #16a34a; }
+            .stamp-fwd { border: 2px dashed #d97706; color: #d97706; }
+            .footer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 20px; font-style: italic; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="hosp-name">THANGAM HOSPITAL</div>
+            <div class="hosp-sub">123 Health City Road, Coimbatore - 641012 | GSTIN: 33AAAAA1111A1Z1</div>
+            <div class="hosp-sub">Pharmacy Dispensing & Outpatient Bill</div>
+            <div class="badge ${isPaid ? 'badge-paid' : 'badge-fwd'}">
+              ${isPaid ? 'PAID AT PHARMACY COUNTER' : 'FORWARDED TO CENTRAL BILLING (DUE AT BILLING DESK)'}
+            </div>
+          </div>
+          
+          <div class="grid">
+            <div><span class="label">Invoice No:</span> <span class="val">${record.invoiceNumber}</span></div>
+            <div><span class="label">Date:</span> <span class="val">${record.date || new Date().toLocaleString()}</span></div>
+            <div><span class="label">Patient Name:</span> <span class="val">${record.patientName}</span></div>
+            <div><span class="label">Mobile/ID:</span> <span class="val">${record.patientMobile}</span></div>
+            <div><span class="label">Doctor:</span> <span class="val">${record.doctorName}</span></div>
+            <div><span class="label">Payment Mode:</span> <span class="val">${record.paymentMethod || 'Cash'}</span></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Medicine / Details</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Deducted Batch</th>
+                <th style="text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="total-row">
+            <span>GRAND TOTAL (incl. GST):</span>
+            <span>₹${(record.totalVal || 0).toFixed(2)}</span>
+          </div>
+
+          <div class="stamp ${isPaid ? 'stamp-paid' : 'stamp-fwd'}">
+            ${isPaid ? 'PAID & DISPENSED' : 'FORWARDED TO BILLING DESK'}
+          </div>
+
+          <div class="footer">
+            Pharmacist: ${record.pharmacistName || 'Registered Pharmacist, RPh'}<br />
+            Thank you for choosing Thangam Hospital. Get well soon!
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   // PDF Generation - GRN / Purchase Bill
@@ -2510,6 +3040,14 @@ export default function PharmacyPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-medium shadow-xs h-8 text-xs"
             >
               <ShoppingBag className="w-3.5 h-3.5" /> + Direct Medicine Sale
+            </Button>
+
+            <Button 
+              onClick={() => handleOpenSalesReturn()}
+              size="sm"
+              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5 font-medium shadow-xs h-8 text-xs"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Return Sold Medicine
             </Button>
             
             <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 rounded-2xl bg-white border border-slate-200 shadow-2xl">
@@ -3447,7 +3985,7 @@ export default function PharmacyPage() {
                     <option value="All">All Invoices {isMounted && importedInvoices.length > 0 ? `(${importedInvoices.length})` : ""}</option>
                     {importedInvoices.map((inv) => (
                       <option key={inv.invoice_number} value={inv.invoice_number}>
-                        🧾 {inv.invoice_number} ({inv.supplier})
+                        {inv.invoice_number} ({inv.supplier})
                       </option>
                     ))}
                   </select>
@@ -3471,7 +4009,7 @@ export default function PharmacyPage() {
                       : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700"
                   }`}
                 >
-                  <Printer className="w-4 h-4" /> 🖨 {
+                  <Printer className="w-4 h-4" /> {
                     categoryFilter === "All" ? "Print Register (All Schedules)" : `Print ${categoryFilter} Register`
                   }
                 </Button>
@@ -3489,10 +4027,17 @@ export default function PharmacyPage() {
 
                 {(searchQuery || categoryFilter !== "All" || statusFilter !== "All" || invoiceFilter !== "All") && (
                   <Button
-                    onClick={() => { setSearchQuery(""); setCategoryFilter("All"); setStatusFilter("All"); setInvoiceFilter("All"); }}
-                    variant="ghost" size="sm" className="h-9 px-3 text-xs text-slate-500 hover:text-slate-900 w-full sm:w-auto"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setCategoryFilter("All");
+                      setStatusFilter("All");
+                      setInvoiceFilter("All");
+                    }}
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-9 text-slate-500 hover:text-slate-800"
                   >
-                    Clear Filters
+                    Reset Filters
                   </Button>
                 )}
               </div>
@@ -3523,7 +4068,7 @@ export default function PharmacyPage() {
                     onClick={() => setInvoiceFilter("All")}
                     className="h-7 text-xs bg-white text-indigo-700 hover:bg-indigo-100 font-semibold gap-1 px-2.5 border-indigo-300 shadow-xs"
                   >
-                    Clear Invoice Filter ✕
+                    Clear Invoice Filter
                   </Button>
                 </div>
               )}
@@ -3833,13 +4378,17 @@ export default function PharmacyPage() {
 
                 {/* Sub-tabs/Filters */}
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {["All", "Waiting", "Completed"].map((tab) => (
+                  {[
+                    { id: "Waiting", label: "Active Queue" },
+                    { id: "Completed", label: "Completed" },
+                    { id: "All Records", label: "All Records" }
+                  ].map((tab) => (
                     <button
-                      key={tab}
-                      onClick={() => setQueueFilterTab(tab)}
-                      className={`px-2 py-1 rounded text-[9px] font-semibold border transition ${queueFilterTab === tab ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
+                      key={tab.id}
+                      onClick={() => setQueueFilterTab(tab.id)}
+                      className={`px-2 py-1 rounded text-[9px] font-semibold border transition ${queueFilterTab === tab.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
                     >
-                      {tab}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
@@ -4028,21 +4577,34 @@ export default function PharmacyPage() {
 
               {selectedWalkIn && (
                 <div className="border-t p-4 bg-slate-50 flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-slate-400">Dispensing Pharmacist *</Label>
+                      <Label className="text-[10px] font-bold text-slate-500">Dispensing Pharmacist *</Label>
                       <Input 
                         value={pharmacistName} 
                         onChange={(e) => setPharmacistName(e.target.value)}
-                        className="h-8 text-xs w-44 border-slate-200 bg-white" 
+                        className="h-8 text-xs border-slate-200 bg-white" 
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-slate-400">Payment Method</Label>
+                      <Label className="text-[10px] font-bold text-slate-500">Payment Handling *</Label>
+                      <select
+                        value={dispensePaymentMode}
+                        onChange={(e) => setDispensePaymentMode(e.target.value)}
+                        className="h-8 text-xs w-full rounded-md border border-slate-200 bg-white px-2 focus:outline-none font-semibold text-slate-800"
+                      >
+                        <option value="Pay at Pharmacy Desk">Pay at Pharmacy Desk (Collect Now)</option>
+                        <option value="Forward to Central Billing Desk">Forward to Central Billing (Pay at Billing)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-bold text-slate-500">Payment Method (if collecting)</Label>
                       <select
                         value={otcPaymentMethod}
                         onChange={(e) => setOtcPaymentMethod(e.target.value)}
-                        className="h-8 text-xs w-36 rounded-md border border-slate-200 bg-white px-2 focus:outline-none font-semibold text-slate-700"
+                        disabled={dispensePaymentMode === "Forward to Central Billing Desk"}
+                        className={`h-8 text-xs w-full rounded-md border border-slate-200 px-2 focus:outline-none font-semibold text-slate-700
+                          ${dispensePaymentMode === "Forward to Central Billing Desk" ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-white"}`}
                       >
                         <option value="Cash">Cash</option>
                         <option value="UPI">UPI</option>
@@ -4053,9 +4615,11 @@ export default function PharmacyPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between border-t pt-3 mt-1">
+                  <div className="flex flex-wrap items-center justify-between border-t pt-3 mt-1 gap-3">
                     <div className="text-left">
-                      <div className="text-[9px] font-bold text-slate-400">GRAND TOTAL (INCL. GST)</div>
+                      <div className="text-[9px] font-bold text-slate-400">
+                        {dispensePaymentMode === "Pay at Pharmacy Desk" ? "COLLECT AT COUNTER (INCL. GST)" : "FORWARDED CHARGES (INCL. GST)"}
+                      </div>
                       <div className="text-lg font-bold text-slate-900 font-mono">
                         ₹{dispenseItems.reduce((acc, curr) => {
                           if (curr.source === "Outside Purchase" || curr.dispense_status === "Outside Purchase") return acc;
@@ -4064,19 +4628,26 @@ export default function PharmacyPage() {
                         }, 0).toFixed(2)}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={executeOutsidePurchase}
                         variant="outline"
-                        className="text-amber-600 border-amber-200 hover:bg-amber-50 font-semibold text-xs h-9 px-4 shadow-sm"
+                        className="text-amber-700 border-amber-200 hover:bg-amber-50 font-semibold text-xs h-9 px-3.5 shadow-sm"
                       >
                         Outside Purchase (No Invoice)
                       </Button>
-                      <Button 
-                        onClick={executeDispensing}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-4 shadow-sm"
+                      <Button
+                        onClick={() => executeDispensing("Forward to Central Billing Desk")}
+                        variant="outline"
+                        className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold text-xs h-9 px-3.5 shadow-sm gap-1.5"
                       >
-                        Dispense & Print Invoice (FEFO)
+                        <ArrowRight className="w-3.5 h-3.5" /> Forward to Billing Desk
+                      </Button>
+                      <Button 
+                        onClick={() => executeDispensing("Pay at Pharmacy Desk")}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 shadow-sm gap-1.5"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Collect Payment & Dispense
                       </Button>
                     </div>
                   </div>
@@ -4110,6 +4681,7 @@ export default function PharmacyPage() {
                   <option value="Schedule H1">Schedule H1 Register</option>
                   <option value="Sleeping Pill">Sleeping Pill Register</option>
                   <option value="Controlled Drug">Controlled Drug Register</option>
+                  <option value="Sales Returns">Sales Returns & Refunds</option>
                 </select>
 
                 <Button onClick={exportRegisterPDF} size="sm" variant="outline" className="h-8 text-xs gap-1.5 border-slate-200 text-slate-700 bg-white font-medium">
@@ -4124,21 +4696,22 @@ export default function PharmacyPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider">
-                      <th className="px-5 py-2.5">Date & Time</th>
-                      <th className="px-5 py-2.5">Patient Details</th>
-                      <th className="px-5 py-2.5">Prescribed By</th>
-                      <th className="px-5 py-2.5">Medicine Name</th>
-                      <th className="px-5 py-2.5">Batch</th>
-                      <th className="px-5 py-2.5 text-center">Qty</th>
-                      <th className="px-5 py-2.5">Invoice ID</th>
-                      <th className="px-5 py-2.5">Pharmacist</th>
+                    <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                      <th className="px-4 py-2.5">Date & Time</th>
+                      <th className="px-4 py-2.5">Patient Details</th>
+                      <th className="px-4 py-2.5">Prescribed By</th>
+                      <th className="px-4 py-2.5">Medicine Name</th>
+                      <th className="px-4 py-2.5">Batch</th>
+                      <th className="px-4 py-2.5 text-center">Qty</th>
+                      <th className="px-4 py-2.5">Invoice ID</th>
+                      <th className="px-4 py-2.5">Pharmacist</th>
+                      <th className="px-4 py-2.5 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {activeRegisterLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-5 py-8 text-center text-slate-400">
+                        <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                           No transactions recorded in the {selectedRegister} Register yet.
                         </td>
                       </tr>
@@ -4147,19 +4720,42 @@ export default function PharmacyPage() {
                         const date = new Date(log.dispensing_date).toLocaleString("en-IN", {
                           day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
                         });
+                        const isReturn = Number(log.quantity) < 0 || log.doctor === "Sales Return" || (log.invoice_number && log.invoice_number.includes("RET-"));
                         return (
-                          <tr key={index} className="hover:bg-slate-50/20">
-                            <td className="px-5 py-3 font-mono text-slate-600">{date}</td>
-                            <td className="px-5 py-3">
+                          <tr key={index} className={`hover:bg-slate-50/50 ${isReturn ? "bg-rose-50/30" : ""}`}>
+                            <td className="px-4 py-3 font-mono text-slate-600">{date}</td>
+                            <td className="px-4 py-3">
                               <div className="font-semibold text-slate-800">{log.patient_name}</div>
                               <div className="text-[10px] text-slate-500">Mob: {log.patient_id}</div>
                             </td>
-                            <td className="px-5 py-3 font-medium text-slate-700">{log.doctor}</td>
-                            <td className="px-5 py-3 font-semibold text-slate-800">{log.medicine}</td>
-                            <td className="px-5 py-3 font-mono text-slate-500">{log.batch_number}</td>
-                            <td className="px-5 py-3 text-center font-mono font-bold text-slate-800">{log.quantity}</td>
-                            <td className="px-5 py-3 font-mono text-indigo-600">{log.invoice_number}</td>
-                            <td className="px-5 py-3 text-slate-600 font-medium">{(log.pharmacist || log.user || "Admin").split(",")[0]}</td>
+                            <td className="px-4 py-3 font-medium text-slate-700">{log.doctor}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">{log.medicine}</td>
+                            <td className="px-4 py-3 font-mono text-slate-500">{log.batch_number}</td>
+                            <td className="px-4 py-3 text-center font-mono font-bold">
+                              {isReturn ? (
+                                <span className="text-rose-600 font-bold">{log.quantity}</span>
+                              ) : (
+                                <span className="text-slate-800 font-bold">{log.quantity}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-mono text-indigo-600">{log.invoice_number}</td>
+                            <td className="px-4 py-3 text-slate-600 font-medium">{(log.pharmacist || log.user || "Admin").split(",")[0]}</td>
+                            <td className="px-4 py-3 text-center">
+                              {isReturn ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 whitespace-nowrap">
+                                  Return Refund
+                                </span>
+                              ) : (
+                                <Button 
+                                  size="xs" 
+                                  variant="outline" 
+                                  onClick={() => handleOpenSalesReturn(log)}
+                                  className="h-6 text-[10px] gap-1 border-rose-200 text-rose-700 hover:bg-rose-50 hover:border-rose-300 font-semibold shadow-2xs whitespace-nowrap"
+                                >
+                                  <RotateCcw className="w-3 h-3" /> Return Item
+                                </Button>
+                              )}
+                            </td>
                           </tr>
                         );
                       })
@@ -5046,7 +5642,7 @@ export default function PharmacyPage() {
                           size="xs"
                           className="h-7 text-[10px] px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
                         >
-                          Filter Inventory ➔
+                          Filter Inventory
                         </Button>
                       </div>
                     </div>
@@ -5702,7 +6298,7 @@ export default function PharmacyPage() {
                   </div>
                   {otcSelectedPatient && (
                     <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 p-2 rounded flex justify-between">
-                      <span>✓ Patient Selected: {otcSelectedPatient.patient_name} ({otcSelectedPatient.patient})</span>
+                      <span>Patient Selected: {otcSelectedPatient.patient_name} ({otcSelectedPatient.patient})</span>
                       <button onClick={() => setOtcSelectedPatient(null)} className="underline text-slate-400 hover:text-slate-600">Clear</button>
                     </div>
                   )}
@@ -5904,30 +6500,82 @@ export default function PharmacyPage() {
 
                   try {
                     showToast("Processing direct OTC sale stock deduction...", "info");
-                    
+
+                    // Build items with unit_price so service records correct amounts
+                    const saleItems = otcBasket.map(item => {
+                      const tabsPerStrip = item.tablets_per_strip || 10;
+                      const dispenseQty = item.sell_unit === "Tablet"
+                        ? Math.max(1, Math.round(item.qty))
+                        : item.qty * tabsPerStrip;
+                      const unitPrice = item.sell_unit === "Tablet"
+                        ? (item.price / tabsPerStrip)
+                        : item.price;
+                      return {
+                        medicine_name: item.medicine_name,
+                        qty: dispenseQty,
+                        unit_price: unitPrice
+                      };
+                    });
+
                     const response = await executeDirectSale(
                       otcCustomerName,
                       otcCustomerMobile || "9999999999",
                       otcCustomerAge || "30",
                       otcCustomerGender || "Female",
-                      otcBasket.map(item => ({ 
-                        medicine_name: item.medicine_name, 
-                        qty: item.sell_unit === "Tablet" ? Math.max(1, Math.round(item.qty)) : item.qty * (item.tablets_per_strip || 10)
-                      })),
+                      saleItems,
                       otcPaymentMethod,
                       pharmacistName
                     );
 
+                    // Compute total from basket (authoritative source for displayed price)
                     const totalVal = otcBasket.reduce((acc, it) => {
                       const tabsPerStrip = it.tablets_per_strip || 10;
                       const unitPrice = it.sell_unit === "Tablet" ? (it.price / tabsPerStrip) : it.price;
                       return acc + (it.qty * unitPrice);
                     }, 0);
 
+                    // Build receipt items directly from otcBasket so names/amounts are always correct
+                    // Merge batch deduction info from service response by matching medicine name
+                    const receiptItems = otcBasket.map(it => {
+                      const tabsPerStrip = it.tablets_per_strip || 10;
+                      const dispenseQty = it.sell_unit === "Tablet"
+                        ? Math.max(1, Math.round(it.qty))
+                        : it.qty * tabsPerStrip;
+                      const unitPrice = it.sell_unit === "Tablet"
+                        ? (it.price / tabsPerStrip)
+                        : it.price;
+                      // Find matching dispensed receipt entry for batch info
+                      const serviceItem = (response.dispensedReceipt || []).find(
+                        r => (r.medicine_name || "").toLowerCase() === (it.medicine_name || "").toLowerCase()
+                      );
+                      return {
+                        medicine_name: it.medicine_name,
+                        requested_qty: dispenseQty,
+                        dispensed_qty: dispenseQty,
+                        unit_price: unitPrice,
+                        line_total: dispenseQty * unitPrice,
+                        deductions: serviceItem?.deductions || []
+                      };
+                    });
+
                     showToast(`Direct Sale completed. Invoice ${response.invoiceNumber} generated!`, "success");
                     
-                    // Trigger print invoice
-                    generatePDFInvoice(response.invoiceNumber, otcCustomerName, otcCustomerMobile || "9999999999", "Self (OTC)", response.dispensedReceipt, totalVal, otcPaymentMethod);
+                    // Show on-screen receipt preview modal (NO auto download)
+                    setLatestDispenseRecord({
+                      invoiceNumber: response.invoiceNumber,
+                      patientName: otcCustomerName || "Direct Walk-in Customer",
+                      patientMobile: otcCustomerMobile || "9999999999",
+                      doctorName: "Self (OTC)",
+                      items: receiptItems,
+                      dispenseItems: otcBasket,
+                      totalVal: totalVal,
+                      paymentMethod: otcPaymentMethod,
+                      paymentMode: "Direct OTC Sale (Paid at Counter)",
+                      isPaidAtPharmacy: true,
+                      pharmacistName: pharmacistName,
+                      date: new Date().toLocaleString("en-IN")
+                    });
+                    setShowDispenseReceiptModal(true);
 
                     setShowOTCSaleModal(false);
                     setOtcBasket([]);
@@ -5939,6 +6587,578 @@ export default function PharmacyPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-8 px-4"
               >
                 Submit Sale
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sales Return (Return Sold Medicine) Modal */}
+      {showSalesReturnModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-0 flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold shadow-xs">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 font-serif">Return Sold Medicine (Sales Return & Refund)</h3>
+                  <p className="text-[11px] text-slate-500">Return dispensed medications, recalculate refunds, restock batches, and update statutory registers.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSalesReturnModal(false)} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+              
+              {/* Step 1: Select Sold Transaction */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                    1. Select Dispensed / Sold Invoice
+                  </Label>
+                  {returnSelectedSale && (
+                    <button 
+                      type="button" 
+                      onClick={() => { setReturnSelectedSale(null); setReturnItems([]); }}
+                      className="text-indigo-600 hover:underline text-xs font-semibold"
+                    >
+                      Search / Pick Another Sale
+                    </button>
+                  )}
+                </div>
+
+                {!returnSelectedSale ? (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                      <Input
+                        placeholder="Search past sales by Invoice # (e.g. INV-OTC, INV-PH), Patient Name, or Mobile..."
+                        value={returnSearchQuery}
+                        onChange={(e) => setReturnSearchQuery(e.target.value)}
+                        className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 rounded-lg"
+                      />
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                      {pastSalesGroups.length === 0 ? (
+                        <div className="text-center py-6 text-slate-400">
+                          No recent sales or dispensed invoices found.
+                        </div>
+                      ) : (
+                        pastSalesGroups.map((group, idx) => (
+                          <div 
+                            key={idx}
+                            onClick={() => handleSelectSaleForReturn(group)}
+                            className="p-3 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-xs cursor-pointer transition flex items-center justify-between gap-3 group"
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-indigo-700 text-xs">{group.invoice_number}</span>
+                                <span className="text-slate-400">•</span>
+                                <span className="font-semibold text-slate-800">{group.patient_name}</span>
+                                {group.patient_id && group.patient_id !== "N/A" && (
+                                  <span className="text-slate-400 text-[10px]">({group.patient_id})</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
+                                <span>{new Date(group.dispensing_date).toLocaleDateString('en-IN')}</span>
+                                <span>•</span>
+                                <span>Doctor: {group.doctor}</span>
+                                <span>•</span>
+                                <span className="font-medium text-slate-700">{group.logs.length} Item(s): {group.logs.map(l => l.medicine).join(", ")}</span>
+                              </div>
+                            </div>
+                            <Button size="xs" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white font-semibold text-[11px] h-7 px-3 shrink-0">
+                              Select Sale
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3.5 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-indigo-950">Original Invoice:</span>
+                        <span className="font-mono font-bold bg-indigo-200/80 text-indigo-900 px-2 py-0.5 rounded text-xs">
+                          {returnSelectedSale.invoice_number}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="font-semibold text-slate-800">{returnSelectedSale.patient_name}</span>
+                        {returnSelectedSale.patient_id && (
+                          <span className="text-slate-500 font-mono">({returnSelectedSale.patient_id})</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Channel / Doctor: <strong className="text-slate-700">{returnSelectedSale.doctor}</strong> • Dispensed on: <strong>{new Date(returnSelectedSale.date).toLocaleString('en-IN')}</strong>
+                      </div>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 rounded text-[10px]">
+                      Active Sale Selected
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Select Items and Return Quantities */}
+              {returnItems.length > 0 && (
+                <div className="space-y-3 border-t border-slate-100 pt-4">
+                  <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">
+                    2. Select Medicines to Return & Adjust Quantity
+                  </Label>
+
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                          <th className="p-3 text-center w-10">Select</th>
+                          <th className="p-3">Medicine & Batch</th>
+                          <th className="p-3 text-center w-20">Sold Qty</th>
+                          <th className="p-3 text-center w-28">Return Qty</th>
+                          <th className="p-3 text-right w-24">Unit Rate</th>
+                          <th className="p-3 text-right w-28">Refund Total</th>
+                          <th className="p-3 w-40">Return Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {returnItems.map((item, idx) => (
+                          <tr key={idx} className={item.selected ? "bg-rose-50/20" : "bg-slate-50/40 opacity-60"}>
+                            <td className="p-3 text-center">
+                              <input 
+                                type="checkbox"
+                                checked={item.selected}
+                                onChange={() => handleToggleReturnItem(idx)}
+                                className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <div className="font-bold text-slate-900">{item.medicine_name}</div>
+                              <div className="text-[10px] font-mono text-slate-500">Batch: {item.batch_number || "N/A"}</div>
+                            </td>
+                            <td className="p-3 text-center font-mono font-semibold text-slate-700">
+                              {item.sold_qty}
+                            </td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={!item.selected || item.return_qty <= 0}
+                                  onClick={() => handleUpdateReturnQty(idx, item.return_qty - 1)}
+                                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <Input
+                                  type="number"
+                                  disabled={!item.selected}
+                                  min={0}
+                                  max={item.sold_qty}
+                                  value={item.return_qty}
+                                  onChange={(e) => handleUpdateReturnQty(idx, e.target.value)}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (isNaN(val) || val < 0) {
+                                      handleUpdateReturnQty(idx, 0);
+                                    } else if (val > item.sold_qty) {
+                                      handleUpdateReturnQty(idx, item.sold_qty);
+                                    }
+                                  }}
+                                  className="w-14 h-7 text-center font-mono font-bold text-xs p-1 bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!item.selected || item.return_qty >= item.sold_qty}
+                                  onClick={() => handleUpdateReturnQty(idx, item.return_qty + 1)}
+                                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="text-[9px] text-slate-400 font-mono mt-0.5">Max: {item.sold_qty}</div>
+                            </td>
+                            <td className="p-3 text-right font-mono text-slate-600">
+                              ₹{Number(item.unit_price).toFixed(2)}
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold text-rose-700">
+                              ₹{Number(item.refund_amount).toFixed(2)}
+                            </td>
+                            <td className="p-3">
+                              <select
+                                disabled={!item.selected}
+                                value={item.reason}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, reason: val } : it));
+                                }}
+                                className="w-full h-7 rounded border border-slate-200 bg-white px-2 text-[11px] focus:outline-none"
+                              >
+                                <option value="Doctor Changed Prescription">Doctor Changed Prescription</option>
+                                <option value="Patient Discontinued / Recovered">Patient Discontinued / Recovered</option>
+                                <option value="Excess / Unopened Medicine">Excess / Unopened Medicine</option>
+                                <option value="Incorrect Medicine Dispensed">Incorrect Medicine Dispensed</option>
+                                <option value="Adverse Drug Reaction">Adverse Drug Reaction</option>
+                                <option value="Defective / Damaged Packaging">Defective / Damaged Packaging</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Return Options & Refund Mode */}
+              {returnItems.length > 0 && (
+                <div className="space-y-4 border-t border-slate-100 pt-4">
+                  <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">
+                    3. Return Configuration & Payment Method
+                  </Label>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Restock checkbox */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-start gap-2.5">
+                      <input 
+                        type="checkbox"
+                        id="restock-toggle"
+                        checked={returnRestock}
+                        onChange={(e) => setReturnRestock(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <label htmlFor="restock-toggle" className="cursor-pointer">
+                        <span className="font-bold text-slate-800 block">Restock to Batch Inventory</span>
+                        <span className="text-[11px] text-slate-500 block mt-0.5">
+                          Automatically increment active batch stock and add stock movement log.
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Refund Payment Mode */}
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                      <Label className="font-bold text-slate-800">Refund Payment Method</Label>
+                      <select
+                        value={returnMethod}
+                        onChange={(e) => setReturnMethod(e.target.value)}
+                        className="w-full h-8 rounded border border-slate-200 bg-white px-2 font-medium text-xs focus:outline-none"
+                      >
+                        <option value="Cash">Cash Refund</option>
+                        <option value="UPI">UPI / QR Payment</option>
+                        <option value="Credit/Debit Card">Card Refund</option>
+                        <option value="Patient Account Credit">Patient Account Credit</option>
+                        <option value="Bank Transfer">Bank Transfer (NEFT/IMPS)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Notes / Pharmacist Remarks */}
+                  <div className="space-y-1">
+                    <Label className="font-bold text-slate-600">Pharmacist Remarks / Clinical Notes (Optional)</Label>
+                    <Input
+                      placeholder="Add return verification remarks or reason details..."
+                      value={returnNotes}
+                      onChange={(e) => setReturnNotes(e.target.value)}
+                      className="h-8 text-xs bg-slate-50 border-slate-200"
+                    />
+                  </div>
+
+                  {/* Summary Box */}
+                  {(() => {
+                    const selectedList = returnItems.filter(i => i.selected && i.return_qty > 0);
+                    const totalRefund = selectedList.reduce((acc, curr) => acc + curr.refund_amount, 0);
+                    const totalUnits = selectedList.reduce((acc, curr) => acc + curr.return_qty, 0);
+
+                    return (
+                      <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div>
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Return Summary</span>
+                          <span className="text-xs text-slate-700 mt-0.5 block">
+                            <strong>{selectedList.length}</strong> item(s) selected • Total units returning: <strong>{totalUnits}</strong>
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Refund Amount</span>
+                          <span className="text-xl font-black font-mono text-emerald-700">
+                            ₹{totalRefund.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setShowSalesReturnModal(false)}
+                className="h-8 text-xs border-slate-200 bg-white"
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                disabled={isSubmittingReturn || returnItems.filter(i => i.selected && i.return_qty > 0).length === 0}
+                onClick={handleExecuteSalesReturn}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs h-8 px-5 gap-1.5 shadow-sm"
+              >
+                {isSubmittingReturn ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Processing Return...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Process Return & Refund (₹{returnItems.filter(i => i.selected && i.return_qty > 0).reduce((acc, c) => acc + c.refund_amount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispensation Invoice & Receipt Preview Modal */}
+      {showDispenseReceiptModal && latestDispenseRecord && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-0 flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/90 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-serif">Pharmacy Invoice & Dispense Receipt</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">Invoice #{latestDispenseRecord.invoiceNumber}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setShowDispenseReceiptModal(false); setLatestDispenseRecord(null); }}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Itemized Invoice Preview */}
+            <div className="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Hospital Title */}
+              <div className="text-center pb-3 border-b border-slate-100 space-y-1">
+                <h4 className="text-base font-extrabold text-slate-900 font-serif tracking-wide">THANGAM HOSPITAL</h4>
+                <p className="text-[10px] text-slate-500">123 Health City Road, Coimbatore - 641012 | Phone: +91 422 2345678</p>
+                <p className="text-[10px] text-slate-400">GSTIN: 33AAAAA1111A1Z1 | Pharmacy License: DL-COI-90823H</p>
+                <div className="pt-1.5 flex justify-center">
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full border
+                    ${latestDispenseRecord.isPaidAtPharmacy 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                      : "bg-amber-50 text-amber-700 border-amber-200"}`}
+                  >
+                    {latestDispenseRecord.isPaidAtPharmacy ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        PAID AT PHARMACY COUNTER
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        FORWARDED TO CENTRAL BILLING DESK (DUE AT BILLING)
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100 text-[11px]">
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Patient Name</span>
+                  <span className="font-semibold text-slate-900">{latestDispenseRecord.patientName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Mobile / ID</span>
+                  <span className="font-mono text-slate-700">{latestDispenseRecord.patientMobile}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Prescribed Doctor</span>
+                  <span className="font-semibold text-slate-900">{latestDispenseRecord.doctorName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Date & Time</span>
+                  <span className="font-mono text-slate-700">{latestDispenseRecord.date || new Date().toLocaleString("en-IN")}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Payment Method</span>
+                  <span className="font-semibold text-slate-900">{latestDispenseRecord.paymentMethod || "Cash"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Dispensing Pharmacist</span>
+                  <span className="font-semibold text-slate-900">{latestDispenseRecord.pharmacistName || pharmacistName}</span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[10px] uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Medicine Item</th>
+                      <th className="py-2.5 px-2 text-center">Qty</th>
+                      <th className="py-2.5 px-2 text-center">Batch / Source</th>
+                      <th className="py-2.5 px-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(latestDispenseRecord.items || []).map((item, idx) => {
+                      const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
+                      const totalQty = item.requested_qty || item.qty || 1;
+                      const batchNames = isOutside 
+                        ? "Outside Purchase" 
+                        : (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ") || "Active Batch";
+                      // Use pre-computed line_total if available; fallback to unit_price * qty
+                      const lineTotal = isOutside ? 0 : (item.line_total !== undefined ? item.line_total : (totalQty * (item.unit_price || 0)));
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 font-semibold text-slate-900">
+                            {item.medicine_name}
+                            {isOutside && <span className="block text-[9px] text-slate-400 font-normal italic">Purchased Outside Hospital</span>}
+                          </td>
+                          <td className="py-2 px-2 text-center font-mono">{totalQty}</td>
+                          <td className="py-2 px-2 text-center text-[10px] text-slate-500 font-mono">{batchNames}</td>
+                          <td className="py-2 px-3 text-right font-bold font-mono text-slate-900">
+                            {isOutside ? "₹0.00" : `₹${lineTotal.toFixed(2)}`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Total & Stamp */}
+              <div className="flex justify-between items-center pt-2 px-1">
+                <div>
+                  <div className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5
+                    ${latestDispenseRecord.isPaidAtPharmacy 
+                      ? "border-emerald-500 text-emerald-700 bg-emerald-50" 
+                      : "border-amber-500 text-amber-700 bg-amber-50"}`}
+                  >
+                    {latestDispenseRecord.isPaidAtPharmacy ? "PAID & DISPENSED" : "FORWARDED TO CENTRAL BILLING"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Grand Total (incl. GST)</span>
+                  <span className="text-xl font-extrabold text-slate-900 font-mono">
+                    ₹{Number(latestDispenseRecord.totalVal || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/80 flex flex-wrap gap-2.5 justify-end shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => { setShowDispenseReceiptModal(false); setLatestDispenseRecord(null); }}
+                className="h-9 text-xs border-slate-200 text-slate-600 bg-white"
+              >
+                Close & Return
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  generatePDFInvoice(
+                    latestDispenseRecord.invoiceNumber,
+                    latestDispenseRecord.patientName,
+                    latestDispenseRecord.patientMobile,
+                    latestDispenseRecord.doctorName,
+                    latestDispenseRecord.items,
+                    latestDispenseRecord.totalVal,
+                    latestDispenseRecord.paymentMethod,
+                    latestDispenseRecord.isPaidAtPharmacy
+                  );
+                  showToast("Invoice PDF downloaded!", "success");
+                }}
+                className="h-9 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold gap-1.5 bg-white"
+              >
+                <Download className="w-3.5 h-3.5" /> Download PDF
+              </Button>
+              <Button
+                onClick={() => printDispenseReceipt(latestDispenseRecord)}
+                className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5 shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Invoice
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sales Return Receipt & Voucher Modal */}
+      {showReturnReceiptModal && latestReturnRecord && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200 border border-slate-200">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 font-serif">Sales Return Processed Successfully</h3>
+              <p className="text-xs text-slate-500 font-mono">Voucher ID: {latestReturnRecord.return_id}</p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Original Invoice:</span>
+                <span className="font-mono font-bold text-slate-800">{latestReturnRecord.invoice_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Customer:</span>
+                <span className="font-semibold text-slate-800">{latestReturnRecord.patient_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Refund Mode:</span>
+                <span className="font-semibold text-slate-800">{latestReturnRecord.refund_method}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Restocked to Inventory:</span>
+                <span className={`font-semibold ${latestReturnRecord.restock_inventory ? "text-emerald-700" : "text-amber-700"}`}>
+                  {latestReturnRecord.restock_inventory ? "Yes (Batches Updated)" : "No"}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                <span className="font-bold text-slate-700">Total Refund:</span>
+                <span className="font-bold font-mono text-base text-emerald-700">
+                  ₹{Number(latestReturnRecord.total_refund).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button 
+                onClick={() => printReturnReceipt(latestReturnRecord)}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 gap-1.5 shadow-sm"
+              >
+                <Printer className="w-4 h-4" /> Print Return Voucher
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => { setShowReturnReceiptModal(false); setLatestReturnRecord(null); }}
+                className="h-9 text-xs border-slate-200 bg-white"
+              >
+                Done
               </Button>
             </div>
           </div>
@@ -6388,7 +7608,7 @@ export default function PharmacyPage() {
                                 }}
                                 className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1 shadow-xs"
                               >
-                                Filter Table ➔
+                                Filter Table
                               </Button>
                             </div>
                           </div>

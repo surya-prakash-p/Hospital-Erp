@@ -370,14 +370,6 @@ export default function AdminDashboardPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleApplyRecommendedPermissions = () => {
-    const recommended = new Set();
-    editRoles.forEach(r => {
-      (ROLE_DEFAULT_PERMISSIONS[r] || []).forEach(p => recommended.add(p));
-    });
-    setEditPermissions(Array.from(recommended));
-    showToast("Applied recommended permissions for selected roles", "info");
-  };
 
   const handleViewStaffProfile = (staff) => {
     setViewingStaff(staff);
@@ -1260,23 +1252,11 @@ export default function AdminDashboardPage() {
               {/* TAB 2: Granular Page Permissions */}
               {activeGovernanceTab === "permissions" && (
                 <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/70">
-                    <div>
-                      <Label className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
-                        Granular Page Access Rights
-                      </Label>
-                      <p className="text-[11px] text-emerald-800">Controls menu visibility and action permissions</p>
-                    </div>
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleApplyRecommendedPermissions}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-semibold h-7 px-2.5 rounded-lg shadow-2xs cursor-pointer shrink-0"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 mr-1" />
-                      Apply Role Defaults
-                    </Button>
+                  <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/70">
+                    <Label className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
+                      Granular Page Access Rights
+                    </Label>
+                    <p className="text-[11px] text-emerald-800">Controls menu visibility and action permissions</p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

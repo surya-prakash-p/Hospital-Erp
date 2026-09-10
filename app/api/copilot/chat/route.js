@@ -36,7 +36,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         intent: "patient_summary",
-        answer: `### 👤 Patient Executive Dashboard: ${pName}\n\nRetrieved live clinical records, appointments, prescriptions, lab reports, billing status, and visit timeline for **${pName}**.`,
+        answer: `### Patient Executive Dashboard: ${pName}\n\nRetrieved live clinical records, appointments, prescriptions, lab reports, billing status, and visit timeline for **${pName}**.`,
         card_type: "patient_dashboard",
         card_data: {
           patient_info: {
@@ -93,7 +93,7 @@ export async function POST(request) {
     if (qLower.includes("book") || qLower.includes("appointment")) {
       return NextResponse.json({
         intent: "action_book_appointment",
-        answer: "### ✅ Appointment Successfully Booked\n\nAppointment has been scheduled for **Ravi** with **Dr. Rajesh** for tomorrow at **10:00 AM**.",
+        answer: "### Appointment Successfully Booked\n\nAppointment has been scheduled for **Ravi** with **Dr. Rajesh** for tomorrow at **10:00 AM**.",
         card_type: "action_result",
         card_data: {
           status: "success",
@@ -113,7 +113,7 @@ export async function POST(request) {
     if (qLower.includes("paracetamol") || qLower.includes("stock") || qLower.includes("medicine")) {
       return NextResponse.json({
         intent: "medicine_query",
-        answer: "### 💊 Medicine Inventory & Stock Status\n\nHere are the live inventory stock levels and unit rates for pharmacy items.",
+        answer: "### Medicine Inventory & Stock Status\n\nHere are the live inventory stock levels and unit rates for pharmacy items.",
         card_type: "medicine_card",
         card_data: [
           { medicine: "Paracetamol 650mg", stock: 100, rate: "₹20/ea", status: "In Stock" },
@@ -132,7 +132,7 @@ export async function POST(request) {
     // 4. Default RAG QA Answer
     return NextResponse.json({
       intent: "general_rag",
-      answer: `### 🤖 Thangam Hospital Copilot\n\nI am your Enterprise AI Copilot for Thangam Hospital ERP. You can:\n- Search any patient name (e.g. **"Ravi"** or **"Saranya"**) to view their **Patient Summary Dashboard**.\n- Ask for **Medicine Stock & Selling Rates**.\n- Query **3 Doctor Consultation Queues**.\n- Ask to **Book Appointments** or **Generate Invoices**.`,
+      answer: `### Thangam Hospital Copilot\n\nI am your Enterprise AI Copilot for Thangam Hospital ERP. You can:\n- Search any patient name (e.g. **"Ravi"** or **"Saranya"**) to view their **Patient Summary Dashboard**.\n- Ask for **Medicine Stock & Selling Rates**.\n- Query **3 Doctor Consultation Queues**.\n- Ask to **Book Appointments** or **Generate Invoices**.`,
       card_type: "rag_response",
       card_data: null,
       smart_buttons: [

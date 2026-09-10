@@ -17,7 +17,7 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
     {
       id: "copilot-welcome",
       role: "assistant",
-      content: `👋 Hello, buddy!\n\nHow can I help you today?`,
+      content: `Hello!\n\nHow can I help you today?`,
       card_type: "welcome_cards",
       card_data: null,
       smart_buttons: [],
@@ -172,7 +172,7 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
         {
           id: `user-${Date.now()}`,
           role: "user",
-          content: "🔍 Search Patient",
+          content: "Search Patient",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         },
         {
@@ -202,7 +202,7 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
     setShowAutocomplete(false);
 
     // If query is "search patient" or "search again"
-    if (q.toLowerCase() === "search patient" || q.toLowerCase() === "search again" || q === "🔍 Search Patient") {
+    if (q.toLowerCase() === "search patient" || q.toLowerCase() === "search again") {
       handleCardClick("search_patient");
       setInputQuery("");
       return;
@@ -262,7 +262,7 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
           {
             id: `err-${Date.now()}`,
             role: "assistant",
-            content: "⚠️ **Copilot Notice:** Request processed.",
+            content: "**Copilot Notice:** Request processed.",
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -340,80 +340,80 @@ export function CopilotChat({ initialQuery = "", onNavigate }) {
 
                 {/* Welcome 4 Modern Action Cards */}
                 {msg.card_type === "welcome_cards" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                    {/* Card 1 */}
-                    <Card 
-                      onClick={() => handleCardClick("search_patient")}
-                      className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                          <Search className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">🔍 Search Patient</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                            Search a patient using Name, Patient ID or Mobile Number.
-                          </p>
-                        </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2 max-w-lg">
+                  {/* Card 1 */}
+                  <Card 
+                    onClick={() => handleCardClick("search_patient")}
+                    className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <Search className="w-4 h-4" />
                       </div>
-                    </Card>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">Search Patient</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Search a patient using Name, Patient ID or Mobile Number.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
 
-                    {/* Card 2 */}
-                    <Card 
-                      onClick={() => handleCardClick("operations")}
-                      className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                          <Stethoscope className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">🏥 Hospital Operations</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                            Monitor appointments, waiting patients, consultations and revenue.
-                          </p>
-                        </div>
+                  {/* Card 2 */}
+                  <Card 
+                    onClick={() => handleCardClick("operations")}
+                    className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <Stethoscope className="w-4 h-4" />
                       </div>
-                    </Card>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">Hospital Operations</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Monitor appointments, waiting patients, consultations and revenue.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
 
-                    {/* Card 3 */}
-                    <Card 
-                      onClick={() => handleCardClick("pharmacy")}
-                      className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-pink-600 group-hover:text-white transition-colors">
-                          <Pill className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">💊 Pharmacy Inventory</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                            Manage medicine stock, restocking and expiry.
-                          </p>
-                        </div>
+                  {/* Card 3 */}
+                  <Card 
+                    onClick={() => handleCardClick("pharmacy")}
+                    className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-pink-600 group-hover:text-white transition-colors">
+                        <Pill className="w-4 h-4" />
                       </div>
-                    </Card>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">Pharmacy Inventory</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Manage medicine stock, restocking and expiry.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
 
-                    {/* Card 4 */}
-                    <Card 
-                      onClick={() => handleCardClick("reports")}
-                      className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                          <BarChart3 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">📊 Analytics & Reports</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                            Generate daily, monthly and yearly hospital reports.
-                          </p>
-                        </div>
+                  {/* Card 4 */}
+                  <Card 
+                    onClick={() => handleCardClick("reports")}
+                    className="border-slate-200 shadow-sm rounded-xl p-4 bg-white hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <BarChart3 className="w-4 h-4" />
                       </div>
-                    </Card>
-                  </div>
-                )}
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-xs group-hover:text-indigo-600 transition-colors">Analytics & Reports</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Generate daily, monthly and yearly hospital reports.
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
 
                 {/* FEATURE 1: Patient Action Center */}
                 {msg.card_type === "patient_action_center" && (

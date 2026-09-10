@@ -84,7 +84,7 @@ export function PatientActionCenter({ data, onActionClick }) {
 
         {/* Dynamic Prescriptions & Lab Reports Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 💊 Prescriptions */}
+          {/* Prescriptions */}
           <Card className="border-slate-200 shadow-sm rounded-xl">
             <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
               <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -104,7 +104,7 @@ export function PatientActionCenter({ data, onActionClick }) {
             </CardContent>
           </Card>
 
-          {/* 💳 Billing */}
+          {/* Billing */}
           <Card className="border-slate-200 shadow-sm rounded-xl">
             <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
               <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -124,7 +124,7 @@ export function PatientActionCenter({ data, onActionClick }) {
           </Card>
         </div>
 
-        {/* 📈 Patient Clinical Journey Timeline */}
+        {/* Patient Clinical Journey Timeline */}
         {patient.timeline && (
           <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
             <CardHeader className="py-2.5 px-4 bg-slate-50 border-b">

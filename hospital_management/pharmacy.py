@@ -77,14 +77,14 @@ def ai_import_invoice():
             if not exists:
                 # Try like search
                 similar = frappe.get_all("Hospital Medicine", filters={"medicine_name": ["like", f"%{med_name[:5]}%"]}, limit=3, pluck="medicine_name")
-                item["status"] = "⚠ Medicine Not Found"
+                item["status"] = "Medicine Not Found"
                 item["suggestions"] = similar
                 item["matched_medicine"] = ""
             else:
-                item["status"] = "✔ Matched"
+                item["status"] = "Matched"
                 item["matched_medicine"] = exists
         else:
-            item["status"] = "⚠ Missing Name"
+            item["status"] = "Missing Name"
             
     return json_data
 

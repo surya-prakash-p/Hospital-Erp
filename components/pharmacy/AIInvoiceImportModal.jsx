@@ -565,7 +565,7 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-mono">
                     {extractedData.items?.map((item, idx) => (
-                      <tr key={idx} className={item.status?.includes('⚠') ? 'bg-amber-50/60' : 'hover:bg-slate-50'}>
+                      <tr key={idx} className={(item.status?.toLowerCase().includes('review') || item.status?.toLowerCase().includes('not')) ? 'bg-amber-50/60' : 'hover:bg-slate-50'}>
                         <td className="px-1.5 py-2 min-w-[75px]">
                           <Input 
                             value={item.rack || 'A-1'} 
@@ -580,43 +580,36 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                             className="h-8 text-xs font-mono uppercase w-full px-2 bg-white"
                           />
                         </td>
-                        <td className="px-1.5 py-2 min-w-[120px]">
+                        <td className="px-1.5 py-2 min-w-[150px]">
                           <Input 
-                            value={item.hsn || ''} 
-                            onChange={(e) => updateItem(idx, 'hsn', e.target.value)}
-                            className="h-8 text-xs font-mono w-full px-2 bg-white"
-                          />
-                        </td>
-                        <td className="px-1.5 py-2 min-w-[240px]">
-                          <Input 
-                            value={item.medicine || ''} 
-                            onChange={(e) => updateItem(idx, 'medicine', e.target.value)}
-                            className="h-8 text-xs font-sans font-semibold w-full px-2.5 bg-white text-slate-900"
-                          />
-                        </td>
-                        <td className="px-1.5 py-2 min-w-[95px]">
-                          <Input 
-                            value={item.pack || ''} 
-                            onChange={(e) => updateItem(idx, 'pack', e.target.value)}
-                            className="h-8 text-xs font-mono w-full px-2 bg-white"
-                          />
-                        </td>
-                        <td className="px-1.5 py-2 min-w-[140px]">
-                          <Input 
-                            value={item.batch || ''} 
-                            onChange={(e) => updateItem(idx, 'batch', e.target.value)}
-                            className="h-8 text-xs font-mono uppercase font-bold w-full px-2 bg-white border-rose-200"
-                          />
-                        </td>
-                        <td className="px-1.5 py-2 min-w-[105px]">
-                          <Input 
-                            value={item.expiry || ''} 
-                            onChange={(e) => updateItem(idx, 'expiry', e.target.value)}
-                            className="h-8 text-xs font-mono text-rose-700 font-bold border-rose-300 w-full px-2 bg-white"
-                            placeholder="MM-YY"
+                            value={item.item_name || ''} 
+                            onChange={(e) => updateItem(idx, 'item_name', e.target.value)}
+                            className="h-8 text-xs font-medium w-full px-2 bg-white"
                           />
                         </td>
                         <td className="px-1.5 py-2 min-w-[100px]">
+                          <Input 
+                            value={item.packing || '1x10'} 
+                            onChange={(e) => updateItem(idx, 'packing', e.target.value)}
+                            className="h-8 text-xs font-mono w-full px-2 bg-white"
+                          />
+                        </td>
+                        <td className="px-1.5 py-2 min-w-[100px]">
+                          <Input 
+                            value={item.batch_no || ''} 
+                            onChange={(e) => updateItem(idx, 'batch_no', e.target.value)}
+                            className="h-8 text-xs font-mono uppercase font-semibold text-slate-800 w-full px-2 bg-white"
+                          />
+                        </td>
+                        <td className="px-1.5 py-2 min-w-[90px]">
+                          <Input 
+                            value={item.expiry || ''} 
+                            onChange={(e) => updateItem(idx, 'expiry', e.target.value)}
+                            placeholder="MM/YY"
+                            className="h-8 text-xs font-mono w-full px-2 bg-white"
+                          />
+                        </td>
+                        <td className="px-1.5 py-2 min-w-[90px]">
                           <Input 
                             type="number"
                             step="0.01"
@@ -625,35 +618,35 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                             className="h-8 text-xs text-right font-mono w-full px-2 bg-white"
                           />
                         </td>
-                        <td className="px-1.5 py-2 min-w-[80px]">
+                        <td className="px-1.5 py-2 min-w-[75px]">
                           <Input 
                             type="number"
-                            value={item.qty || 0} 
-                            onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 0)}
-                            className="h-8 text-xs text-right font-mono font-bold w-full px-2 bg-white"
+                            value={item.qty || 1} 
+                            onChange={(e) => updateItem(idx, 'qty', parseInt(e.target.value) || 1)}
+                            className="h-8 text-xs text-right font-mono font-bold text-slate-900 w-full px-2 bg-white"
                           />
                         </td>
-                        <td className="px-1.5 py-2 min-w-[80px]">
+                        <td className="px-1.5 py-2 min-w-[70px]">
                           <Input 
                             type="number"
-                            value={item.free || 0} 
-                            onChange={(e) => updateItem(idx, 'free', parseInt(e.target.value) || 0)}
-                            className="h-8 text-xs text-right font-mono text-emerald-700 font-bold w-full px-2 bg-white"
+                            value={item.free_qty || 0} 
+                            onChange={(e) => updateItem(idx, 'free_qty', parseInt(e.target.value) || 0)}
+                            className="h-8 text-xs text-right font-mono text-emerald-600 font-semibold w-full px-2 bg-white"
                           />
                         </td>
-                        <td className="px-1.5 py-2 min-w-[100px]">
+                        <td className="px-1.5 py-2 min-w-[90px]">
                           <Input 
                             type="number"
                             step="0.01"
-                            value={item.rate ?? item.ptr ?? 0} 
+                            value={item.rate || 0} 
                             onChange={(e) => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)}
-                            className="h-8 text-xs text-right font-mono w-full px-2 bg-white"
+                            className="h-8 text-xs text-right font-mono font-semibold text-slate-800 w-full px-2 bg-white"
                           />
                         </td>
                         <td className="px-1.5 py-2 min-w-[85px]">
                           <Input 
                             type="number"
-                            step="0.01"
+                            step="0.1"
                             value={item.p_dis || 0} 
                             onChange={(e) => updateItem(idx, 'p_dis', parseFloat(e.target.value) || 0)}
                             className="h-8 text-xs text-right font-mono w-full px-2 bg-white"
@@ -662,7 +655,7 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                         <td className="px-1.5 py-2 min-w-[85px]">
                           <Input 
                             type="number"
-                            step="0.01"
+                            step="0.1"
                             value={item.s_dis || 0} 
                             onChange={(e) => updateItem(idx, 's_dis', parseFloat(e.target.value) || 0)}
                             className="h-8 text-xs text-right font-mono w-full px-2 bg-white"
@@ -671,7 +664,8 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                         <td className="px-1.5 py-2 min-w-[80px]">
                           <Input 
                             type="number"
-                            value={item.gst || 5} 
+                            step="0.1"
+                            value={item.gst || 0} 
                             onChange={(e) => updateItem(idx, 'gst', parseFloat(e.target.value) || 0)}
                             className="h-8 text-xs text-right font-mono w-full px-2 bg-white"
                           />
@@ -686,7 +680,7 @@ export function AIInvoiceImportModal({ isOpen, onOpenChange, onImportSuccess, sh
                           />
                         </td>
                         <td className="px-1.5 py-2 text-center min-w-[120px]">
-                          {item.status?.includes('✔') ? (
+                          {item.status?.toLowerCase().includes('matched') ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Matched
                             </span>

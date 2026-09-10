@@ -182,7 +182,7 @@ class HospitalCopilotEngine:
 
             return {
                 "intent": "patient_summary",
-                "answer": f"### 👤 Patient Summary Dashboard: {p_name}\n\nRetrieved live Frappe document `[{p_id}]` for **{p_name}**.",
+                "answer": f"### Patient Summary Dashboard: {p_name}\n\nRetrieved live Frappe document `[{p_id}]` for **{p_name}**.",
                 "card_type": "patient_dashboard",
                 "card_data": dashboard_data,
                 "smart_buttons": [

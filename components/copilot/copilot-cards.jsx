@@ -10,7 +10,7 @@ export function CopilotCards({ cardType, cardData, smartButtons, onButtonClick }
 
   return (
     <div className="space-y-3 my-3">
-      {/* 💊 Medicine Inventory Card */}
+      {/* Medicine Inventory Card */}
       {cardType === "medicine_card" && Array.isArray(cardData) && (
         <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-slate-50/50">
           <CardHeader className="py-2.5 px-4 bg-slate-100/70 border-b flex flex-row items-center justify-between">
@@ -38,7 +38,7 @@ export function CopilotCards({ cardType, cardData, smartButtons, onButtonClick }
         </Card>
       )}
 
-      {/* ⚡ Action Result Card */}
+      {/* Action Result Card */}
       {cardType === "action_result" && (
         <Card className="border-emerald-200 bg-emerald-50/40 shadow-sm rounded-xl overflow-hidden p-4 flex gap-4 items-center">
           <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow">
@@ -56,7 +56,7 @@ export function CopilotCards({ cardType, cardData, smartButtons, onButtonClick }
         </Card>
       )}
 
-      {/* 🔘 Smart Action Buttons Row */}
+      {/* Smart Action Buttons Row */}
       {smartButtons && smartButtons.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2">
           {smartButtons.map((btn, i) => (

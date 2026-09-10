@@ -15,7 +15,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         type: "restock_success",
-        title: "✅ Stock Updated Successfully",
+        title: "Stock Updated Successfully",
         message: `Added **${addedQty} units** to **${medicineName}**.`,
         medicineName: medicineName,
         addedQty: addedQty,
@@ -35,7 +35,7 @@ export async function POST(request) {
     const isReportsQuery = ["report", "analytic", "monthly", "yearly", "daily"].some(k => qLower.includes(k));
 
     // Handle prompt search request
-    if (qLower === "search patient" || qLower === "search again" || qLower === "🔍 search patient") {
+    if (qLower === "search patient" || qLower === "search again") {
       return NextResponse.json({
         type: "prompt_search_instruction",
         title: "Sure! I can help you find a patient.",
@@ -255,8 +255,8 @@ export async function POST(request) {
           title: "I couldn't find a patient matching your search.",
           message: "Please check the Patient Name, Patient ID or Mobile Number and try again.",
           smart_buttons: [
-            { label: "➕ Register Walk-in Patient", url: "/reception" },
-            { label: "🔍 Search Again", action: "prompt_search" }
+            { label: "Register Walk-in Patient", url: "/reception" },
+            { label: "Search Again", action: "prompt_search" }
           ]
         });
       }
@@ -426,7 +426,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         type: "pharmacy_stock_manager",
-        title: "💊 Pharmacy Inventory Stock & Expiry Alerts",
+        title: "Pharmacy Inventory Stock & Expiry Alerts",
         medicines: medicinesList,
         quick_actions: [
           { label: "Restock Paracetamol (+100 Strips)", action: "restock_paracetamol" },

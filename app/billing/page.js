@@ -88,11 +88,25 @@ export default function BillingPage() {
     const pharmFee = targetWalkIn.need_medicines === 1 ? (targetWalkIn.pharmacy_bill_amount || 0) : 0;
     const grandTotal = docFee + labFee + pharmFee;
 
-    // Subtract payments already collected at department level
+    // Retrieve department-level payments already logged (e.g. Reception, Pharmacy)
     const currentDeptPayments = JSON.parse(localStorage.getItem("hospital_dept_payments") || "[]");
-    const deptAlreadyPaid = currentDeptPayments
-      .filter(p => p.walkInId === targetWalkInName)
+    const patientDeptPayments = currentDeptPayments.filter(p => p.walkInId === targetWalkInName);
+
+    // Check if pharmacy bill was settled at Pharmacy Counter
+    const isPharmPaidAtCounter = 
+      targetWalkIn.pharmacy_payment_status === "Paid" || 
+      (Number(targetWalkIn.pharmacy_paid_amount) > 0) ||
+      patientDeptPayments.some(p => p.department === "Pharmacy" && p.status === "Paid");
+
+    const pharmPaidAmount = isPharmPaidAtCounter 
+      ? (Number(targetWalkIn.pharmacy_paid_amount) || (patientDeptPayments.find(p => p.department === "Pharmacy")?.amount) || pharmFee)
+      : 0;
+
+    const nonPharmDeptPaid = patientDeptPayments
+      .filter(p => p.department !== "Pharmacy")
       .reduce((s, p) => s + (p.amount || 0), 0);
+
+    const deptAlreadyPaid = nonPharmDeptPaid + pharmPaidAmount;
     const netBalance = Math.max(0, grandTotal - deptAlreadyPaid);
 
     // Optimistically update states instantly
@@ -104,6 +118,11 @@ export default function BillingPage() {
       ...targetWalkIn,
       grandTotal,
       labFee,
+      docFee,
+      pharmFee,
+      isPharmPaidAtCounter,
+      pharmPaidAmount,
+      nonPharmDeptPaid,
       deptAlreadyPaid,
       netBalance,
       paymentMethod,
@@ -124,7 +143,9 @@ export default function BillingPage() {
         bill_amount: grandTotal,
         payment_received: 1,
         payment_method: paymentMethod,
-        appointment_status: "Completed"
+        appointment_status: "Completed",
+        billing_collected_amount: netBalance,
+        total_paid_amount: grandTotal
       });
 
       // 2. Record only the net balance in finance (dept payments already recorded separately)
@@ -132,7 +153,7 @@ export default function BillingPage() {
         const storedFinance = localStorage.getItem("hospital_custom_finance");
         const financeEntries = storedFinance ? JSON.parse(storedFinance) : [];
         const deptPaidNote = deptAlreadyPaid > 0
-          ? ` (Gross ₹${grandTotal} − Dept Paid ₹${deptAlreadyPaid})`
+          ? ` (Gross ₹${grandTotal} − Paid at Counter/Dept ₹${deptAlreadyPaid})`
           : "";
         const billTx = {
           id: `tx-billing-${Date.now()}`,
@@ -142,7 +163,7 @@ export default function BillingPage() {
           amount: netBalance,
           method: paymentMethod,
           date: new Date().toISOString().split("T")[0],
-          notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Lab included: ${targetWalkIn.need_lab_test === 1 ? "Yes" : "No"}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? "Yes" : "No"}.${deptPaidNote}`
+          notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Lab: ${targetWalkIn.need_lab_test === 1 ? "Yes" : "No"}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? (isPharmPaidAtCounter ? "Paid at Pharmacy" : "Yes") : "No"}.${deptPaidNote}`
         };
         financeEntries.unshift(billTx);
         localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
@@ -786,11 +807,23 @@ Status: Completed.
                       const grossTotal = docFee + labFee + pharmFee;
 
                       // Find dept payments already made for this walk-in
-                      const patientDeptPaid = deptPayments
-                        .filter(p => p.walkInId === selectedWalkIn.name)
-                        .reduce((s, p) => s + (p.amount || 0), 0);
                       const patientDeptPayments = deptPayments.filter(p => p.walkInId === selectedWalkIn.name);
-                      const netDue = Math.max(0, grossTotal - patientDeptPaid);
+
+                      const isPharmPaidAtPharmacy = 
+                        selectedWalkIn.pharmacy_payment_status === "Paid" || 
+                        (Number(selectedWalkIn.pharmacy_paid_amount) > 0) ||
+                        patientDeptPayments.some(p => p.department === "Pharmacy" && p.status === "Paid");
+
+                      const pharmPaidAmount = isPharmPaidAtPharmacy 
+                        ? (Number(selectedWalkIn.pharmacy_paid_amount) || (patientDeptPayments.find(p => p.department === "Pharmacy")?.amount) || pharmFee)
+                        : 0;
+
+                      const nonPharmDeptPaid = patientDeptPayments
+                        .filter(p => p.department !== "Pharmacy")
+                        .reduce((s, p) => s + (p.amount || 0), 0);
+
+                      const totalAlreadyPaid = nonPharmDeptPaid + pharmPaidAmount;
+                      const netDue = Math.max(0, grossTotal - totalAlreadyPaid);
 
                       return (
                         <div className="space-y-2 text-sm">
@@ -808,9 +841,22 @@ Status: Completed.
 
                           {selectedWalkIn.need_medicines === 1 && (
                             <>
-                              <div className="flex justify-between text-slate-600 font-semibold">
-                                <span>Pharmacy Dispensed Package</span>
-                                <span>₹{pharmFee}</span>
+                              <div className="flex justify-between items-center text-slate-600 font-semibold py-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span>Pharmacy Medication Package</span>
+                                  {isPharmPaidAtPharmacy ? (
+                                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                      <BadgeCheck className="w-3 h-3 text-emerald-600" /> Paid at Pharmacy Counter (₹0 Due)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                      Forwarded from Pharmacy (Pay at Billing)
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={isPharmPaidAtPharmacy ? "text-slate-500 line-through text-xs" : "text-slate-900"}>
+                                  ₹{pharmFee}
+                                </span>
                               </div>
                               {selectedWalkIn.dispensed_medicines && selectedWalkIn.dispensed_medicines.length > 0 && (
                                 <div className="pl-4 pr-1 space-y-1.5 pt-1 pb-1">
@@ -830,26 +876,32 @@ Status: Completed.
                             <span>₹{grossTotal}</span>
                           </div>
 
-                          {patientDeptPaid > 0 && (
+                          {totalAlreadyPaid > 0 && (
                             <div className="space-y-1">
                               <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50 px-2 py-1.5 rounded border border-emerald-100">
                                 <span className="flex items-center gap-1.5">
                                   <BadgeCheck className="w-3.5 h-3.5" />
-                                  Already Paid at Dept. Level
+                                  Already Paid at Counter / Department Level
                                 </span>
-                                <span>− ₹{patientDeptPaid.toLocaleString("en-IN")}</span>
+                                <span>− ₹{totalAlreadyPaid.toLocaleString("en-IN")}</span>
                               </div>
-                              {patientDeptPayments.map((p) => (
-                                <div key={p.id} className="flex justify-between text-xs text-emerald-600 pl-6">
-                                  <span>{p.department}: {p.description}</span>
-                                  <span>− ₹{p.amount.toLocaleString("en-IN")}</span>
+                              {nonPharmDeptPaid > 0 && (
+                                <div className="flex justify-between text-xs text-emerald-600 pl-6">
+                                  <span>Consultation OPD Fee ({selectedWalkIn.doctor})</span>
+                                  <span>− ₹{nonPharmDeptPaid.toLocaleString("en-IN")}</span>
                                 </div>
-                              ))}
+                              )}
+                              {isPharmPaidAtPharmacy && (
+                                <div className="flex justify-between text-xs text-emerald-600 pl-6">
+                                  <span>Pharmacy Desk: Medication Fee (Paid at Counter)</span>
+                                  <span>− ₹{pharmPaidAmount.toLocaleString("en-IN")}</span>
+                                </div>
+                              )}
                             </div>
                           )}
 
                           <div className={`flex justify-between font-bold text-base pt-3 border-t border-slate-200 ${netDue === 0 ? "text-emerald-600" : "text-slate-900"}`}>
-                            <span>{netDue === 0 ? "✓ Fully Paid — Balance Due" : "Balance Due"}</span>
+                            <span>{netDue === 0 ? "Fully Settled — Balance Due" : "Balance Due at Billing Desk"}</span>
                             <span>₹{netDue.toLocaleString("en-IN")}</span>
                           </div>
                         </div>

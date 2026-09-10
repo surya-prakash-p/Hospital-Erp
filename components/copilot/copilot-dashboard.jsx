@@ -12,11 +12,11 @@ export function CopilotDashboard({ onQuickSearch, onRoleChange }) {
   const [activeRole, setActiveRole] = useState("admin");
 
   const roles = [
-    { id: "admin", label: "👑 Hospital Admin" },
-    { id: "doctor", label: "🩺 Doctor View" },
-    { id: "receptionist", label: "📋 Receptionist View" },
-    { id: "pharmacist", label: "💊 Pharmacist View" },
-    { id: "billing", label: "💳 Billing View" }
+    { id: "admin", label: "Hospital Admin" },
+    { id: "doctor", label: "Doctor View" },
+    { id: "receptionist", label: "Receptionist View" },
+    { id: "pharmacist", label: "Pharmacist View" },
+    { id: "billing", label: "Billing View" }
   ];
 
   const kpis = [

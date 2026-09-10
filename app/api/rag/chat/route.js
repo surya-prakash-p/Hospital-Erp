@@ -32,7 +32,7 @@ export async function POST(request) {
     let sources = [];
 
     if (qLower.includes("patient") || qLower.includes("history") || qLower.includes("checkup") || qLower.includes("walkin")) {
-      answer = `### 📋 Patient Record & History Search Results\n\n` +
+      answer = `### Patient Record & History Search Results\n\n` +
         (patientMobile ? `**Target Patient Mobile:** \`${patientMobile}\`\n\n` : '') +
         `- **Next Check-up Date:** Allocations made during doctor consultation are displayed under the **Next Check-up Date** column in the Patient Profile.\n` +
         `- **Walk-in Logs:** All previous visits, diagnoses, prescriptions, and lab test scans are stored chronologically in the timeline.\n` +
@@ -43,7 +43,7 @@ export async function POST(request) {
         { id: 2, text: "Consultation Diagnosis & Prescription Form Metadata", similarity: 0.91 }
       ];
     } else if (qLower.includes("medicine") || qLower.includes("pharmacy") || qLower.includes("stock") || qLower.includes("price") || qLower.includes("rate")) {
-      answer = `### 💊 Pharmacy & Inventory Logistics Engine\n\n` +
+      answer = `### Pharmacy & Inventory Logistics Engine\n\n` +
         `- **Paracetamol 650mg** (Tablet) — Rate: **₹20/ea** | Stock: 100 units\n` +
         `- **Pantocid 40mg** (Tablet) — Rate: **₹120/ea** | Stock: 150 units\n` +
         `- **Amoxicillin 500mg** (Capsule) — Rate: **₹95/ea** | Stock: 80 units\n` +
@@ -58,7 +58,7 @@ export async function POST(request) {
         { id: 2, text: "Pharmacy Dispensation & Billing Itemization Logs", similarity: 0.93 }
       ];
     } else if (qLower.includes("doctor") || qLower.includes("priya") || qLower.includes("vignesh") || qLower.includes("rajesh") || qLower.includes("queue") || qLower.includes("consultation")) {
-      answer = `### 🩺 Doctor Consultation Queues (3 Separate Columns)\n\n` +
+      answer = `### Doctor Consultation Queues (3 Separate Columns)\n\n` +
         `- **Dr. Rajesh** (General Physician) — Fee: **₹500** | Active Column 1\n` +
         `- **Dr. Priya** (Cardiologist) — Fee: **₹1000** | Active Column 2\n` +
         `- **Dr. Vignesh** (Pediatrician) — Fee: **₹600** | Active Column 3\n\n` +
@@ -71,7 +71,7 @@ export async function POST(request) {
         { id: 2, text: "Consultation Page 3 Doctor Column Layout", similarity: 0.94 }
       ];
     } else if (qLower.includes("lab") || qLower.includes("scan") || qLower.includes("image") || qLower.includes("test") || qLower.includes("cbc")) {
-      answer = `### 🧪 Lab Diagnostics & Scans Module\n\n` +
+      answer = `### Lab Diagnostics & Scans Module\n\n` +
         `- **Complete Blood Count (CBC)** — Fee: ₹450\n` +
         `- **Blood Sugar (Fasting)** — Fee: ₹250\n` +
         `- **Lipid Profile** — Fee: ₹800\n` +
@@ -84,7 +84,7 @@ export async function POST(request) {
         { id: 2, text: "Patient Profile Image Scan Viewer Modal", similarity: 0.89 }
       ];
     } else if (qLower.includes("bill") || qLower.includes("invoice") || qLower.includes("settle") || qLower.includes("pay")) {
-      answer = `### 💳 Billing & Checkout Invoice System\n\n` +
+      answer = `### Billing & Checkout Invoice System\n\n` +
         `- **Itemized Breakdown:** Combines Consultation Fee, Lab Panel Fee, and Itemized Pharmacy Dispensed Package.\n` +
         `- **Invoice Receipt Modal:** Generates an official **Thangam Hospital Invoice** displaying exact item rates, quantities, and paid stamps.\n` +
         `- **Documents Sync:** Downloaded invoices auto-save to the patient's Documents tab.`;
@@ -94,7 +94,7 @@ export async function POST(request) {
         { id: 2, text: "Thangam Hospital Official Invoice Printer Template", similarity: 0.92 }
       ];
     } else {
-      answer = `### 🤖 Thangam Hospital RAG AI Assistant\n\n` +
+      answer = `### Thangam Hospital RAG AI Assistant\n\n` +
         `I am your intelligent clinical & operational assistant. Here is what I can query for you:\n` +
         `- **Clinical:** Patient medical history, diagnoses, lab scan images, and Next Check-up dates.\n` +
         `- **Operations:** Doctor 3-column consultation queues, patient token numbers (FCFS).\n` +

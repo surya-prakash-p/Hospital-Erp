@@ -423,7 +423,7 @@ function normalizeInvoiceData(raw) {
       value: lineVal,
       amount: lineVal,
       confidence: item.confidence || "HIGH",
-      status: "✔ Matched"
+      status: "Matched"
     };
   });
 
@@ -504,7 +504,7 @@ function verifyAndCleanItems(items, rawOcrText = "") {
       value: typeof item.value === 'number' ? item.value : parseFloat(item.amount || item.value || 0),
       confidence: confidence,
       notes: notes,
-      status: item.status || (confidence === "LOW" ? "⚠ Review Required" : "✔ Matched")
+      status: item.status || (confidence === "LOW" ? "Review Required" : "Matched")
     };
   });
 }
@@ -596,7 +596,7 @@ function parseOcrText(text, fileName, file) {
           s_dis: 0,
           gst: 5,
           value: parseFloat(((qty > 0 ? qty : 1) * rate).toFixed(2)),
-          status: "✔ Matched"
+          status: "Matched"
         });
 
         if (nextLine && isPharmaLine) i++; // advance past combined line

@@ -99,7 +99,7 @@ class RAGEngine:
 
         if "medicine" in q_lower or "stock" in q_lower or "pharmacy" in q_lower or "paracetamol" in q_lower:
             return (
-                "### 💊 Pharmacy Inventory & Stock Alert\n\n"
+                "### Pharmacy Inventory & Stock Alert\n\n"
                 "- **Paracetamol 650mg** (Tablet) — Rate: ₹20/ea | Stock: 100 units\n"
                 "- **Pantocid 40mg** (Tablet) — Rate: ₹120/ea | Stock: 150 units\n"
                 "- **Amoxicillin 500mg** (Capsule) — Rate: ₹95/ea | Stock: 80 units\n"
@@ -109,7 +109,7 @@ class RAGEngine:
 
         if "lab" in q_lower or "test" in q_lower or "scan" in q_lower or "cbc" in q_lower:
             return (
-                "### 🧪 Lab Diagnostics Panel\n\n"
+                "### Lab Diagnostics Panel\n\n"
                 "- **Complete Blood Count (CBC)** — Fee: ₹450\n"
                 "- **Blood Sugar (Fasting)** — Fee: ₹250\n"
                 "- **Lipid Profile** — Fee: ₹800\n"
@@ -120,13 +120,13 @@ class RAGEngine:
 
         if extra_context:
             return (
-                "### 📋 Retrieved Patient ERP Records\n\n"
+                "### Retrieved Patient ERP Records\n\n"
                 f"{extra_context}\n\n"
                 "*The patient records above reflect live updates from the Thangam Hospital ERP system.*"
             )
 
         return (
-            "### 🤖 Thangam Hospital AI Assistant\n\n"
+            "### Thangam Hospital AI Assistant\n\n"
             "I am connected to the Thangam Hospital ERP database. You can ask me about:\n"
             "- Patient Medical History & Next Check-up Dates\n"
             "- Doctor Consultation Schedules & Queue Status\n"

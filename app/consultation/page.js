@@ -622,7 +622,7 @@ export default function ConsultationPage() {
                     <div className="relative">
                       <Input
                         type="text"
-                        placeholder="🔍 Type to search & configure medicine dosage (Days, Morning, Afternoon, Night)..."
+                        placeholder="Type to search & configure medicine dosage (Days, Morning, Afternoon, Night)..."
                         value={searchMedQuery}
                         onChange={(e) => handleMedSearchChange(e.target.value)}
                         className="h-9 text-xs mb-2 border-indigo-100 focus:border-indigo-400"
@@ -676,7 +676,7 @@ export default function ConsultationPage() {
                         <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                              💊
+                              <Pill className="w-3.5 h-3.5" />
                             </span>
                             <div>
                               <h4 className="font-bold text-slate-900 text-xs">{selectedMedForDose.medicine_name}</h4>

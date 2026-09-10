@@ -15,7 +15,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
 
   return (
     <div className="space-y-6 my-4 animate-in fade-in zoom-in-95 duration-200">
-      {/* 👤 Patient Information Bar */}
+      {/* Patient Information Bar */}
       <Card className="border-l-4 border-l-indigo-600 border-slate-200 shadow-md rounded-xl overflow-hidden bg-gradient-to-r from-slate-50 to-indigo-50/30">
         <CardHeader className="py-3 px-5 border-b border-slate-200/60 flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
@@ -68,7 +68,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
 
       {/* Grid of 4 Core Cards: Appointments, Prescriptions, Lab Reports, Billing */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 📅 Appointments */}
+        {/* Appointments */}
         <Card className="border-slate-200 shadow-sm rounded-xl">
           <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
             <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -96,7 +96,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
           </CardContent>
         </Card>
 
-        {/* 💊 Prescriptions */}
+        {/* Prescriptions */}
         <Card className="border-slate-200 shadow-sm rounded-xl">
           <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
             <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -119,7 +119,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
           </CardContent>
         </Card>
 
-        {/* 🧪 Lab Reports */}
+        {/* Lab Reports */}
         <Card className="border-slate-200 shadow-sm rounded-xl">
           <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
             <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -149,7 +149,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
           </CardContent>
         </Card>
 
-        {/* 💳 Billing */}
+        {/* Billing */}
         <Card className="border-slate-200 shadow-sm rounded-xl">
           <CardHeader className="py-2.5 px-4 bg-slate-50 border-b flex flex-row items-center justify-between">
             <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -175,7 +175,7 @@ export function PatientSummaryDashboard({ data, onButtonClick }) {
         </Card>
       </div>
 
-      {/* 📈 Interactive Patient Journey Timeline */}
+      {/* Interactive Patient Journey Timeline */}
       <Card className="border-slate-200 shadow-sm rounded-xl overflow-hidden">
         <CardHeader className="py-3 px-5 bg-slate-50 border-b">
           <CardTitle className="text-xs font-bold text-slate-800 flex items-center gap-2">

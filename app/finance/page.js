@@ -151,47 +151,63 @@ export default function FinancePage() {
   // Combine clinical revenue and custom transactions
   const allTransactions = [...customTx].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Compute metrics from customTx
-  const totalClinicalIncome = customTx
-    .filter(tx => tx.type === "Income" && tx.category === "Clinical Services")
-    .reduce((acc, tx) => acc + tx.amount, 0);
+  // Compute metrics from customTx including refunds
+  let totalClinicalIncome = 0;
+  let totalPharmacyGross = 0;
+  let totalPharmacyRefunds = 0;
+  let totalCustomIncome = 0;
+  let totalExpenses = 0;
+  let totalOtherRefunds = 0;
 
-  const totalPharmacyIncome = customTx
-    .filter(tx => tx.type === "Income" && (
-      tx.category === "Pharmacy Income" || 
-      tx.category === "Pharmacy" || 
-      tx.category === "Pharmacy Sales" || 
-      (tx.title && tx.title.toLowerCase().includes("pharmacy sale"))
-    ))
-    .reduce((acc, tx) => acc + tx.amount, 0);
+  customTx.forEach(tx => {
+    const rawAmt = parseFloat(tx.amount || 0);
+    const amt = Math.abs(rawAmt);
+    const cat = (tx.category || "").toLowerCase();
+    const title = (tx.title || "").toLowerCase();
+    const isRefund = tx.type === "Refund" || cat.includes("refund") || cat.includes("return") || title.includes("return") || rawAmt < 0;
 
-  const totalCustomIncome = customTx
-    .filter(tx => tx.type === "Income" && 
-      tx.category !== "Clinical Services" && 
-      tx.category !== "Pharmacy" && 
-      tx.category !== "Pharmacy Income" && 
-      tx.category !== "Pharmacy Sales" && 
-      (!tx.title || !tx.title.toLowerCase().includes("pharmacy sale"))
-    )
-    .reduce((acc, tx) => acc + tx.amount, 0);
-  
-  const totalRevenue = totalClinicalIncome + totalPharmacyIncome + totalCustomIncome;
-  const totalExpenses = customTx.filter(tx => tx.type === "Expense").reduce((acc, tx) => acc + tx.amount, 0);
+    if (isRefund) {
+      if (cat.includes("pharmacy") || title.includes("pharmacy") || cat === "pharmacy refund") {
+        totalPharmacyRefunds += amt;
+      } else {
+        totalOtherRefunds += amt;
+      }
+    } else if (tx.type === "Income") {
+      if (cat === "clinical services" || title.includes("opd consultation") || title.includes("patient billing")) {
+        totalClinicalIncome += amt;
+      } else if (cat.includes("pharmacy") || title.includes("pharmacy sale") || cat === "pharmacy") {
+        totalPharmacyGross += amt;
+      } else {
+        totalCustomIncome += amt;
+      }
+    } else if (tx.type === "Expense") {
+      totalExpenses += amt;
+    }
+  });
+
+  const totalPharmacyIncome = Math.max(0, totalPharmacyGross - totalPharmacyRefunds);
+  const totalRevenue = (totalClinicalIncome + totalPharmacyGross + totalCustomIncome) - (totalPharmacyRefunds + totalOtherRefunds);
   const netProfit = totalRevenue - totalExpenses;
 
   // Filtered transactions for the display ledger
   const filteredTransactions = allTransactions.filter(tx => {
-    const matchesSearch = tx.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          tx.method.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === "All" || tx.type === typeFilter;
+    const rawAmt = parseFloat(tx.amount || 0);
+    const isRefund = tx.type === "Refund" || (tx.category || "").toLowerCase().includes("refund") || (tx.category || "").toLowerCase().includes("return") || (tx.title || "").toLowerCase().includes("return") || rawAmt < 0;
+    const resolvedType = isRefund ? "Refund" : tx.type;
+
+    const matchesSearch = (tx.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (tx.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (tx.method || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === "All" || resolvedType === typeFilter;
     
     let matchesCategory = categoryFilter === "All" || tx.category === categoryFilter;
     if (categoryFilter === "Pharmacy Income" || categoryFilter === "Pharmacy") {
-      matchesCategory = tx.category === "Pharmacy Income" || 
+      matchesCategory = (tx.category === "Pharmacy Income" || 
                         tx.category === "Pharmacy" || 
                         tx.category === "Pharmacy Sales" || 
-                        (tx.title && tx.title.toLowerCase().includes("pharmacy sale"));
+                        (tx.title && tx.title.toLowerCase().includes("pharmacy sale"))) && !isRefund;
+    } else if (categoryFilter === "Pharmacy Refund") {
+      matchesCategory = isRefund && ((tx.category || "").toLowerCase().includes("pharmacy") || (tx.title || "").toLowerCase().includes("pharmacy"));
     }
     
     return matchesSearch && matchesType && matchesCategory;
@@ -199,7 +215,7 @@ export default function FinancePage() {
 
   // Calculate payment method share
   const paymentMethodsCounts = allTransactions.reduce((acc, tx) => {
-    acc[tx.method] = (acc[tx.method] || 0) + tx.amount;
+    acc[tx.method || "Cash"] = (acc[tx.method || "Cash"] || 0) + Math.abs(parseFloat(tx.amount || 0));
     return acc;
   }, {});
 
@@ -370,6 +386,7 @@ export default function FinancePage() {
                     <option value="All">All Types</option>
                     <option value="Income">Incomes Only</option>
                     <option value="Expense">Expenses Only</option>
+                    <option value="Refund">Refunds Only</option>
                   </select>
                   <select 
                     value={categoryFilter} 
@@ -378,6 +395,7 @@ export default function FinancePage() {
                   >
                     <option value="All">All Categories</option>
                     <option value="Pharmacy Income">Pharmacy Income</option>
+                    <option value="Pharmacy Refund">Pharmacy Refund</option>
                     <option value="Clinical Services">Clinical Services</option>
                     <option value="Salary">Salary</option>
                     <option value="Medical Supplies">Medical Supplies</option>
@@ -402,7 +420,13 @@ export default function FinancePage() {
                   
                   <div className="divide-y divide-slate-200 bg-white">
                     {filteredTransactions.map((tx, idx) => {
-                      const isPatient = tx.id.startsWith("tx-consult-") || tx.id.startsWith("tx-lab-") || tx.id.startsWith("tx-pharm-") || tx.id.startsWith("tx-billing-") || tx.id.startsWith("tx-rx-");
+                      const isPatient = tx.id.startsWith("tx-consult-") || tx.id.startsWith("tx-lab-") || tx.id.startsWith("tx-pharm-") || tx.id.startsWith("tx-billing-") || tx.id.startsWith("tx-rx-") || tx.id.startsWith("tx-ret-") || tx.id.startsWith("REF-");
+                      const rawAmt = parseFloat(tx.amount || 0);
+                      const isRefund = tx.type === "Refund" || (tx.category || "").toLowerCase().includes("refund") || (tx.category || "").toLowerCase().includes("return") || (tx.title || "").toLowerCase().includes("return") || rawAmt < 0;
+                      const isIncome = tx.type === "Income" && !isRefund;
+                      const isPharmRefund = isRefund && ((tx.category || "").toLowerCase().includes("pharmacy") || (tx.title || "").toLowerCase().includes("pharmacy"));
+                      const isPharmIncome = !isRefund && ((tx.category || "") === "Pharmacy Income" || (tx.category || "") === "Pharmacy" || (tx.category || "") === "Pharmacy Sales");
+
                       return (
                         <div key={tx.id || idx} className="grid grid-cols-12 px-6 py-3 items-center text-xs hover:bg-slate-50/50 transition-colors">
                           <div className="col-span-2 text-slate-500 font-mono text-[10px]">{tx.date}</div>
@@ -412,7 +436,8 @@ export default function FinancePage() {
                           </div>
                           <div className="col-span-2">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-medium border
-                              ${(tx.category === "Pharmacy Income" || tx.category === "Pharmacy" || tx.category === "Pharmacy Sales") ? "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold" : ""}
+                              ${isPharmRefund ? "bg-rose-50 text-rose-700 border-rose-200 font-bold" : ""}
+                              ${isPharmIncome ? "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold" : ""}
                               ${tx.category === "Clinical Services" ? "bg-teal-50 text-teal-700 border-teal-100" : ""}
                               ${tx.category === "Salary" ? "bg-purple-50 text-purple-700 border-purple-100" : ""}
                               ${tx.category === "Medical Supplies" ? "bg-amber-50 text-amber-700 border-amber-100" : ""}
@@ -420,18 +445,18 @@ export default function FinancePage() {
                               ${tx.category === "Maintenance" ? "bg-sky-50 text-sky-700 border-sky-100" : ""}
                               ${tx.category === "Ambulance" ? "bg-rose-50 text-rose-700 border-rose-100" : ""}
                               ${tx.category === "Rent" ? "bg-indigo-50 text-indigo-700 border-indigo-100" : ""}
-                              ${tx.category === "Others" ? "bg-slate-50 text-slate-700 border-slate-100" : ""}`}
+                              ${(!isPharmRefund && !isPharmIncome && tx.category !== "Clinical Services" && tx.category !== "Salary" && tx.category !== "Medical Supplies" && tx.category !== "Utilities" && tx.category !== "Maintenance" && tx.category !== "Ambulance" && tx.category !== "Rent") ? "bg-slate-50 text-slate-700 border-slate-100" : ""}`}
                             >
-                              {tx.category === "Pharmacy" ? "Pharmacy Income" : tx.category}
+                              {isRefund ? (isPharmRefund ? "Pharmacy Refund" : "Refund") : (tx.category === "Pharmacy" ? "Pharmacy Income" : tx.category)}
                             </span>
                           </div>
                           <div className="col-span-2 text-slate-600 font-medium flex items-center gap-1">
                             <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            {tx.method}
+                            {tx.method || "Cash"}
                           </div>
                           <div className="col-span-2 text-right flex items-center justify-end gap-2.5">
-                            <span className={`font-bold text-sm ${tx.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>
-                              {tx.type === "Income" ? "+" : "-"}₹{tx.amount.toLocaleString()}
+                            <span className={`font-bold text-sm ${isIncome ? "text-emerald-600" : "text-rose-600"}`}>
+                              {isIncome ? "+" : "-"}₹{Math.abs(rawAmt).toLocaleString()}
                             </span>
                             {!isPatient ? (
                               <button 

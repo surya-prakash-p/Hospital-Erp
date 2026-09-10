@@ -1391,7 +1391,7 @@ export default function ReceptionPage() {
                       ? "border-indigo-300 text-indigo-700 bg-indigo-50/50"
                       : "border-emerald-300 text-emerald-700 bg-emerald-50/50"
                   }`}>
-                    {previewInvoice.type === "appointment" ? "✓ CONSULTATION INVOICED" : "✓ MEDICINES DISPENSED"}
+                    {previewInvoice.type === "appointment" ? "CONSULTATION INVOICED" : "MEDICINES DISPENSED"}
                   </div>
                   <p className="text-[9px] text-slate-400 italic">
                     Digitally generated • Thangam Hospital Desk
