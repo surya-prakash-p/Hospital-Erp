@@ -130,12 +130,8 @@ export default function PatientRegistryPage() {
   // Handle new patient registration
   const handleRegisterPatient = async (e) => {
     e.preventDefault();
-    if (!patientForm.patient_name.trim() || !patientForm.mobile_number.trim() || !patientForm.age) {
-      showToast("Name, Mobile, and Age are required", "error");
-      return;
-    }
-    if (patientForm.mobile_number.length !== 10) {
-      showToast("Enter a valid 10-digit mobile number", "error");
+    if (!patientForm.patient_name.trim()) {
+      showToast("Patient name is required", "error");
       return;
     }
 
@@ -144,8 +140,8 @@ export default function PatientRegistryPage() {
       const newPatient = {
         patient_name: patientForm.patient_name.trim(),
         mobile_number: patientForm.mobile_number.trim(),
-        age: parseInt(patientForm.age),
-        gender: patientForm.gender,
+        age: patientForm.age ? parseInt(patientForm.age) : null,
+        gender: patientForm.gender || "Male",
         email: patientForm.email.trim(),
         emergency_contact: patientForm.emergency_contact.trim(),
         allergies: patientForm.allergies.trim(),
@@ -374,19 +370,18 @@ export default function PatientRegistryPage() {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="reg-mobile" className="text-xs font-semibold block mb-1.5">Mobile Number (10 Digits) *</Label>
+                <Label htmlFor="reg-mobile" className="text-xs font-semibold block mb-1.5">Mobile Number (Optional)</Label>
                 <Input 
                   id="reg-mobile" 
-                  placeholder="e.g. 9876543210"
+                  placeholder="e.g. 9876543210 (Optional)"
                   maxLength={10}
                   value={patientForm.mobile_number}
                   onChange={(e) => setPatientForm(prev => ({ ...prev, mobile_number: e.target.value.replace(/\D/g, "") }))}
-                  required 
                 />
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="reg-age" className="text-xs font-semibold block mb-1.5">Age (Years) *</Label>
+                <Label htmlFor="reg-age" className="text-xs font-semibold block mb-1.5">Age (Years, Optional)</Label>
                 <Input 
                   id="reg-age" 
                   type="number"
@@ -395,12 +390,11 @@ export default function PatientRegistryPage() {
                   max="130"
                   value={patientForm.age}
                   onChange={(e) => setPatientForm(prev => ({ ...prev, age: e.target.value }))}
-                  required 
                 />
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="reg-gender" className="text-xs font-semibold block mb-1.5">Gender *</Label>
+                <Label htmlFor="reg-gender" className="text-xs font-semibold block mb-1.5">Gender</Label>
                 <select 
                   id="reg-gender"
                   value={patientForm.gender}

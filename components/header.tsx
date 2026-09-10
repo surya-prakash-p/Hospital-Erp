@@ -106,8 +106,7 @@ export function Header() {
         setDesignation(user.designation || (user.roles?.length ? user.roles[0] : ""));
         setDepartment(user.department || (
           user.roles?.includes('Receptionist') ? "Front Desk & Admissions" :
-          user.roles?.includes('Pharmacist') ? "Pharmacy & Stock" :
-          user.roles?.includes('Lab Technician') ? "Diagnostics & Lab" : "Hospital Administration"
+          user.roles?.includes('Pharmacist') ? "Pharmacy & Stock" : "Hospital Administration"
         ));
         setOpdTimings(user.opd_timings || user.shiftTimings || "Day Shift (08:00 AM - 04:00 PM)");
       }
@@ -547,7 +546,7 @@ export function Header() {
                         value={department}
                         onChange={(e) => setDepartment(e.target.value)}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                        placeholder="e.g. Front Desk / Pharmacy / Lab"
+                        placeholder="e.g. Front Desk / Pharmacy / Nursing"
                       />
                     </div>
 

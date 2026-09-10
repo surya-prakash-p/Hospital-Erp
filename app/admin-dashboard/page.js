@@ -41,7 +41,6 @@ const ALL_ROLES = [
   "Hospital Admin",
   "Doctor",
   "Pharmacist",
-  "Lab Technician",
   "Nurse",
   "Receptionist",
   "Billing Clerk"
@@ -49,9 +48,8 @@ const ALL_ROLES = [
 
 const ROLE_DEFINITIONS = [
   { role: "Hospital Admin", icon: ShieldCheck, desc: "Full administrative authority, security governance & system configuration" },
-  { role: "Doctor", icon: Stethoscope, desc: "Doctor consultation queue, clinical diagnosis, prescriptions & lab review" },
+  { role: "Doctor", icon: Stethoscope, desc: "Doctor consultation queue, clinical diagnosis, prescriptions & medical review" },
   { role: "Pharmacist", icon: Pill, desc: "Pharmacy dispensing, batch inventory, FEFO tracking & stock registers" },
-  { role: "Lab Technician", icon: FlaskConical, desc: "Laboratory diagnostic test entries, specimen tracking & test reports" },
   { role: "Nurse", icon: UserRoundCheck, desc: "Inpatient triage, vital checks, ward management & nursing assistance" },
   { role: "Receptionist", icon: Building2, desc: "Front desk patient registration, appointment scheduling & queue tokens" },
   { role: "Billing Clerk", icon: KeyRound, desc: "Patient cashier checkout, billing invoices, receipts & finance ledger" }
@@ -62,7 +60,6 @@ const PERMISSION_OPTIONS = [
   { id: "Write Prescriptions", label: "Issue Medical Prescriptions", desc: "Create and authorize digital patient drug prescriptions" },
   { id: "Dispense Medicines", label: "Pharmacy Dispensing & FEFO", desc: "Dispense prescribed medications and deduct batch inventory" },
   { id: "Manage Pharmacy Stock", label: "Pharmacy Stock & GRN Import", desc: "Manage medicine master, purchase orders, and goods receipts" },
-  { id: "Enter Lab Results", label: "Lab Diagnostic Test Reports", desc: "Enter diagnostic test findings, normal ranges, and publish lab reports" },
   { id: "Register Patients", label: "Patient Registration & Walk-Ins", desc: "Register new patients, edit demographics, and create reception walk-ins" },
   { id: "Manage Invoices", label: "Billing, Receipts & Invoicing", desc: "Generate patient bills, cashier receipts, and manage checkout payments" },
   { id: "View Financials", label: "Financial Ledger & Reports", desc: "Access hospital financial ledger, revenue summaries, and expense entries" },
@@ -72,10 +69,9 @@ const PERMISSION_OPTIONS = [
 ];
 
 const ROLE_DEFAULT_PERMISSIONS = {
-  "Hospital Admin": ["Doctor Consultations", "Write Prescriptions", "Dispense Medicines", "Manage Pharmacy Stock", "Enter Lab Results", "Register Patients", "Manage Invoices", "View Financials", "Audit Logs", "Manage Roles & Staff", "Full System Access"],
+  "Hospital Admin": ["Doctor Consultations", "Write Prescriptions", "Dispense Medicines", "Manage Pharmacy Stock", "Register Patients", "Manage Invoices", "View Financials", "Audit Logs", "Manage Roles & Staff", "Full System Access"],
   "Doctor": ["Doctor Consultations", "Write Prescriptions"],
   "Pharmacist": ["Dispense Medicines", "Manage Pharmacy Stock"],
-  "Lab Technician": ["Enter Lab Results"],
   "Nurse": ["Doctor Consultations", "Register Patients"],
   "Receptionist": ["Register Patients"],
   "Billing Clerk": ["Manage Invoices", "View Financials"]
@@ -308,7 +304,7 @@ export default function AdminDashboardPage() {
     showToast(`Creating ${primaryRole} account and syncing backend...`, "info");
 
     try {
-      const targetDept = primaryRole === "Nurse" ? "Nursing & Wards" : (department.trim() || (primaryRole === "Doctor" ? "General Medicine" : primaryRole === "Pharmacist" ? "Pharmacy" : "Laboratory"));
+      const targetDept = primaryRole === "Nurse" ? "Nursing & Wards" : (department.trim() || (primaryRole === "Doctor" ? "General Medicine" : primaryRole === "Pharmacist" ? "Pharmacy" : "General Administration"));
       const validJoinedDate = joinedDate || new Date().toISOString().split('T')[0];
       const newStaff = await createStaffUser({
         full_name: fullName.trim(),
@@ -555,7 +551,6 @@ export default function AdminDashboardPage() {
   const totalStaffCount = staffUsers.length;
   const doctorsCount = staffUsers.filter(s => s.roles?.includes('Doctor')).length;
   const pharmaCount = staffUsers.filter(s => s.roles?.includes('Pharmacist')).length;
-  const labCount = staffUsers.filter(s => s.roles?.includes('Lab Technician')).length;
   const nurseCount = staffUsers.filter(s => s.roles?.includes('Nurse')).length;
   const recepCount = staffUsers.filter(s => s.roles?.includes('Receptionist')).length;
 
@@ -634,7 +629,6 @@ export default function AdminDashboardPage() {
           { id: 'All', label: 'All Members', count: totalStaffCount, icon: Users },
           { id: 'Doctor', label: 'Doctors', count: doctorsCount, icon: Stethoscope },
           { id: 'Pharmacist', label: 'Pharmacists', count: pharmaCount, icon: Pill },
-          { id: 'Lab Technician', label: 'Lab Technicians', count: labCount, icon: FlaskConical },
           { id: 'Nurse', label: 'Nurses', count: nurseCount, icon: UserRoundCheck },
           { id: 'Receptionist', label: 'Receptionists', count: recepCount, icon: Building2 },
         ].map((tab) => {

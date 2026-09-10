@@ -12,7 +12,6 @@ export default function UnauthorizedPage() {
   let homePath = '/';
   if (userRole === 'Pharmacist') homePath = '/pharmacy';
   else if (userRole === 'Doctor') homePath = '/consultation';
-  else if (userRole === 'Lab Technician') homePath = '/lab';
   else if (userRole === 'Receptionist') homePath = '/reception';
   else if (userRole === 'Billing Clerk') homePath = '/billing';
 

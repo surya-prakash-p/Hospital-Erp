@@ -87,8 +87,6 @@ export default function PharmacyPage() {
   // Sales Return (Medicine Return) States
   const [showSalesReturnModal, setShowSalesReturnModal] = useState(false);
   const [salesReturnsList, setSalesReturnsList] = useState([]);
-  const [returnSearchQuery, setReturnSearchQuery] = useState("");
-  const [returnSelectedSale, setReturnSelectedSale] = useState(null);
   const [returnItems, setReturnItems] = useState([]);
   const [returnReason, setReturnReason] = useState("Doctor Changed Prescription");
   const [returnMethod, setReturnMethod] = useState("Cash");
@@ -97,6 +95,16 @@ export default function PharmacyPage() {
   const [showReturnReceiptModal, setShowReturnReceiptModal] = useState(false);
   const [latestReturnRecord, setLatestReturnRecord] = useState(null);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  
+  // Direct Return specific inputs
+  const [directReturnMed, setDirectReturnMed] = useState(null);
+  const [directReturnMedSearch, setDirectReturnMedSearch] = useState("");
+  const [directReturnQty, setDirectReturnQty] = useState(10);
+  const [directReturnBatch, setDirectReturnBatch] = useState("");
+  const [directReturnPrice, setDirectReturnPrice] = useState("");
+  const [directReturnReason, setDirectReturnReason] = useState("Doctor Changed Prescription");
+  const [directReturnPatient, setDirectReturnPatient] = useState("");
+  const [directReturnMobile, setDirectReturnMobile] = useState("");
 
   // Queue sub-filters
   const [queueSearchQuery, setQueueSearchQuery] = useState("");
@@ -1036,7 +1044,7 @@ export default function PharmacyPage() {
     
     try {
       const pName = selectedWalkIn?.patient_name || "Walk-in Customer";
-      const pMobile = selectedWalkIn?.mobile_number || "9999999999";
+      const pMobile = selectedWalkIn?.mobile_number || "";
       const docName = selectedWalkIn?.doctor || "Self (OTC)";
 
       // 1. Deduct stock using FEFO and create register logs
@@ -1198,37 +1206,7 @@ export default function PharmacyPage() {
     }
   };
 
-  // Group past sales from drug register for easy return selection
-  const pastSalesGroups = useMemo(() => {
-    const groups = {};
-    for (const log of drugRegister) {
-      if (!log.invoice_number || Number(log.quantity) <= 0) continue;
-      const inv = log.invoice_number;
-      if (!groups[inv]) {
-        groups[inv] = {
-          invoice_number: inv,
-          patient_name: log.patient_name || "Direct Customer",
-          patient_id: log.patient_id || "N/A",
-          doctor: log.doctor || "Direct Sale",
-          dispensing_date: log.dispensing_date,
-          logs: []
-        };
-      }
-      groups[inv].logs.push(log);
-    }
-
-    const list = Object.values(groups);
-    if (!returnSearchQuery.trim()) return list.slice(0, 10);
-    const q = returnSearchQuery.toLowerCase().trim();
-    return list.filter(g => 
-      g.invoice_number.toLowerCase().includes(q) ||
-      g.patient_name.toLowerCase().includes(q) ||
-      (g.patient_id && g.patient_id.toLowerCase().includes(q)) ||
-      g.logs.some(l => l.medicine.toLowerCase().includes(q))
-    ).slice(0, 15);
-  }, [drugRegister, returnSearchQuery]);
-
-  // Open Sales Return Modal (prefilled or blank)
+  // Open Sales Return Modal
   const handleOpenSalesReturn = (prefillLog = null) => {
     if (userRole === "Store Manager") {
       showToast("Access Denied: Store Managers cannot process sales returns.", "error");
@@ -1238,25 +1216,24 @@ export default function PharmacyPage() {
     setReturnReason("Doctor Changed Prescription");
     setReturnMethod("Cash");
     setReturnRestock(true);
+    setDirectReturnPatient(prefillLog?.patient_name || "");
+    setDirectReturnMobile(prefillLog?.patient_id || "");
+    setDirectReturnMed(null);
+    setDirectReturnMedSearch("");
+    setDirectReturnQty(10);
+    setDirectReturnBatch("");
+    setDirectReturnPrice("");
+    setDirectReturnReason("Doctor Changed Prescription");
 
     if (prefillLog) {
-      setReturnSearchQuery(prefillLog.invoice_number || "");
       const med = medicines.find(m => m.medicine_name === prefillLog.medicine);
       const unitPrice = med ? (Number(med.selling_price) || Number(med.mrp) || 20) : 20;
       const soldQty = Math.abs(Number(prefillLog.quantity) || 1);
 
-      setReturnSelectedSale({
-        invoice_number: prefillLog.invoice_number || "INV-MANUAL",
-        patient_name: prefillLog.patient_name || "Patient",
-        patient_id: prefillLog.patient_id || "N/A",
-        doctor: prefillLog.doctor || "Direct Sale",
-        date: prefillLog.dispensing_date
-      });
-
       setReturnItems([{
         medicine_name: prefillLog.medicine,
         batch_number: prefillLog.batch_number || "RETURN",
-        sold_qty: soldQty,
+        sold_qty: null,
         return_qty: soldQty,
         unit_price: unitPrice,
         refund_amount: soldQty * unitPrice,
@@ -1264,53 +1241,73 @@ export default function PharmacyPage() {
         selected: true
       }]);
     } else {
-      setReturnSearchQuery("");
-      setReturnSelectedSale(null);
       setReturnItems([]);
     }
     setShowSalesReturnModal(true);
   };
 
-  // Select past sale for return
-  const handleSelectSaleForReturn = (saleGroup) => {
-    setReturnSelectedSale({
-      invoice_number: saleGroup.invoice_number,
-      patient_name: saleGroup.patient_name,
-      patient_id: saleGroup.patient_id,
-      doctor: saleGroup.doctor,
-      date: saleGroup.dispensing_date
+  // Add Direct Return Medicine Item
+  const handleAddDirectReturnItem = () => {
+    if (!directReturnMed) {
+      showToast("Please select a medicine to return", "warning");
+      return;
+    }
+    const qty = parseInt(directReturnQty, 10);
+    if (isNaN(qty) || qty <= 0) {
+      showToast("Please enter a valid return quantity (e.g. 5, 10 tablets)", "warning");
+      return;
+    }
+
+    const medName = directReturnMed.medicine_name || directReturnMed.name;
+    const unitPrice = parseFloat(directReturnPrice) || Number(directReturnMed.selling_price) || Number(directReturnMed.mrp) || 10;
+    const batchNo = directReturnBatch || (directReturnMed.batches?.[0]?.batch_number) || (directReturnMed.batch_number) || "RETURN";
+
+    const newItem = {
+      medicine_name: medName,
+      batch_number: batchNo,
+      sold_qty: null,
+      return_qty: qty,
+      unit_price: unitPrice,
+      refund_amount: parseFloat((qty * unitPrice).toFixed(2)),
+      reason: directReturnReason || returnReason || "Doctor Changed Prescription",
+      selected: true
+    };
+
+    setReturnItems(prev => {
+      const existingIdx = prev.findIndex(i => i.medicine_name.toLowerCase() === medName.toLowerCase() && i.batch_number === batchNo);
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        const newQty = updated[existingIdx].return_qty + qty;
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          return_qty: newQty,
+          refund_amount: parseFloat((newQty * updated[existingIdx].unit_price).toFixed(2)),
+          selected: true
+        };
+        return updated;
+      }
+      return [...prev, newItem];
     });
 
-    const items = saleGroup.logs.map(log => {
-      const med = medicines.find(m => m.medicine_name === log.medicine);
-      const unitPrice = med ? (Number(med.selling_price) || Number(med.mrp) || 20) : 20;
-      const soldQty = Math.abs(Number(log.quantity) || 1);
-      return {
-        medicine_name: log.medicine,
-        batch_number: log.batch_number,
-        sold_qty: soldQty,
-        return_qty: soldQty,
-        unit_price: unitPrice,
-        refund_amount: soldQty * unitPrice,
-        reason: returnReason || "Doctor Changed Prescription",
-        selected: true
-      };
-    });
-
-    setReturnItems(items);
+    showToast(`Added ${qty} units of ${medName} to return list`, "success");
+    setDirectReturnMed(null);
+    setDirectReturnMedSearch("");
+    setDirectReturnQty(10);
+    setDirectReturnBatch("");
+    setDirectReturnPrice("");
   };
 
-  // Update return qty for an item (strictly constrained between 0 and sold_qty)
+  // Remove item from return list
+  const handleRemoveReturnItem = (idx) => {
+    setReturnItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Update return qty for an item
   const handleUpdateReturnQty = (idx, newQty) => {
     setReturnItems(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const parsed = parseInt(newQty, 10);
-      let validQty = isNaN(parsed) ? 0 : parsed;
-      if (validQty > item.sold_qty) {
-        showToast(`Return quantity cannot exceed purchased quantity (${item.sold_qty})`, "warning");
-        validQty = item.sold_qty;
-      }
-      validQty = Math.max(0, Math.min(item.sold_qty, validQty));
+      const validQty = Math.max(1, isNaN(parsed) ? 1 : parsed);
       return {
         ...item,
         return_qty: validQty,
@@ -1334,16 +1331,11 @@ export default function PharmacyPage() {
   const handleExecuteSalesReturn = async () => {
     const selectedItems = returnItems.filter(i => i.selected && i.return_qty > 0);
     if (selectedItems.length === 0) {
-      showToast("Please select at least one item with a valid return quantity > 0", "error");
+      showToast("Please add at least one medicine with a valid return quantity > 0", "error");
       return;
     }
 
-    // Validate that no item exceeds the purchased quantity
     for (const item of selectedItems) {
-      if (item.return_qty > item.sold_qty) {
-        showToast(`Return quantity for ${item.medicine_name} (${item.return_qty}) cannot exceed purchased quantity (${item.sold_qty})`, "error");
-        return;
-      }
       if (item.return_qty <= 0) {
         showToast(`Return quantity for ${item.medicine_name} must be greater than 0`, "error");
         return;
@@ -1351,19 +1343,22 @@ export default function PharmacyPage() {
     }
 
     const totalRefund = selectedItems.reduce((acc, curr) => acc + curr.refund_amount, 0);
+    const patientName = directReturnPatient.trim() || "Walk-in Customer";
+    const patientId = directReturnMobile.trim() || "N/A";
+    const invoiceNumber = `RET-INV-${Date.now().toString().slice(-6)}`;
 
     try {
       setIsSubmittingReturn(true);
 
       const returnPayload = {
-        invoice_number: returnSelectedSale?.invoice_number || "N/A",
-        patient_name: returnSelectedSale?.patient_name || "Direct Customer",
-        patient_id: returnSelectedSale?.patient_id || "N/A",
+        invoice_number: invoiceNumber,
+        patient_name: patientName,
+        patient_id: patientId,
         items: selectedItems.map(i => ({
           medicine_name: i.medicine_name,
           batch_number: i.batch_number,
-          sold_qty: i.sold_qty,
-          return_qty: Math.min(i.return_qty, i.sold_qty),
+          sold_qty: i.return_qty,
+          return_qty: i.return_qty,
           unit_price: i.unit_price,
           refund_amount: i.refund_amount,
           reason: i.reason || returnReason
@@ -1382,17 +1377,17 @@ export default function PharmacyPage() {
         const refId = `tx-ret-${result.return_id}`;
         const refundTx = {
           id: refId,
-          title: `Medicine Return Refund — ${returnSelectedSale?.patient_name || "Customer"}`,
+          title: `Medicine Return Refund — ${patientName}`,
           type: "Refund",
           category: "Pharmacy Refund",
-          patient: returnSelectedSale?.patient_name || "Customer",
-          patient_name: returnSelectedSale?.patient_name || "Customer",
+          patient: patientName,
+          patient_name: patientName,
           date: new Date().toISOString().split("T")[0],
           amount: Math.abs(totalRefund),
           method: returnMethod || "Cash",
           status: "Processed",
           reference_id: result.return_id,
-          notes: `Sales return (${result.return_id}) for invoice ${returnSelectedSale?.invoice_number || 'N/A'}. Reason: ${returnReason}`
+          notes: `Sales return (${result.return_id}) for ${invoiceNumber}. Items: ${selectedItems.map(i => `${i.medicine_name} (${i.return_qty} units)`).join(", ")}`
         };
         const currentCustom = JSON.parse(localStorage.getItem("hospital_custom_finance") || "[]");
         const updatedCustom = [refundTx, ...currentCustom.filter(t => t.id !== refId)];
@@ -1402,7 +1397,7 @@ export default function PharmacyPage() {
         console.warn("Finance refund record warning:", fe);
       }
 
-      showToast(`Sales return completed! Refund of INR ${totalRefund.toLocaleString('en-IN')} processed.`, "success");
+      showToast(`Sales return completed! ${returnRestock ? 'Restocked to inventory.' : ''} Refund: INR ${totalRefund.toLocaleString('en-IN')}`, "success");
       setLatestReturnRecord(result);
       setShowSalesReturnModal(false);
       setShowReturnReceiptModal(true);
@@ -1415,110 +1410,123 @@ export default function PharmacyPage() {
     }
   };
 
-  // Print Return Receipt
+  // Print Return Receipt via Hidden Iframe (No Popup / No New Tab)
   const printReturnReceipt = (record) => {
     if (!record) return;
-    const printWin = window.open("", "_blank", "width=800,height=900");
-    if (!printWin) {
-      showToast("Pop-up blocked. Please allow popups to print return receipts.", "error");
-      return;
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const itemsHtml = (record.items || []).map((item, idx) => `
+        <tr>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0;"><strong>${item.medicine_name}</strong><br><small style="color: #64748b;">Batch: ${item.batch_number || 'N/A'}</small></td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.return_qty}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">INR ${Number(item.unit_price).toFixed(2)}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #0f172a;">INR ${Number(item.refund_amount).toFixed(2)}</td>
+          <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">${item.reason || record.notes || 'N/A'}</td>
+        </tr>
+      `).join("");
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Sales Return Voucher - ${record.return_id}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #1e293b; }
+            .header { text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+            .title { font-size: 22px; font-weight: bold; color: #0369a1; margin: 0; }
+            .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
+            .doc-type { display: inline-block; background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-top: 10px; border: 1px solid #fecaca; }
+            .grid { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
+            .col { flex: 1; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+            th { background: #f8fafc; padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: left; font-size: 11px; text-transform: uppercase; color: #475569; }
+            .total-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: right; margin-bottom: 30px; }
+            .total-amount { font-size: 20px; font-weight: bold; color: #059669; }
+            .footer { display: flex; justify-content: space-between; margin-top: 60px; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            .sign-box { text-align: center; width: 200px; }
+            .sign-line { border-top: 1px dashed #94a3b8; margin-top: 40px; padding-top: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">THANGAM HOSPITAL</div>
+            <div class="subtitle">Central Pharmacy Department • Medicine Sales Return & Refund Voucher</div>
+            <div class="doc-type">OFFICIAL CREDIT NOTE / SALES RETURN RECEIPT</div>
+          </div>
+
+          <div class="grid">
+            <div class="col">
+              <div><strong>Return Voucher #:</strong> ${record.return_id}</div>
+              <div><strong>Original Invoice #:</strong> ${record.invoice_number}</div>
+              <div><strong>Return Date:</strong> ${new Date(record.return_date).toLocaleString('en-IN')}</div>
+              <div><strong>Restocked to Inventory:</strong> ${record.restock_inventory ? 'Yes (Returned to Batch Stock)' : 'No (Scrapped/Quarantine)'}</div>
+            </div>
+            <div class="col" style="text-align: right;">
+              <div><strong>Patient / Customer:</strong> ${record.patient_name}</div>
+              <div><strong>Patient ID / Mobile:</strong> ${record.patient_id}</div>
+              <div><strong>Refund Method:</strong> ${record.refund_method}</div>
+              <div><strong>Authorized Pharmacist:</strong> ${record.pharmacist}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 40px;">#</th>
+                <th>Medicine Name & Batch</th>
+                <th style="text-align: center; width: 80px;">Return Qty</th>
+                <th style="text-align: right; width: 100px;">Unit Rate</th>
+                <th style="text-align: right; width: 120px;">Refund Total</th>
+                <th style="width: 140px;">Return Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="total-box">
+            <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">TOTAL REFUND PROCESSED (${(record.refund_method || 'CASH').toUpperCase()})</div>
+            <div class="total-amount">INR ${Number(record.total_refund).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+          </div>
+
+          <div class="footer">
+            <div class="sign-box">
+              <div class="sign-line">Customer Signature / Acknowledgment</div>
+            </div>
+            <div class="sign-box">
+              <div class="sign-line">Authorized Pharmacist Signature</div>
+              <div style="font-size: 10px; color: #64748b;">${record.pharmacist}</div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 250);
+    } catch (e) {
+      console.error(e);
+      showToast("Print failed", "error");
     }
-
-    const itemsHtml = (record.items || []).map((item, idx) => `
-      <tr>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${idx + 1}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0;"><strong>${item.medicine_name}</strong><br><small style="color: #64748b;">Batch: ${item.batch_number || 'N/A'}</small></td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.return_qty}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">INR ${Number(item.unit_price).toFixed(2)}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #0f172a;">INR ${Number(item.refund_amount).toFixed(2)}</td>
-        <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">${item.reason || record.notes || 'N/A'}</td>
-      </tr>
-    `).join("");
-
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Sales Return Voucher - ${record.return_id}</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; color: #1e293b; }
-          .header { text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
-          .title { font-size: 22px; font-weight: bold; color: #0369a1; margin: 0; }
-          .subtitle { font-size: 12px; color: #64748b; margin-top: 4px; }
-          .doc-type { display: inline-block; background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-top: 10px; border: 1px solid #fecaca; }
-          .grid { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
-          .col { flex: 1; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
-          th { background: #f8fafc; padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: left; font-size: 11px; text-transform: uppercase; color: #475569; }
-          .total-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: right; margin-bottom: 30px; }
-          .total-amount { font-size: 20px; font-weight: bold; color: #059669; }
-          .footer { display: flex; justify-content: space-between; margin-top: 60px; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-          .sign-box { text-align: center; width: 200px; }
-          .sign-line { border-top: 1px dashed #94a3b8; margin-top: 40px; padding-top: 5px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">THANGAM HOSPITAL</div>
-          <div class="subtitle">Central Pharmacy Department • Medicine Sales Return & Refund Voucher</div>
-          <div class="doc-type">OFFICIAL CREDIT NOTE / SALES RETURN RECEIPT</div>
-        </div>
-
-        <div class="grid">
-          <div class="col">
-            <div><strong>Return Voucher #:</strong> ${record.return_id}</div>
-            <div><strong>Original Invoice #:</strong> ${record.invoice_number}</div>
-            <div><strong>Return Date:</strong> ${new Date(record.return_date).toLocaleString('en-IN')}</div>
-            <div><strong>Restocked to Inventory:</strong> ${record.restock_inventory ? 'Yes (Returned to Batch Stock)' : 'No (Scrapped/Quarantine)'}</div>
-          </div>
-          <div class="col" style="text-align: right;">
-            <div><strong>Patient / Customer:</strong> ${record.patient_name}</div>
-            <div><strong>Patient ID / Mobile:</strong> ${record.patient_id}</div>
-            <div><strong>Refund Method:</strong> ${record.refund_method}</div>
-            <div><strong>Authorized Pharmacist:</strong> ${record.pharmacist}</div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="text-align: center; width: 40px;">#</th>
-              <th>Medicine Name & Batch</th>
-              <th style="text-align: center; width: 80px;">Return Qty</th>
-              <th style="text-align: right; width: 100px;">Unit Rate</th>
-              <th style="text-align: right; width: 120px;">Refund Total</th>
-              <th style="width: 140px;">Return Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-
-        <div class="total-box">
-          <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">TOTAL REFUND PROCESSED (${record.refund_method.toUpperCase()})</div>
-          <div class="total-amount">INR ${Number(record.total_refund).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-        </div>
-
-        <div class="footer">
-          <div class="sign-box">
-            <div class="sign-line">Customer Signature / Acknowledgment</div>
-          </div>
-          <div class="sign-box">
-            <div class="sign-line">Authorized Pharmacist Signature</div>
-            <div style="font-size: 10px; color: #64748b;">${record.pharmacist}</div>
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-          };
-        </script>
-      </body>
-      </html>
-    `);
-    printWin.document.close();
   };
 
   // Add new medicine record with mandatory Batch Number & Pack Size calculation
@@ -1773,189 +1781,197 @@ export default function PharmacyPage() {
     const dateStr = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
     const timeStr = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      showToast("Pop-up blocked! Please allow pop-ups to print the Register.", "error");
-      return;
-    }
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${reportTitle} - THANGAM HOSPITAL</title>
-          <style>
-            @page {
-              size: A4 landscape;
-              margin: 10mm;
-            }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-              color: #0f172a;
-              margin: 0;
-              padding: 15px;
-              background: #fff;
-              font-size: 11px;
-            }
-            .header {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              border-bottom: 2px solid #4338ca;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
-            }
-            .hospital-title {
-              font-size: 22px;
-              font-weight: 800;
-              color: #1e1b4b;
-              margin: 0;
-              letter-spacing: 0.5px;
-            }
-            .pharmacy-subtitle {
-              font-size: 13px;
-              font-weight: 600;
-              color: #4f46e5;
-              margin-top: 3px;
-            }
-            .report-title {
-              font-size: 15px;
-              font-weight: 700;
-              color: #dc2626;
-              margin-top: 6px;
-              text-transform: uppercase;
-              letter-spacing: 0.8px;
-            }
-            .meta-info {
-              text-align: right;
-              font-size: 10px;
-              color: #475569;
-              line-height: 1.5;
-            }
-            .meta-info strong {
-              color: #0f172a;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            th, td {
-              border: 1px solid #cbd5e1;
-              padding: 6px 8px;
-              text-align: left;
-              font-size: 10px;
-            }
-            th {
-              background-color: #f1f5f9;
-              color: #1e293b;
-              font-weight: 700;
-              text-transform: uppercase;
-              font-size: 9px;
-              letter-spacing: 0.3px;
-            }
-            tr:nth-child(even) {
-              background-color: #f8fafc;
-            }
-            .text-center { text-align: center; }
-            .text-right { text-align: right; }
-            .font-mono { font-family: monospace; font-weight: 600; }
-            .badge-batch {
-              display: inline-block;
-              background: ${badgeBg};
-              color: ${badgeColor};
-              font-weight: bold;
-              padding: 1px 5px;
-              border-radius: 3px;
-              font-size: 9.5px;
-            }
-            .footer {
-              margin-top: 30px;
-              display: flex;
-              justify-content: space-between;
-              font-size: 10px;
-              color: #64748b;
-              border-top: 1px solid #e2e8f0;
-              padding-top: 12px;
-            }
-            .sign-box {
-              text-align: center;
-              width: 220px;
-              border-top: 1px dashed #94a3b8;
-              padding-top: 5px;
-              margin-top: 25px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 class="hospital-title">THANGAM HOSPITAL</h1>
-              <div class="pharmacy-subtitle">Central Pharmacy & Statutory Drug Store</div>
-              <div class="report-title">${reportTitle}</div>
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${reportTitle} - THANGAM HOSPITAL</title>
+            <style>
+              @page {
+                size: A4 landscape;
+                margin: 10mm;
+              }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                color: #0f172a;
+                margin: 0;
+                padding: 15px;
+                background: #fff;
+                font-size: 11px;
+              }
+              .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                border-bottom: 2px solid #4338ca;
+                padding-bottom: 10px;
+                margin-bottom: 15px;
+              }
+              .hospital-title {
+                font-size: 22px;
+                font-weight: 800;
+                color: #1e1b4b;
+                margin: 0;
+                letter-spacing: 0.5px;
+              }
+              .pharmacy-subtitle {
+                font-size: 13px;
+                font-weight: 600;
+                color: #4f46e5;
+                margin-top: 3px;
+              }
+              .report-title {
+                font-size: 15px;
+                font-weight: 700;
+                color: #0f172a;
+                margin-top: 6px;
+                display: inline-block;
+                background: ${badgeBg};
+                color: ${badgeColor};
+                padding: 3px 10px;
+                border-radius: 4px;
+              }
+              .meta-info {
+                text-align: right;
+                font-size: 11px;
+                color: #475569;
+                line-height: 1.4;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 6px 8px;
+                text-align: left;
+              }
+              th {
+                background-color: #f1f5f9;
+                font-weight: 700;
+                color: #1e293b;
+                font-size: 10.5px;
+                text-transform: uppercase;
+              }
+              tr:nth-child(even) {
+                background-color: #f8fafc;
+              }
+              .text-center { text-align: center; }
+              .text-right { text-align: right; }
+              .font-mono { font-family: ui-monospace, monospace; }
+              .badge-batch {
+                background: #e2e8f0;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-weight: 600;
+              }
+              .footer {
+                margin-top: 25px;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                font-size: 10px;
+                color: #64748b;
+                border-top: 1px solid #e2e8f0;
+                padding-top: 10px;
+              }
+              .sign-box {
+                text-align: center;
+                width: 220px;
+                border-top: 1px dashed #94a3b8;
+                padding-top: 5px;
+                margin-top: 25px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div>
+                <h1 class="hospital-title">THANGAM HOSPITAL</h1>
+                <div class="pharmacy-subtitle">Central Pharmacy & Statutory Drug Store</div>
+                <div class="report-title">${reportTitle}</div>
+              </div>
+              <div class="meta-info">
+                <div><strong>Print Date:</strong> ${dateStr}</div>
+                <div><strong>Print Time:</strong> ${timeStr}</div>
+                <div><strong>Generated By:</strong> ${pharmacistName || "Chief Pharmacist"}</div>
+                <div><strong>Total Batches Logged:</strong> ${reportRows.length}</div>
+              </div>
             </div>
-            <div class="meta-info">
-              <div><strong>Print Date:</strong> ${dateStr}</div>
-              <div><strong>Print Time:</strong> ${timeStr}</div>
-              <div><strong>Generated By:</strong> ${pharmacistName || "Chief Pharmacist"}</div>
-              <div><strong>Total Batches Logged:</strong> ${reportRows.length}</div>
-            </div>
-          </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 30px;">#</th>
-                <th>Medicine Name</th>
-                <th>Generic Name</th>
-                <th>Batch Number</th>
-                <th class="text-center">Pack Size</th>
-                <th class="text-center">No. of Packs</th>
-                <th class="text-center">Total Units</th>
-                <th>Supplier</th>
-                <th class="text-center">MFG Date</th>
-                <th class="text-center">EXP Date</th>
-                <th class="text-center">Current Stock</th>
-                <th>Rack Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${reportRows.map((r, idx) => `
+            <table>
+              <thead>
                 <tr>
-                  <td class="text-center font-mono">${idx + 1}</td>
-                  <td><strong>${r.medicine_name}</strong></td>
-                  <td>${r.generic_name}</td>
-                  <td class="font-mono"><span class="badge-batch">${r.batch_number}</span></td>
-                  <td class="text-center font-mono">${r.pack_size}</td>
-                  <td class="text-center font-mono">${r.no_of_packs}</td>
-                  <td class="text-center font-mono"><strong>${r.total_units}</strong></td>
-                  <td>${r.supplier}</td>
-                  <td class="text-center font-mono">${r.mfg_date}</td>
-                  <td class="text-center font-mono">${r.exp_date}</td>
-                  <td class="text-center font-mono"><strong>${r.current_stock}</strong></td>
-                  <td class="font-mono">${r.rack_location}</td>
+                  <th style="width: 30px;">#</th>
+                  <th>Medicine Name</th>
+                  <th>Generic Name</th>
+                  <th>Batch Number</th>
+                  <th class="text-center">Pack Size</th>
+                  <th class="text-center">No. of Packs</th>
+                  <th class="text-center">Total Units</th>
+                  <th>Supplier</th>
+                  <th class="text-center">MFG Date</th>
+                  <th class="text-center">EXP Date</th>
+                  <th class="text-center">Current Stock</th>
+                  <th>Rack Location</th>
                 </tr>
-              `).join("")}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                ${reportRows.map((r, idx) => `
+                  <tr>
+                    <td class="text-center font-mono">${idx + 1}</td>
+                    <td><strong>${r.medicine_name}</strong></td>
+                    <td>${r.generic_name}</td>
+                    <td class="font-mono"><span class="badge-batch">${r.batch_number}</span></td>
+                    <td class="text-center font-mono">${r.pack_size}</td>
+                    <td class="text-center font-mono">${r.no_of_packs}</td>
+                    <td class="text-center font-mono"><strong>${r.total_units}</strong></td>
+                    <td>${r.supplier}</td>
+                    <td class="text-center font-mono">${r.mfg_date}</td>
+                    <td class="text-center font-mono">${r.exp_date}</td>
+                    <td class="text-center font-mono"><strong>${r.current_stock}</strong></td>
+                    <td class="font-mono">${r.rack_location}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
 
-          <div class="footer">
-            <div>Verified &amp; Printed in accordance with statutory Drugs and Cosmetics Rules, Government of India.</div>
-            <div class="sign-box">Authorized Registered Pharmacist Signature &amp; Stamp</div>
-          </div>
+            <div class="footer">
+              <div>Verified &amp; Printed in accordance with statutory Drugs and Cosmetics Rules, Government of India.</div>
+              <div class="sign-box">Authorized Registered Pharmacist Signature &amp; Stamp</div>
+            </div>
+          </body>
+        </html>
+      `;
 
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 250);
+    } catch (e) {
+      console.error(e);
+      showToast("Print failed", "error");
+    }
   };
 
   // Download report of medicines whose stock levels are below reorder limits
@@ -2447,114 +2463,126 @@ export default function PharmacyPage() {
     }
   };
 
-  // Print Dispensation Receipt
+  // Print Dispensation Receipt via Hidden Iframe (No Popup / No New Tab)
   const printDispenseReceipt = (record) => {
     if (!record) return;
-    const printWin = window.open("", "_blank", "width=750,height=850");
-    if (!printWin) {
-      showToast("Pop-up blocked. Please allow popups to print receipt.", "error");
-      return;
-    }
-    const isPaid = record.isPaidAtPharmacy;
-    const rowsHtml = (record.items || []).map(item => {
-      const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
-      const totalQty = item.requested_qty || item.qty || 1;
-      const batchNames = isOutside ? "Outside Purchase" : (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ") || "Batch Stored";
-      // Use pre-computed line_total if available; fallback to unit_price * qty
-      const lineTotal = isOutside ? 0 : (item.line_total !== undefined ? item.line_total : (totalQty * (item.unit_price || 0)));
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
 
-      return `
-        <tr>
-          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${item.medicine_name}</td>
-          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${totalQty}</td>
-          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b;">${batchNames}</td>
-          <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${isOutside ? 'Outside (₹0)' : '₹' + lineTotal.toFixed(2)}</td>
-        </tr>
-      `;
-    }).join("");
+      const isPaid = record.isPaidAtPharmacy;
+      const rowsHtml = (record.items || []).map(item => {
+        const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
+        const totalQty = item.requested_qty || item.qty || 1;
+        const batchNames = isOutside ? "Outside Purchase" : (item.deductions || []).map(d => `${d.batch_number} (x${d.qty})`).join(", ") || "Batch Stored";
+        const lineTotal = isOutside ? 0 : (item.line_total !== undefined ? item.line_total : (totalQty * (item.unit_price || 0)));
 
-    printWin.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Thangam Hospital - Pharmacy Invoice ${record.invoiceNumber}</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #0f172a; max-width: 600px; margin: 0 auto; }
-            .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
-            .hosp-name { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
-            .hosp-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
-            .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-top: 8px; }
-            .badge-paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
-            .badge-fwd { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 16px; }
-            .label { color: #64748b; font-size: 11px; font-weight: 500; }
-            .val { font-weight: 600; color: #0f172a; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
-            th { background: #f8fafc; padding: 8px; text-align: left; font-size: 11px; color: #475569; border-bottom: 2px solid #cbd5e1; }
-            .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 800; padding: 10px 0; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; margin-bottom: 16px; }
-            .stamp { text-align: center; margin: 16px auto; padding: 8px 16px; width: fit-content; border-radius: 6px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
-            .stamp-paid { border: 2px dashed #16a34a; color: #16a34a; }
-            .stamp-fwd { border: 2px dashed #d97706; color: #d97706; }
-            .footer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 20px; font-style: italic; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="hosp-name">THANGAM HOSPITAL</div>
-            <div class="hosp-sub">123 Health City Road, Coimbatore - 641012 | GSTIN: 33AAAAA1111A1Z1</div>
-            <div class="hosp-sub">Pharmacy Dispensing & Outpatient Bill</div>
-            <div class="badge ${isPaid ? 'badge-paid' : 'badge-fwd'}">
-              ${isPaid ? 'PAID AT PHARMACY COUNTER' : 'FORWARDED TO CENTRAL BILLING (DUE AT BILLING DESK)'}
+        return `
+          <tr>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${item.medicine_name}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center;">${totalQty}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b;">${batchNames}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${isOutside ? 'Outside (₹0)' : '₹' + lineTotal.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Thangam Hospital - Pharmacy Invoice ${record.invoiceNumber}</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #0f172a; max-width: 600px; margin: 0 auto; }
+              .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
+              .hosp-name { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 0.5px; }
+              .hosp-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
+              .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-top: 8px; }
+              .badge-paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+              .badge-fwd { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 16px; }
+              .label { color: #64748b; font-size: 11px; font-weight: 500; }
+              .val { font-weight: 600; color: #0f172a; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+              th { background: #f8fafc; padding: 8px; text-align: left; font-size: 11px; color: #475569; border-bottom: 2px solid #cbd5e1; }
+              .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 800; padding: 10px 0; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; margin-bottom: 16px; }
+              .stamp { text-align: center; margin: 16px auto; padding: 8px 16px; width: fit-content; border-radius: 6px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+              .stamp-paid { border: 2px dashed #16a34a; color: #16a34a; }
+              .stamp-fwd { border: 2px dashed #d97706; color: #d97706; }
+              .footer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 20px; font-style: italic; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="hosp-name">THANGAM HOSPITAL</div>
+              <div class="hosp-sub">123 Health City Road, Coimbatore - 641012 | GSTIN: 33AAAAA1111A1Z1</div>
+              <div class="hosp-sub">Pharmacy Dispensing & Outpatient Bill</div>
+              <div class="badge ${isPaid ? 'badge-paid' : 'badge-fwd'}">
+                ${isPaid ? 'PAID AT PHARMACY COUNTER' : 'FORWARDED TO CENTRAL BILLING (DUE AT BILLING DESK)'}
+              </div>
             </div>
-          </div>
-          
-          <div class="grid">
-            <div><span class="label">Invoice No:</span> <span class="val">${record.invoiceNumber}</span></div>
-            <div><span class="label">Date:</span> <span class="val">${record.date || new Date().toLocaleString()}</span></div>
-            <div><span class="label">Patient Name:</span> <span class="val">${record.patientName}</span></div>
-            <div><span class="label">Mobile/ID:</span> <span class="val">${record.patientMobile}</span></div>
-            <div><span class="label">Doctor:</span> <span class="val">${record.doctorName}</span></div>
-            <div><span class="label">Payment Mode:</span> <span class="val">${record.paymentMethod || 'Cash'}</span></div>
-          </div>
+            
+            <div class="grid">
+              <div><span class="label">Invoice No:</span> <span class="val">${record.invoiceNumber}</span></div>
+              <div><span class="label">Date:</span> <span class="val">${record.date || new Date().toLocaleString()}</span></div>
+              <div><span class="label">Patient Name:</span> <span class="val">${record.patientName}</span></div>
+              <div><span class="label">Mobile/ID:</span> <span class="val">${record.patientMobile}</span></div>
+              <div><span class="label">Doctor:</span> <span class="val">${record.doctorName}</span></div>
+              <div><span class="label">Payment Mode:</span> <span class="val">${record.paymentMethod || 'Cash'}</span></div>
+            </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>Medicine / Details</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: center;">Deducted Batch</th>
-                <th style="text-align: right;">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+            <table>
+              <thead>
+                <tr>
+                  <th>Medicine / Details</th>
+                  <th style="text-align: center;">Qty</th>
+                  <th style="text-align: center;">Deducted Batch</th>
+                  <th style="text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
 
-          <div class="total-row">
-            <span>GRAND TOTAL (incl. GST):</span>
-            <span>₹${(record.totalVal || 0).toFixed(2)}</span>
-          </div>
+            <div class="total-row">
+              <span>GRAND TOTAL (incl. GST):</span>
+              <span>₹${(record.totalVal || 0).toFixed(2)}</span>
+            </div>
 
-          <div class="stamp ${isPaid ? 'stamp-paid' : 'stamp-fwd'}">
-            ${isPaid ? 'PAID & DISPENSED' : 'FORWARDED TO BILLING DESK'}
-          </div>
+            <div class="stamp ${isPaid ? 'stamp-paid' : 'stamp-fwd'}">
+              ${isPaid ? 'PAID & DISPENSED' : 'FORWARDED TO BILLING DESK'}
+            </div>
 
-          <div class="footer">
-            Pharmacist: ${record.pharmacistName || 'Registered Pharmacist, RPh'}<br />
-            Thank you for choosing Thangam Hospital. Get well soon!
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWin.document.close();
+            <div class="footer">
+              Pharmacist: ${record.pharmacistName || 'Registered Pharmacist, RPh'}<br />
+              Thank you for choosing Thangam Hospital. Get well soon!
+            </div>
+          </body>
+        </html>
+      `);
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 250);
+    } catch (e) {
+      console.error(e);
+      showToast("Print failed", "error");
+    }
   };
 
   // PDF Generation - GRN / Purchase Bill
@@ -6224,21 +6252,21 @@ export default function PharmacyPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="font-bold text-slate-500">Age *</Label>
+                    <Label className="font-bold text-slate-500">Age (Optional)</Label>
                     <Input
                       type="number"
-                      placeholder="30"
+                      placeholder="e.g. 30"
                       value={otcCustomerAge}
                       onChange={(e) => setOtcCustomerAge(e.target.value)}
                       className="h-8 text-xs border-slate-200 bg-white"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="font-bold text-slate-500">Gender *</Label>
+                    <Label className="font-bold text-slate-500">Gender</Label>
                     <select
                       value={otcCustomerGender}
                       onChange={(e) => setOtcCustomerGender(e.target.value)}
-                      className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none"
+                      className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none text-xs"
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -6248,7 +6276,7 @@ export default function PharmacyPage() {
                   <div className="space-y-1 col-span-2">
                     <Label className="font-bold text-slate-500">Mobile Number (Optional)</Label>
                     <Input
-                      placeholder="9876543210"
+                      placeholder="e.g. 9876543210 (Optional)"
                       value={otcCustomerMobile}
                       onChange={(e) => setOtcCustomerMobile(e.target.value)}
                       className="h-8 text-xs border-slate-200 bg-white"
@@ -6519,9 +6547,9 @@ export default function PharmacyPage() {
 
                     const response = await executeDirectSale(
                       otcCustomerName,
-                      otcCustomerMobile || "9999999999",
-                      otcCustomerAge || "30",
-                      otcCustomerGender || "Female",
+                      otcCustomerMobile || "",
+                      otcCustomerAge || "",
+                      otcCustomerGender || "Unspecified",
                       saleItems,
                       otcPaymentMethod,
                       pharmacistName
@@ -6563,8 +6591,8 @@ export default function PharmacyPage() {
                     // Show on-screen receipt preview modal (NO auto download)
                     setLatestDispenseRecord({
                       invoiceNumber: response.invoiceNumber,
-                      patientName: otcCustomerName || "Direct Walk-in Customer",
-                      patientMobile: otcCustomerMobile || "9999999999",
+                      patientName: otcCustomerName || "Walk-in Customer",
+                      patientMobile: otcCustomerMobile || "N/A",
                       doctorName: "Self (OTC)",
                       items: receiptItems,
                       dispenseItems: otcBasket,
@@ -6604,8 +6632,8 @@ export default function PharmacyPage() {
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 font-serif">Return Sold Medicine (Sales Return & Refund)</h3>
-                  <p className="text-[11px] text-slate-500">Return dispensed medications, recalculate refunds, restock batches, and update statutory registers.</p>
+                  <h3 className="text-base font-bold text-slate-900 font-serif">Return Sold Medicine (Sales Return & Restock)</h3>
+                  <p className="text-[11px] text-slate-500">Return medicines by tablet count or lookup past sales. Restocks inventory and records refunds automatically.</p>
                 </div>
               </div>
               <button onClick={() => setShowSalesReturnModal(false)} className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition">
@@ -6616,105 +6644,177 @@ export default function PharmacyPage() {
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
               
-              {/* Step 1: Select Sold Transaction */}
-              <div className="space-y-3">
+              {/* Direct Medicine Return Builder */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3.5">
                 <div className="flex justify-between items-center">
-                  <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">
-                    1. Select Dispensed / Sold Invoice
+                  <Label className="font-bold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-indigo-600" />
+                    1. Select Medicine & Tablets to Return
                   </Label>
-                  {returnSelectedSale && (
-                    <button 
-                      type="button" 
-                      onClick={() => { setReturnSelectedSale(null); setReturnItems([]); }}
-                      className="text-indigo-600 hover:underline text-xs font-semibold"
-                    >
-                      Search / Pick Another Sale
-                    </button>
-                  )}
+                  <span className="text-[10px] text-slate-400 font-medium">Customer details are optional</span>
                 </div>
 
-                {!returnSelectedSale ? (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <Input
-                        placeholder="Search past sales by Invoice # (e.g. INV-OTC, INV-PH), Patient Name, or Mobile..."
-                        value={returnSearchQuery}
-                        onChange={(e) => setReturnSearchQuery(e.target.value)}
-                        className="pl-9 h-9 text-xs bg-slate-50 border-slate-200 rounded-lg"
-                      />
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {/* Medicine Picker */}
+                  <div className="sm:col-span-2 space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Select Medicine *</Label>
+                    <select
+                      value={directReturnMed ? (directReturnMed.medicine_name || directReturnMed.name) : ""}
+                      onChange={(e) => {
+                        const med = medicines.find(m => (m.medicine_name || m.name) === e.target.value);
+                        setDirectReturnMed(med || null);
+                        if (med) {
+                          const price = Number(med.selling_price) || Number(med.mrp) || 10;
+                          setDirectReturnPrice(price);
+                          const firstBatch = med.batches?.[0]?.batch_number || med.batch_number || "BATCH-01";
+                          setDirectReturnBatch(firstBatch);
+                        }
+                      }}
+                      className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 font-medium text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Choose Medicine from Inventory --</option>
+                      {medicines.map((m, idx) => (
+                        <option key={idx} value={m.medicine_name || m.name}>
+                          {m.medicine_name} (Stock: {m.stock || 0} | {m.dosage_form || "Tablet"} | ₹{m.selling_price || m.mrp || 0})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
-                      {pastSalesGroups.length === 0 ? (
-                        <div className="text-center py-6 text-slate-400">
-                          No recent sales or dispensed invoices found.
-                        </div>
-                      ) : (
-                        pastSalesGroups.map((group, idx) => (
-                          <div 
-                            key={idx}
-                            onClick={() => handleSelectSaleForReturn(group)}
-                            className="p-3 bg-white rounded-lg border border-slate-200 hover:border-indigo-400 hover:shadow-xs cursor-pointer transition flex items-center justify-between gap-3 group"
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-indigo-700 text-xs">{group.invoice_number}</span>
-                                <span className="text-slate-400">•</span>
-                                <span className="font-semibold text-slate-800">{group.patient_name}</span>
-                                {group.patient_id && group.patient_id !== "N/A" && (
-                                  <span className="text-slate-400 text-[10px]">({group.patient_id})</span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-2">
-                                <span>{new Date(group.dispensing_date).toLocaleDateString('en-IN')}</span>
-                                <span>•</span>
-                                <span>Doctor: {group.doctor}</span>
-                                <span>•</span>
-                                <span className="font-medium text-slate-700">{group.logs.length} Item(s): {group.logs.map(l => l.medicine).join(", ")}</span>
-                              </div>
-                            </div>
-                            <Button size="xs" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white font-semibold text-[11px] h-7 px-3 shrink-0">
-                              Select Sale
-                            </Button>
-                          </div>
-                        ))
-                      )}
+                  {/* Return Quantity (Tablets / Units) */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Tablets / Units to Return *</Label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setDirectReturnQty(prev => Math.max(1, (parseInt(prev, 10) || 1) - 1))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center cursor-pointer text-sm"
+                      >
+                        -
+                      </button>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={directReturnQty}
+                        onChange={(e) => setDirectReturnQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="h-8 text-center font-mono font-bold text-xs bg-white"
+                        placeholder="Qty"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDirectReturnQty(prev => (parseInt(prev, 10) || 0) + 1)}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center cursor-pointer text-sm"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3.5 flex justify-between items-center text-xs">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-indigo-950">Original Invoice:</span>
-                        <span className="font-mono font-bold bg-indigo-200/80 text-indigo-900 px-2 py-0.5 rounded text-xs">
-                          {returnSelectedSale.invoice_number}
-                        </span>
-                        <span className="text-slate-400">•</span>
-                        <span className="font-semibold text-slate-800">{returnSelectedSale.patient_name}</span>
-                        {returnSelectedSale.patient_id && (
-                          <span className="text-slate-500 font-mono">({returnSelectedSale.patient_id})</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-1">
-                        Channel / Doctor: <strong className="text-slate-700">{returnSelectedSale.doctor}</strong> • Dispensed on: <strong>{new Date(returnSelectedSale.date).toLocaleString('en-IN')}</strong>
-                      </div>
-                    </div>
-                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 rounded text-[10px]">
-                      Active Sale Selected
-                    </span>
+
+                  {/* Batch Selection */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Batch # (Restock Target)</Label>
+                    {directReturnMed && (directReturnMed.batches || []).length > 0 ? (
+                      <select
+                        value={directReturnBatch}
+                        onChange={(e) => setDirectReturnBatch(e.target.value)}
+                        className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs focus:outline-none"
+                      >
+                        {(directReturnMed.batches || []).map((b, bIdx) => (
+                          <option key={bIdx} value={b.batch_number}>
+                            {b.batch_number} (Stock: {b.current_stock || 0} | Exp: {b.exp_date || "N/A"})
+                          </option>
+                        ))}
+                        <option value="RETURN">Auto Return Batch (RET)</option>
+                      </select>
+                    ) : (
+                      <Input
+                        value={directReturnBatch}
+                        onChange={(e) => setDirectReturnBatch(e.target.value)}
+                        placeholder="e.g. BATCH-01 or RETURN"
+                        className="h-8 text-xs bg-white"
+                      />
+                    )}
                   </div>
-                )}
+
+                  {/* Unit Rate */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Unit Rate (₹ / tablet)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={directReturnPrice}
+                      onChange={(e) => setDirectReturnPrice(e.target.value)}
+                      placeholder="Price"
+                      className="h-8 text-xs font-mono bg-white"
+                    />
+                  </div>
+
+                  {/* Return Reason */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Return Reason</Label>
+                    <select
+                      value={directReturnReason}
+                      onChange={(e) => setDirectReturnReason(e.target.value)}
+                      className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs focus:outline-none"
+                    >
+                      <option value="Doctor Changed Prescription">Doctor Changed Prescription</option>
+                      <option value="Excess / Unused Tablets">Excess / Unused Tablets</option>
+                      <option value="Patient Discontinued / Recovered">Patient Discontinued / Recovered</option>
+                      <option value="Incorrect Medicine Dispensed">Incorrect Medicine Dispensed</option>
+                      <option value="Adverse Drug Reaction">Adverse Drug Reaction</option>
+                      <option value="Defective / Damaged Packaging">Defective / Damaged Packaging</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Optional Customer Name */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Customer / Patient Name (Optional)</Label>
+                    <Input
+                      value={directReturnPatient}
+                      onChange={(e) => setDirectReturnPatient(e.target.value)}
+                      placeholder="Walk-in Customer (Optional)"
+                      className="h-8 text-xs bg-white"
+                    />
+                  </div>
+
+                  {/* Optional Customer Mobile */}
+                  <div className="space-y-1">
+                    <Label className="font-semibold text-slate-700 text-[11px]">Mobile # / ID (Optional)</Label>
+                    <Input
+                      value={directReturnMobile}
+                      onChange={(e) => setDirectReturnMobile(e.target.value)}
+                      placeholder="Mobile # (Optional)"
+                      className="h-8 text-xs bg-white"
+                    />
+                  </div>
+
+                  {/* Add to Return List Button */}
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      onClick={handleAddDirectReturnItem}
+                      disabled={!directReturnMed}
+                      className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add to Return List
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               {/* Step 2: Select Items and Return Quantities */}
-              {returnItems.length > 0 && (
+              {returnItems.length > 0 ? (
                 <div className="space-y-3 border-t border-slate-100 pt-4">
-                  <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">
-                    2. Select Medicines to Return & Adjust Quantity
-                  </Label>
+                  <div className="flex justify-between items-center">
+                    <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">
+                      2. Medicines to Return & Refund Amount ({returnItems.length} items)
+                    </Label>
+                    <span className="text-[10px] text-slate-400">Review quantities and refund amounts</span>
+                  </div>
 
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
@@ -6724,7 +6824,8 @@ export default function PharmacyPage() {
                           <th className="p-3 text-center w-28">Return Qty</th>
                           <th className="p-3 text-right w-24">Unit Rate</th>
                           <th className="p-3 text-right w-28">Refund Total</th>
-                          <th className="p-3 w-40">Return Reason</th>
+                          <th className="p-3 w-36">Return Reason</th>
+                          <th className="p-3 text-center w-10">Remove</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -6743,13 +6844,13 @@ export default function PharmacyPage() {
                               <div className="text-[10px] font-mono text-slate-500">Batch: {item.batch_number || "N/A"}</div>
                             </td>
                             <td className="p-3 text-center font-mono font-semibold text-slate-700">
-                              {item.sold_qty}
+                              {item.sold_qty !== null && item.sold_qty !== undefined ? item.sold_qty : <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Direct</span>}
                             </td>
                             <td className="p-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   type="button"
-                                  disabled={!item.selected || item.return_qty <= 0}
+                                  disabled={!item.selected || item.return_qty <= 1}
                                   onClick={() => handleUpdateReturnQty(idx, item.return_qty - 1)}
                                   className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer"
                                 >
@@ -6758,15 +6859,15 @@ export default function PharmacyPage() {
                                 <Input
                                   type="number"
                                   disabled={!item.selected}
-                                  min={0}
-                                  max={item.sold_qty}
+                                  min={1}
+                                  max={item.sold_qty || undefined}
                                   value={item.return_qty}
                                   onChange={(e) => handleUpdateReturnQty(idx, e.target.value)}
                                   onBlur={(e) => {
                                     const val = parseInt(e.target.value, 10);
-                                    if (isNaN(val) || val < 0) {
-                                      handleUpdateReturnQty(idx, 0);
-                                    } else if (val > item.sold_qty) {
+                                    if (isNaN(val) || val < 1) {
+                                      handleUpdateReturnQty(idx, 1);
+                                    } else if (item.sold_qty && val > item.sold_qty) {
                                       handleUpdateReturnQty(idx, item.sold_qty);
                                     }
                                   }}
@@ -6774,14 +6875,14 @@ export default function PharmacyPage() {
                                 />
                                 <button
                                   type="button"
-                                  disabled={!item.selected || item.return_qty >= item.sold_qty}
+                                  disabled={!item.selected || (item.sold_qty !== null && item.sold_qty !== undefined && item.return_qty >= item.sold_qty)}
                                   onClick={() => handleUpdateReturnQty(idx, item.return_qty + 1)}
                                   className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer"
                                 >
                                   +
                                 </button>
                               </div>
-                              <div className="text-[9px] text-slate-400 font-mono mt-0.5">Max: {item.sold_qty}</div>
+                              {item.sold_qty && <div className="text-[9px] text-slate-400 font-mono mt-0.5">Max: {item.sold_qty}</div>}
                             </td>
                             <td className="p-3 text-right font-mono text-slate-600">
                               ₹{Number(item.unit_price).toFixed(2)}
@@ -6800,13 +6901,23 @@ export default function PharmacyPage() {
                                 className="w-full h-7 rounded border border-slate-200 bg-white px-2 text-[11px] focus:outline-none"
                               >
                                 <option value="Doctor Changed Prescription">Doctor Changed Prescription</option>
+                                <option value="Excess / Unused Tablets">Excess / Unused Tablets</option>
                                 <option value="Patient Discontinued / Recovered">Patient Discontinued / Recovered</option>
-                                <option value="Excess / Unopened Medicine">Excess / Unopened Medicine</option>
                                 <option value="Incorrect Medicine Dispensed">Incorrect Medicine Dispensed</option>
                                 <option value="Adverse Drug Reaction">Adverse Drug Reaction</option>
                                 <option value="Defective / Damaged Packaging">Defective / Damaged Packaging</option>
                                 <option value="Other">Other</option>
                               </select>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveReturnItem(idx)}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition cursor-pointer"
+                                title="Remove from return list"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -6814,13 +6925,19 @@ export default function PharmacyPage() {
                     </table>
                   </div>
                 </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl bg-slate-50/60 text-slate-500 space-y-1">
+                  <Pill className="w-6 h-6 mx-auto text-slate-400" />
+                  <p className="font-semibold text-xs">No medicines added to return list yet</p>
+                  <p className="text-[11px] text-slate-400">Select a medicine above, specify tablet count, and click &quot;Add to Return List&quot;.</p>
+                </div>
               )}
 
               {/* Step 3: Return Options & Refund Mode */}
               {returnItems.length > 0 && (
                 <div className="space-y-4 border-t border-slate-100 pt-4">
                   <Label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">
-                    3. Return Configuration & Payment Method
+                    3. Return Configuration & Restock Settings
                   </Label>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -6880,7 +6997,7 @@ export default function PharmacyPage() {
                         <div>
                           <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">Return Summary</span>
                           <span className="text-xs text-slate-700 mt-0.5 block">
-                            <strong>{selectedList.length}</strong> item(s) selected • Total units returning: <strong>{totalUnits}</strong>
+                            <strong>{selectedList.length}</strong> medicine(s) selected • Total units returning: <strong>{totalUnits}</strong>
                           </span>
                         </div>
                         <div className="text-right">
@@ -6921,7 +7038,7 @@ export default function PharmacyPage() {
                 ) : (
                   <>
                     <RotateCcw className="w-3.5 h-3.5" />
-                    Process Return & Refund (₹{returnItems.filter(i => i.selected && i.return_qty > 0).reduce((acc, c) => acc + c.refund_amount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    Process Return & Restock (₹{returnItems.filter(i => i.selected && i.return_qty > 0).reduce((acc, c) => acc + c.refund_amount, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                   </>
                 )}
               </Button>

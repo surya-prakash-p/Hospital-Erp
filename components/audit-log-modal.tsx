@@ -359,7 +359,6 @@ export function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                 <option value="Admin">Hospital Admin</option>
                 <option value="Doctor">Doctor</option>
                 <option value="Pharmacist">Pharmacist</option>
-                <option value="Lab Technician">Lab Technician</option>
                 <option value="Receptionist">Receptionist</option>
               </select>
 

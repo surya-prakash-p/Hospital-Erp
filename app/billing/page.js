@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getQueue, updateWalkIn, getPatient, updatePatientHistory, getLabTests, recordFinanceTransaction } from "@/lib/hospital-service";
+import { getQueue, updateWalkIn, getPatient, updatePatientHistory, recordFinanceTransaction } from "@/lib/hospital-service";
 
 const DOCTOR_FEES = {
   "Dr. Rajesh": 500,
@@ -22,7 +22,6 @@ export default function BillingPage() {
   const [toasts, setToasts] = useState([]);
   const [settledInvoice, setSettledInvoice] = useState(null);
   const [deptPayments, setDeptPayments] = useState([]);
-  const [labTests, setLabTests] = useState([]);
 
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -36,9 +35,8 @@ export default function BillingPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [q, labs] = await Promise.all([getQueue(), getLabTests()]);
+        const q = await getQueue();
         setQueue(q || []);
-        setLabTests(labs || []);
       } catch (err) {
         showToast("Error loading billing queue", "error");
         console.error(err);
@@ -48,18 +46,6 @@ export default function BillingPage() {
     }
     loadData();
   }, []);
-
-  const getLabFee = (testName) => {
-    if (!testName) return 0;
-    const names = testName.split(",").map(n => n.trim()).filter(Boolean);
-    if (names.length === 0) return 0;
-    let total = 0;
-    names.forEach(name => {
-      const test = labTests.find(t => t.test_name === name);
-      total += test ? test.fee : 450;
-    });
-    return total;
-  };
 
   // Load department-level payments from localStorage
   useEffect(() => {
@@ -84,9 +70,8 @@ export default function BillingPage() {
 
     // Calculate fee breakdown
     const docFee = DOCTOR_FEES[targetWalkIn.doctor] || 500;
-    const labFee = targetWalkIn.need_lab_test === 1 ? getLabFee(targetWalkIn.lab_test_name) : 0;
     const pharmFee = targetWalkIn.need_medicines === 1 ? (targetWalkIn.pharmacy_bill_amount || 0) : 0;
-    const grandTotal = docFee + labFee + pharmFee;
+    const grandTotal = docFee + pharmFee;
 
     // Retrieve department-level payments already logged (e.g. Reception, Pharmacy)
     const currentDeptPayments = JSON.parse(localStorage.getItem("hospital_dept_payments") || "[]");
@@ -117,7 +102,6 @@ export default function BillingPage() {
     setSettledInvoice({
       ...targetWalkIn,
       grandTotal,
-      labFee,
       docFee,
       pharmFee,
       isPharmPaidAtCounter,
@@ -163,7 +147,7 @@ export default function BillingPage() {
           amount: netBalance,
           method: paymentMethod,
           date: new Date().toISOString().split("T")[0],
-          notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Lab: ${targetWalkIn.need_lab_test === 1 ? "Yes" : "No"}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? (isPharmPaidAtCounter ? "Paid at Pharmacy" : "Yes") : "No"}.${deptPaidNote}`
+          notes: `Settled at Billing desk. Doctor: ${targetWalkIn.doctor}. Pharmacy: ${targetWalkIn.need_medicines === 1 ? (isPharmPaidAtCounter ? "Paid at Pharmacy" : "Yes") : "No"}.${deptPaidNote}`
         };
         financeEntries.unshift(billTx);
         localStorage.setItem("hospital_custom_finance", JSON.stringify(financeEntries));
@@ -183,12 +167,9 @@ export default function BillingPage() {
           date: new Date().toLocaleDateString('en-GB'),
           walkinData: {
             doctor: targetWalkIn.doctor || "",
-            lab_test_name: targetWalkIn.lab_test_name || "",
-            need_lab_test: targetWalkIn.need_lab_test || 0,
             pharmacy_bill_amount: targetWalkIn.pharmacy_bill_amount || 0,
             dispensed_medicines: targetWalkIn.dispensed_medicines || [],
             docFee,
-            labFee,
             grandTotal,
             deptAlreadyPaid,
             netBalance,
@@ -208,7 +189,6 @@ Visit Date: ${todayStr}
 Doctor: ${targetWalkIn.doctor}
 Diagnosis: ${targetWalkIn.diagnosis || "General Consultation Checkup"}
 Prescription: ${targetWalkIn.prescription || "None"}
-Lab Test: ${targetWalkIn.need_lab_test === 1 ? `${targetWalkIn.lab_test_name} (Results: ${targetWalkIn.lab_result || "normal"})` : "None"}
 Bill Total: ₹${grandTotal}${deptAlreadyPaid > 0 ? ` (Dept Paid: ₹${deptAlreadyPaid} | Balance Collected: ₹${netBalance})` : ""} (${paymentMethod})
 Status: Completed.
 `;
@@ -348,17 +328,7 @@ Status: Completed.
       doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
       posY += 7;
 
-      // Row 2: Lab Test
-      if (settledInvoice.need_lab_test === 1) {
-        const currentLabFee = settledInvoice.labFee || getLabFee(settledInvoice.lab_test_name);
-        doc.text(`Lab Diagnostic Panel (${settledInvoice.lab_test_name})`, 22, posY);
-        doc.text("1", 120, posY, { align: "center" });
-        doc.text(`INR ${currentLabFee.toFixed(2)}`, 145, posY, { align: "right" });
-        doc.text(`INR ${currentLabFee.toFixed(2)}`, 185, posY, { align: "right" });
-        posY += 7;
-      }
-
-      // Row 3: Pharmacy Medications
+      // Row 2: Pharmacy Medications
       if (settledInvoice.need_medicines === 1) {
         const pharmTotal = settledInvoice.pharmacy_bill_amount || 0;
         doc.text("Pharmacy Medication Package", 22, posY);
@@ -429,8 +399,18 @@ Status: Completed.
     if (!settledInvoice) return;
     try {
       const printContent = document.getElementById("printable-invoice").innerHTML;
-      const printWindow = window.open("", "_blank", "width=850,height=900");
-      printWindow.document.write(`
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
         <html>
           <head>
             <title>Invoice - ${settledInvoice.name}</title>
@@ -452,16 +432,19 @@ Status: Completed.
             <div class="max-w-2xl mx-auto border border-slate-100 p-8 rounded-xl shadow-sm">
               ${printContent}
             </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 500);
-              };
-            </script>
           </body>
         </html>
       `);
-      printWindow.document.close();
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 250);
     } catch (printErr) {
       showToast("Error printing invoice", "error");
       console.error(printErr);
@@ -529,38 +512,6 @@ Status: Completed.
                 {settledInvoice.diagnosis && (
                   <p className="text-muted-foreground mt-1">Diagnosis: <span className="text-slate-800">{settledInvoice.diagnosis}</span></p>
                 )}
-                {settledInvoice.need_lab_test === 1 && settledInvoice.lab_test_image && (
-                  <div className="mt-2.5 pt-2 border-t border-slate-200">
-                    <p className="text-[9px] text-muted-foreground font-bold uppercase mb-1">Attached Lab Diagnostic Scan(s)</p>
-                    <div className="flex flex-col gap-2">
-                      {(() => {
-                        let resolvedField = settledInvoice.lab_test_image;
-                        if (resolvedField === "stored_locally") {
-                          resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${settledInvoice.name}`) : "";
-                        }
-                        if (!resolvedField) return null;
-                        
-                        if (resolvedField.startsWith("{")) {
-                          try {
-                            const parsed = JSON.parse(resolvedField);
-                            return Object.entries(parsed).map(([test, src]) => (
-                              src && (
-                                <div key={test} className="space-y-1">
-                                  <p className="text-[9px] font-semibold text-slate-500">{test}</p>
-                                  <img src={src} alt={test} className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto" />
-                                </div>
-                              )
-                            ));
-                          } catch (e) {
-                            return null;
-                          }
-                        } else {
-                          return <img src={resolvedField} alt="Lab Report" className="max-h-24 rounded border border-slate-200 object-contain bg-white mx-auto" />;
-                        }
-                      })()}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Table of Charges */}
@@ -571,12 +522,6 @@ Status: Completed.
                     <span className="text-slate-600">Consultation Fee ({settledInvoice.doctor})</span>
                     <span className="font-medium">₹{DOCTOR_FEES[settledInvoice.doctor] || 500}</span>
                   </div>
-                  {settledInvoice.need_lab_test === 1 && (
-                    <div className="flex justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-600">Lab Diagnostic Panel ({settledInvoice.lab_test_name})</span>
-                      <span className="font-medium">₹{settledInvoice.labFee || getLabFee(settledInvoice.lab_test_name)}</span>
-                    </div>
-                  )}
                   {settledInvoice.need_medicines === 1 && (
                     <>
                       <div className="flex justify-between py-1 border-b border-slate-100">
@@ -750,47 +695,6 @@ Status: Completed.
                         {selectedWalkIn.prescription || "None"}
                       </p>
                     </div>
-
-                    {selectedWalkIn.need_lab_test === 1 && (
-                      <div className="bg-slate-50 p-3 rounded border border-slate-100 space-y-2 md:col-span-2">
-                        <span className="font-bold text-purple-600 uppercase tracking-wider block">Lab Diagnostic Report</span>
-                        <p className="font-medium text-slate-800">
-                          Test: <span className="font-semibold">{selectedWalkIn.lab_test_name}</span> | Results: <span className="font-mono bg-purple-50 px-1 py-0.5 rounded text-purple-700">{selectedWalkIn.lab_result || "normal"}</span>
-                        </p>
-                        {selectedWalkIn.lab_test_image && (
-                          <div className="mt-2 pt-2 border-t border-slate-200">
-                            <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Attached Lab Report Scan(s)</span>
-                            <div className="flex flex-wrap gap-3 mt-1">
-                              {(() => {
-                                let resolvedField = selectedWalkIn.lab_test_image;
-                                if (resolvedField === "stored_locally") {
-                                  resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${selectedWalkIn.name}`) : "";
-                                }
-                                if (!resolvedField) return null;
-                                
-                                if (resolvedField.startsWith("{")) {
-                                  try {
-                                    const parsed = JSON.parse(resolvedField);
-                                    return Object.entries(parsed).map(([test, src]) => (
-                                      src && (
-                                        <div key={test} className="space-y-1">
-                                          <p className="text-[9px] font-semibold text-slate-500">{test}</p>
-                                          <img src={src} alt={test} className="max-h-36 rounded border border-slate-200 object-contain bg-white" />
-                                        </div>
-                                      )
-                                    ));
-                                  } catch (e) {
-                                    return null;
-                                  }
-                                } else {
-                                  return <img src={resolvedField} alt="Lab Test Attachment" className="max-h-36 rounded border border-slate-200 object-contain bg-white" />;
-                                }
-                              })()}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Invoice Itemization */}
@@ -802,9 +706,8 @@ Status: Completed.
                     
                     {(() => {
                       const docFee = DOCTOR_FEES[selectedWalkIn.doctor] || 500;
-                      const labFee = selectedWalkIn.need_lab_test === 1 ? getLabFee(selectedWalkIn.lab_test_name) : 0;
                       const pharmFee = selectedWalkIn.need_medicines === 1 ? (selectedWalkIn.pharmacy_bill_amount || 0) : 0;
-                      const grossTotal = docFee + labFee + pharmFee;
+                      const grossTotal = docFee + pharmFee;
 
                       // Find dept payments already made for this walk-in
                       const patientDeptPayments = deptPayments.filter(p => p.walkInId === selectedWalkIn.name);
@@ -831,13 +734,6 @@ Status: Completed.
                             <span>Consultation Fee ({selectedWalkIn.doctor})</span>
                             <span>₹{docFee}</span>
                           </div>
-
-                          {selectedWalkIn.need_lab_test === 1 && (
-                            <div className="flex justify-between text-slate-600">
-                              <span>Lab Test Fee ({selectedWalkIn.lab_test_name})</span>
-                              <span>₹{labFee}</span>
-                            </div>
-                          )}
 
                           {selectedWalkIn.need_medicines === 1 && (
                             <>
@@ -962,9 +858,8 @@ Status: Completed.
                 <TrendingDown className="w-3 h-3" />
                 Due ₹{Math.max(0, pendingBilling.reduce((s, q) => {
                   const docFee = DOCTOR_FEES[q.doctor] || 500;
-                  const labFee = q.need_lab_test === 1 ? getLabFee(q.lab_test_name) : 0;
                   const pharmFee = q.need_medicines === 1 ? (q.pharmacy_bill_amount || 0) : 0;
-                  const gross = docFee + labFee + pharmFee;
+                  const gross = docFee + pharmFee;
                   const paid = deptPayments.filter(p => p.walkInId === q.name).reduce((a, p) => a + (p.amount || 0), 0);
                   return s + Math.max(0, gross - paid);
                 }, 0)).toLocaleString("en-IN")}

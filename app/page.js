@@ -88,18 +88,16 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y text-xs">
-            <div className="grid grid-cols-5 px-6 py-2.5 font-bold text-slate-500 uppercase bg-slate-50/60 tracking-wider">
+            <div className="grid grid-cols-4 px-6 py-2.5 font-bold text-slate-500 uppercase bg-slate-50/60 tracking-wider">
               <div>Patient</div>
               <div>Assigned Doctor</div>
               <div className="text-center">Active Department</div>
-              <div className="text-center">Lab test</div>
               <div className="text-right">Action State</div>
             </div>
             {queue.map((item, index) => {
               const activeStatus = item.appointment_status;
-              const hasLab = item.need_lab_test === 1;
               return (
-                <div key={`${item.name}-${index}`} className="grid grid-cols-5 px-6 py-3 items-center hover:bg-slate-50/40 transition-colors">
+                <div key={`${item.name}-${index}`} className="grid grid-cols-4 px-6 py-3 items-center hover:bg-slate-50/40 transition-colors">
                   <div className="font-semibold text-slate-800">{item.patient_name} <span className="text-[10px] text-slate-400 block font-normal">{item.mobile_number}</span></div>
                   <div className="text-slate-600 font-medium">{item.doctor}</div>
                   <div className="text-center font-medium">
@@ -110,15 +108,6 @@ export default function DashboardPage() {
                     }`}>
                       {activeStatus}
                     </span>
-                  </div>
-                  <div className="text-center font-semibold">
-                    {hasLab ? (
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                        item.lab_test_status === "Completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-purple-50 text-purple-700 border-purple-100 animate-pulse"
-                      }`}>
-                        {item.lab_test_status === "Completed" ? "Report Ready" : "Testing"}
-                      </span>
-                    ) : "No order"}
                   </div>
                   <div className="text-right font-medium text-slate-500">
                     {activeStatus === "Completed" ? (

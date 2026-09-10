@@ -6,7 +6,7 @@ import {
   ArrowLeft, User, Phone, Mail, Droplet, Ruler, Scale, Calendar, Edit2, 
   Check, RefreshCw, UserRound, BookOpen, Heart, Activity, CheckCircle, 
   AlertCircle, Info, Thermometer, HeartPulse, Wind, ShieldAlert, PlusCircle, 
-  FileText, Receipt, File, History, StickyNote, Printer, Download, Share2, ArrowRight, Pill, FlaskConical
+  FileText, Receipt, File, History, StickyNote, Printer, Download, Share2, ArrowRight, Pill
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getPatient, updatePatient, getDoctors, createWalkIn, getQueue, getLabTests } from "@/lib/hospital-service";
+import { getPatient, updatePatient, getDoctors, createWalkIn, getQueue } from "@/lib/hospital-service";
 
 const DOCTOR_FEES = {
   "Dr. Rajesh": 500,
@@ -45,7 +45,6 @@ export default function PatientProfilePage() {
   
   const [patientWalkins, setPatientWalkins] = useState([]);
   const [nextAppointment, setNextAppointment] = useState(null);
-  const [labTests, setLabTests] = useState([]);
 
   // Edit fields matching all vital and contact parameters
   const [editState, setEditState] = useState({
@@ -99,9 +98,6 @@ export default function PatientProfilePage() {
       if (latestWalkin && latestWalkin.next_checkup_date) {
         setNextAppointment(latestWalkin.next_checkup_date);
       }
-
-      const labs = await getLabTests();
-      setLabTests(labs);
 
       const storedInvoices = localStorage.getItem(`hospital_patient_invoices_${mobile}`);
       if (storedInvoices) {
@@ -310,24 +306,22 @@ export default function PatientProfilePage() {
     window.print();
   };
 
-  const getLabFee = (testName) => {
-    if (!testName) return 0;
-    const names = testName.split(",").map(n => n.trim()).filter(Boolean);
-    if (names.length === 0) return 0;
-    let total = 0;
-    names.forEach(name => {
-      const test = labTests.find(t => t.test_name === name);
-      total += test ? test.fee : 450;
-    });
-    return total;
-  };
-
   const handlePrintActiveInvoice = () => {
     if (!activeInvoice) return;
     try {
       const printContent = document.getElementById("printable-patient-invoice").innerHTML;
-      const printWindow = window.open("", "_blank", "width=850,height=900");
-      printWindow.document.write(`
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(`
         <html>
           <head>
             <title>Invoice - ${activeInvoice.name}</title>
@@ -355,19 +349,22 @@ export default function PatientProfilePage() {
               </div>
               ${printContent}
             </div>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 500);
-              };
-            </script>
           </body>
         </html>
       `);
-      printWindow.document.close();
-    } catch (printErr) {
-      showToast("Error printing invoice", "error");
-      console.error(printErr);
+      doc.close();
+      iframe.contentWindow.focus();
+      setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 250);
+    } catch (e) {
+      console.error(e);
+      showToast("Print failed", "error");
     }
   };
 
@@ -457,12 +454,11 @@ export default function PatientProfilePage() {
       doc.rect(20, posY - 4, 170, 7, "F");
       doc.text("Description", 22, posY);
       doc.text("Qty", 120, posY, { align: "center" });
-      doc.text("Unit Price", 145, posY, { align: "right" });
+      doc.text("Rate", 145, posY, { align: "right" });
       doc.text("Amount", 185, posY, { align: "right" });
       posY += 8;
 
-      // Add rows
-      const docFee = activeInvoice.walkinData?.docFee ?? (DOCTOR_FEES[activeInvoice.walkinData?.doctor] || 500);
+      const docFee = DOCTOR_FEES[activeInvoice.walkinData?.doctor] || 500;
       
       // Row 1: Consultation
       doc.setFont("helvetica", "normal");
@@ -472,17 +468,7 @@ export default function PatientProfilePage() {
       doc.text(`INR ${docFee.toFixed(2)}`, 185, posY, { align: "right" });
       posY += 7;
 
-      // Row 2: Lab Test
-      if (activeInvoice.walkinData?.need_lab_test === 1) {
-        const labFee = activeInvoice.walkinData?.labFee ?? getLabFee(activeInvoice.walkinData?.lab_test_name);
-        doc.text(`Lab Diagnostic Panel (${activeInvoice.walkinData?.lab_test_name})`, 22, posY);
-        doc.text("1", 120, posY, { align: "center" });
-        doc.text(`INR ${labFee.toFixed(2)}`, 145, posY, { align: "right" });
-        doc.text(`INR ${labFee.toFixed(2)}`, 185, posY, { align: "right" });
-        posY += 7;
-      }
-
-      // Row 3: Pharmacy Medications
+      // Row 2: Pharmacy Medications
       if (activeInvoice.walkinData?.pharmacy_bill_amount > 0) {
         const pharmTotal = activeInvoice.walkinData.pharmacy_bill_amount;
         doc.text("Pharmacy Medication Package", 22, posY);
@@ -518,7 +504,7 @@ export default function PatientProfilePage() {
       doc.line(20, posY, 190, posY);
       posY += 8;
 
-      const grandTotal = docFee + (activeInvoice.walkinData?.need_lab_test === 1 ? (activeInvoice.walkinData?.labFee ?? getLabFee(activeInvoice.walkinData?.lab_test_name)) : 0) + (activeInvoice.walkinData?.pharmacy_bill_amount || 0);
+      const grandTotal = docFee + (activeInvoice.walkinData?.pharmacy_bill_amount || 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("GRAND TOTAL:", 130, posY);
@@ -553,9 +539,8 @@ export default function PatientProfilePage() {
     if (action === "Report") {
       const latestW = patientWalkins?.[0] || {};
       const docFee = DOCTOR_FEES[latestW.doctor] || 500;
-      const labFee = latestW.need_lab_test === 1 ? getLabFee(latestW.lab_test_name) : 0;
       const pharmFee = latestW.pharmacy_bill_amount || 0;
-      const grandTotal = docFee + labFee + pharmFee;
+      const grandTotal = docFee + pharmFee;
 
       const newInvoice = {
         id: Date.now(),
@@ -564,12 +549,9 @@ export default function PatientProfilePage() {
         date: new Date().toLocaleDateString('en-GB'),
         walkinData: {
           doctor: latestW.doctor || "",
-          lab_test_name: latestW.lab_test_name || "",
-          need_lab_test: latestW.need_lab_test || 0,
           pharmacy_bill_amount: pharmFee,
           dispensed_medicines: latestW.dispensed_medicines || [],
           docFee,
-          labFee,
           grandTotal,
           deptAlreadyPaid: 0,
           netBalance: grandTotal,
@@ -638,8 +620,8 @@ export default function PatientProfilePage() {
 
       {/* Top Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
-        <Button variant="ghost" onClick={() => router.push('/reception')} className="gap-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">
-          <ArrowLeft className="w-4 h-4" /> Reception Desk
+        <Button variant="ghost" onClick={() => router.back()} className="gap-2 text-slate-600 hover:text-slate-900 font-semibold text-sm">
+          <ArrowLeft className="w-4 h-4" /> Back
         </Button>
 
         <div className="flex items-center gap-3">
@@ -998,7 +980,6 @@ export default function PatientProfilePage() {
                   { id: 'Overview', icon: BookOpen },
                   { id: 'Medical History', icon: UserRound },
                   { id: 'Prescriptions', icon: Pill },
-                  { id: 'Lab Results', icon: FlaskConical },
                   { id: 'Documents', icon: FileText },
                   { id: 'Billing', icon: Receipt },
                   { id: 'Notes', icon: StickyNote }
@@ -1030,7 +1011,7 @@ export default function PatientProfilePage() {
                             <BookOpen className="w-4 h-4 text-indigo-500" />
                             Medical History & Walk-In Logs
                           </CardTitle>
-                          <CardDescription className="text-xs">Timeline of consultations, diagnoses, prescriptions, and lab tests.</CardDescription>
+                          <CardDescription className="text-xs">Timeline of consultations, diagnoses, and prescriptions.</CardDescription>
                         </div>
                         <Select defaultValue="all">
                           <SelectTrigger className="w-32 h-8 text-xs font-semibold">
@@ -1224,72 +1205,6 @@ export default function PatientProfilePage() {
                  </Card>
               )}
 
-              {activeTab === "Lab Results" && (
-                 <Card className="border-slate-200 shadow-sm rounded-xl p-6">
-                    <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2"><FlaskConical className="w-5 h-5 text-indigo-500" /> Lab Results</h3>
-                    {patientWalkins.filter(w => w.need_lab_test || w.lab_result).length > 0 ? (
-                       <div className="space-y-4">
-                          {patientWalkins.filter(w => w.need_lab_test || w.lab_result).map((w, i) => (
-                             <div key={i} className="p-4 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center">
-                                <div>
-                                   <p className="text-xs text-slate-500 mb-1">{w.creation ? new Date(w.creation).toLocaleDateString('en-GB') : registeredDate}</p>
-                                   <p className="text-sm font-semibold text-slate-700">{w.lab_test_name || "General Lab Test"}</p>
-                                   {w.lab_result && <p className="text-sm text-slate-600 mt-1">Result: <span className="font-medium text-slate-800">{w.lab_result}</span></p>}
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <span className={`px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider ${w.lab_test_status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{w.lab_test_status || "Pending"}</span>
-                                  {w.lab_test_image && (
-                                    <div className="flex gap-1.5 flex-wrap">
-                                      {(() => {
-                                        let resolvedField = w.lab_test_image;
-                                        if (resolvedField === "stored_locally") {
-                                          resolvedField = typeof window !== 'undefined' ? localStorage.getItem(`hospital_scan_images_${w.name}`) : "";
-                                        }
-                                        if (!resolvedField) return null;
-
-                                        if (resolvedField.startsWith("{")) {
-                                          try {
-                                            const parsed = JSON.parse(resolvedField);
-                                            return Object.entries(parsed).map(([test, src]) => (
-                                              src && (
-                                                <Dialog key={test}>
-                                                  <DialogTrigger asChild>
-                                                    <img src={src} alt={test} className="w-16 h-12 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" title={test} />
-                                                  </DialogTrigger>
-                                                  <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
-                                                    <DialogTitle className="sr-only">{test}</DialogTitle>
-                                                    <img src={src} alt={test} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
-                                                  </DialogContent>
-                                                </Dialog>
-                                              )
-                                            ));
-                                          } catch (e) {
-                                            return null;
-                                          }
-                                        } else {
-                                          return (
-                                            <Dialog>
-                                              <DialogTrigger asChild>
-                                                <img src={resolvedField} alt="Lab Result" className="w-16 h-12 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity" />
-                                              </DialogTrigger>
-                                              <DialogContent className="max-w-4xl p-1 bg-white/5 border-none shadow-none">
-                                                <DialogTitle className="sr-only">Lab Result Image</DialogTitle>
-                                                <img src={resolvedField} alt="Full Size Lab Test" className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
-                                              </DialogContent>
-                                            </Dialog>
-                                          );
-                                        }
-                                      })()}
-                                    </div>
-                                  )}
-                                </div>
-                             </div>
-                          ))}
-                       </div>
-                    ) : <p className="text-sm text-slate-500 italic">No lab results found.</p>}
-                 </Card>
-              )}
-
               {activeTab === "Billing" && (
                  <Card className="border-slate-200 shadow-sm rounded-xl p-6">
                     <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2"><Receipt className="w-5 h-5 text-indigo-500" /> Billing History</h3>
@@ -1351,7 +1266,7 @@ export default function PatientProfilePage() {
                                 setActiveReportImage(doc.image);
                                 setShowReportModal(true);
                               } else {
-                                window.open('#', '_blank');
+                                showToast(`Opening document: ${doc.name}`, "info");
                               }
                             }} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">View</Button>
                           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Stethoscope, CheckCircle, AlertCircle, Info, Activity, History, Send,
   Printer, BadgeCheck, FileText, Sun, Moon, Clock, Utensils, Calendar, Plus, X, Pill
@@ -14,6 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import { getQueue, getDoctors, getMedicines, getPatient, updateWalkIn } from "@/lib/hospital-service";
 
 export default function ConsultationPage() {
+  const router = useRouter();
   const { user, hasRole } = useAuth();
   const [queue, setQueue] = useState([]);
   const [doctorsList, setDoctorsList] = useState([]);
@@ -199,8 +201,6 @@ export default function ConsultationPage() {
       await updateWalkIn(targetWalkInName, {
         diagnosis: savedDiagnosis,
         prescription: savedPrescription,
-        need_lab_test: 0,
-        lab_test_name: "",
         need_medicines: hasMedicines ? 1 : 0,
         appointment_status: nextStatus,
         next_checkup_date: savedNextCheckupDate
@@ -532,10 +532,10 @@ export default function ConsultationPage() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`/patient/${item.mobile_number}`, '_blank');
+                            router.push(`/patient/${item.mobile_number}`);
                           }}
                           className="h-7 px-2 text-[10px] text-indigo-600 hover:bg-indigo-100/80 font-bold shrink-0 gap-1 border border-indigo-100"
-                          title="View patient history, billing, lab tests & profile"
+                          title="View patient history, billing & profile"
                         >
                           <FileText className="w-3 h-3" />
                           Profile
@@ -571,12 +571,12 @@ export default function ConsultationPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(`/patient/${selectedWalkIn.mobile_number}`, '_blank')}
+                        onClick={() => router.push(`/patient/${selectedWalkIn.mobile_number}`)}
                         className="h-7 text-xs bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-bold gap-1 cursor-pointer shadow-2xs"
-                        title="View complete patient profile, medical history, lab results, billing, and documents"
+                        title="View complete patient profile, medical history, billing, and documents"
                       >
                         <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                        View Full Patient Profile & Records ↗
+                        View Full Patient Profile & Records
                       </Button>
                     </div>
                   </div>

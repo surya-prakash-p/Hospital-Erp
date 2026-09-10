@@ -220,8 +220,18 @@ export default function FinancePage() {
   }, {});
 
   const printSummaryReport = () => {
-    const printWindow = window.open("", "_blank", "width=850,height=900");
-    printWindow.document.write(`
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`
       <html>
         <head>
           <title>Thangam Hospital - Financial Ledger</title>
@@ -284,16 +294,19 @@ export default function FinancePage() {
               `).join('')}
             </tbody>
           </table>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
+    doc.close();
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 1000);
+    }, 250);
   };
 
   return (
