@@ -22,14 +22,14 @@ import {
   Eye, 
   EyeOff, 
   Calendar, 
-  TrendingUp, 
-  Plus, 
-  ChevronRight,
+  Plus,
   AlertTriangle,
   Trash2,
-  IdCard
+  IdCard,
+  Loader2,
+  Sparkles
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,67 +47,62 @@ const ALL_ROLES = [
   "Billing Clerk"
 ];
 
-const PERMISSION_OPTIONS = [
-  { id: "Doctor Consultations", label: "Doctor Consultations & Queues" },
-  { id: "Write Prescriptions", label: "Issue Medical Prescriptions" },
-  { id: "Dispense Medicines", label: "Pharmacy Dispensing & FEFO" },
-  { id: "Manage Pharmacy Stock", label: "Pharmacy Stock & GRN Import" },
-  { id: "Enter Lab Results", label: "Lab Diagnostic Test Reports" },
-  { id: "Register Patients", label: "Patient Registration & Walk-Ins" },
-  { id: "Manage Invoices", label: "Billing, Receipts & Invoicing" },
-  { id: "View Financials", label: "Financial Ledger & Reports" },
-  { id: "Audit Logs", label: "View Hospital Audit & Access Logs" },
-  { id: "Manage Roles & Staff", label: "Manage Hospital Roles & Permissions" },
-  { id: "Full System Access", label: "Full System Super-Admin Privileges" }
+const ROLE_DEFINITIONS = [
+  { role: "Hospital Admin", icon: ShieldCheck, desc: "Full administrative authority, security governance & system configuration" },
+  { role: "Doctor", icon: Stethoscope, desc: "Doctor consultation queue, clinical diagnosis, prescriptions & lab review" },
+  { role: "Pharmacist", icon: Pill, desc: "Pharmacy dispensing, batch inventory, FEFO tracking & stock registers" },
+  { role: "Lab Technician", icon: FlaskConical, desc: "Laboratory diagnostic test entries, specimen tracking & test reports" },
+  { role: "Nurse", icon: UserRoundCheck, desc: "Inpatient triage, vital checks, ward management & nursing assistance" },
+  { role: "Receptionist", icon: Building2, desc: "Front desk patient registration, appointment scheduling & queue tokens" },
+  { role: "Billing Clerk", icon: KeyRound, desc: "Patient cashier checkout, billing invoices, receipts & finance ledger" }
 ];
+
+const PERMISSION_OPTIONS = [
+  { id: "Doctor Consultations", label: "Doctor Consultations & Queues", desc: "Access doctor consultation workflow, queue list, and patient records" },
+  { id: "Write Prescriptions", label: "Issue Medical Prescriptions", desc: "Create and authorize digital patient drug prescriptions" },
+  { id: "Dispense Medicines", label: "Pharmacy Dispensing & FEFO", desc: "Dispense prescribed medications and deduct batch inventory" },
+  { id: "Manage Pharmacy Stock", label: "Pharmacy Stock & GRN Import", desc: "Manage medicine master, purchase orders, and goods receipts" },
+  { id: "Enter Lab Results", label: "Lab Diagnostic Test Reports", desc: "Enter diagnostic test findings, normal ranges, and publish lab reports" },
+  { id: "Register Patients", label: "Patient Registration & Walk-Ins", desc: "Register new patients, edit demographics, and create reception walk-ins" },
+  { id: "Manage Invoices", label: "Billing, Receipts & Invoicing", desc: "Generate patient bills, cashier receipts, and manage checkout payments" },
+  { id: "View Financials", label: "Financial Ledger & Reports", desc: "Access hospital financial ledger, revenue summaries, and expense entries" },
+  { id: "Audit Logs", label: "View Hospital Audit & Access Logs", desc: "Access multi-device security audit logs and staff activity records" },
+  { id: "Manage Roles & Staff", label: "Manage Hospital Roles & Permissions", desc: "Assign staff roles, grant granular permissions, and manage credentials" },
+  { id: "Full System Access", label: "Full System Super-Admin Privileges", desc: "Unrestricted master access across all clinical, financial, and admin modules" }
+];
+
+const ROLE_DEFAULT_PERMISSIONS = {
+  "Hospital Admin": ["Doctor Consultations", "Write Prescriptions", "Dispense Medicines", "Manage Pharmacy Stock", "Enter Lab Results", "Register Patients", "Manage Invoices", "View Financials", "Audit Logs", "Manage Roles & Staff", "Full System Access"],
+  "Doctor": ["Doctor Consultations", "Write Prescriptions"],
+  "Pharmacist": ["Dispense Medicines", "Manage Pharmacy Stock"],
+  "Lab Technician": ["Enter Lab Results"],
+  "Nurse": ["Doctor Consultations", "Register Patients"],
+  "Receptionist": ["Register Patients"],
+  "Billing Clerk": ["Manage Invoices", "View Financials"]
+};
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const isHospitalAdmin = Boolean(user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*') || user?.roles?.includes('Admin'));
   const [staffUsers, setStaffUsers] = useState([]);
-  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
-  const [selectedMonthFilter, setSelectedMonthFilter] = useState("this-month");
   const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
-  const formatActivityTime = (act) => {
-    if (!act) return '';
-    if (act.createdAt) {
-      try {
-        return new Date(act.createdAt).toLocaleTimeString('en-IN', {
-          timeZone: 'Asia/Kolkata',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-      } catch (e) {}
-    }
-    return act.time || '';
-  };
-
-  // DOM Refs for smooth scrolling
+  // DOM Ref for smooth scrolling
   const staffTableRef = React.useRef(null);
-  const deptSectionRef = React.useRef(null);
 
-  // Live Today's Date Calculation (Updates automatically every day)
+  // Live Today's Date Calculation
   const today = new Date();
   const formattedToday = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const currentMonthName = today.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  const prevDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const lastMonthName = prevDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
   const handleMetricCardClick = (targetRole) => {
-    if (targetRole === "Departments") {
-      deptSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      showToast("Viewing Department Wise Staff Breakdown", "info");
-    } else {
-      setRoleFilter(targetRole);
-      staffTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      showToast(`Showing staff members: ${targetRole === 'All' ? 'All Roles' : targetRole}`, "info");
-    }
+    setRoleFilter(targetRole);
+    staffTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast(`Filtering staff: ${targetRole === 'All' ? 'All Staff Members' : targetRole}`, "info");
   };
 
   // Modal States
@@ -129,6 +124,7 @@ export default function AdminDashboardPage() {
   const [editStaffDepartment, setEditStaffDepartment] = useState("");
   const [editStaffMobile, setEditStaffMobile] = useState("");
   const [editStaffStatus, setEditStaffStatus] = useState("Active");
+  const [editStaffJoinedDate, setEditStaffJoinedDate] = useState("");
   const [editStaffPassword, setEditStaffPassword] = useState("");
 
   // All Activities Modal State
@@ -141,6 +137,7 @@ export default function AdminDashboardPage() {
   const [department, setDepartment] = useState("General Medicine");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [joinedDate, setJoinedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [qualifications, setQualifications] = useState("");
@@ -219,9 +216,14 @@ export default function AdminDashboardPage() {
 
   const getStaffJoinDate = (staff) => {
     if (!staff) return "-";
-    const raw = staff.createdAt || staff.creation || staff.joined_date || staff.date_of_joining || staff.updatedAt;
+    const raw = staff.joined_date || staff.date_of_joining || staff.createdAt || staff.creation || staff.updatedAt;
     if (!raw) return "-";
     try {
+      if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const [y, m, d] = raw.split('-');
+        const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+        return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      }
       const d = new Date(raw);
       if (isNaN(d.getTime())) return String(raw);
       return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -231,33 +233,6 @@ export default function AdminDashboardPage() {
   };
 
   const addSystemActivityLog = (title, desc, type = "user") => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-    
-    let color = "bg-blue-50 text-blue-600 border-blue-200";
-    if (type === "user") color = "bg-amber-50 text-amber-600 border-amber-200";
-    else if (type === "role") color = "bg-blue-50 text-blue-600 border-blue-200";
-    else if (type === "dept") color = "bg-emerald-50 text-emerald-600 border-emerald-200";
-    else if (type === "profile") color = "bg-rose-50 text-rose-600 border-rose-200";
-    else if (type === "system") color = "bg-teal-50 text-teal-600 border-teal-200";
-
-    const newLog = {
-      id: `act-${Date.now()}`,
-      title,
-      desc,
-      time: timeStr,
-      createdAt: now.toISOString(),
-      type,
-      color
-    };
-
-    setActivities(prev => [newLog, ...prev.slice(0, 29)]);
-
     fetch('/api/logs/record', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -284,9 +259,6 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         if (data.success && Array.isArray(data.users)) {
           setStaffUsers(data.users);
-          if (Array.isArray(data.activities) && data.activities.length > 0) {
-            setActivities(data.activities);
-          }
         }
       }
     } catch (e) {}
@@ -300,7 +272,6 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         if (data.success && Array.isArray(data.users)) {
           setStaffUsers(data.users);
-          setActivities(data.activities || []);
           if (typeof window !== 'undefined') {
             localStorage.setItem('hospital_staff_users', JSON.stringify(data.users));
           }
@@ -322,7 +293,7 @@ export default function AdminDashboardPage() {
     loadData();
     const interval = setInterval(() => {
       loadDataSilently();
-    }, 6000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -338,6 +309,7 @@ export default function AdminDashboardPage() {
 
     try {
       const targetDept = primaryRole === "Nurse" ? "Nursing & Wards" : (department.trim() || (primaryRole === "Doctor" ? "General Medicine" : primaryRole === "Pharmacist" ? "Pharmacy" : "Laboratory"));
+      const validJoinedDate = joinedDate || new Date().toISOString().split('T')[0];
       const newStaff = await createStaffUser({
         full_name: fullName.trim(),
         email: email.trim(),
@@ -349,7 +321,11 @@ export default function AdminDashboardPage() {
         designation: primaryRole,
         qualifications: qualifications.trim(),
         consultation_fee: consultationFee,
-        status: "Active"
+        status: "Active",
+        joined_date: validJoinedDate,
+        date_of_joining: validJoinedDate,
+        createdAt: `${validJoinedDate}T08:00:00.000Z`,
+        creation: `${validJoinedDate}T08:00:00.000Z`
       });
 
       addSystemActivityLog("New staff user created", `${newStaff.full_name} (${primaryRole})`, "user");
@@ -363,6 +339,7 @@ export default function AdminDashboardPage() {
       setPassword("");
       setDepartment("General Medicine");
       setQualifications("");
+      setJoinedDate(new Date().toISOString().split('T')[0]);
       setStaffUsers(prev => {
         const empId = newStaff.employeeId || newStaff.employee_id;
         const exists = prev.some(u => (u.employeeId || u.employee_id || u.id) === (empId || newStaff.id));
@@ -378,16 +355,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleOpenEdit = (staff) => {
-    setSelectedUser(staff);
-    setEditRoles(staff.roles || [staff.role || "Staff Member"]);
-    setEditPermissions(staff.permissions || []);
-    setModalSearchQuery("");
-    setIsStaffDropdownOpen(false);
-    setIsEditModalOpen(true);
-  };
-
-  const handleOpenRoleModal = (staff) => {
+  const handleOpenGovernanceModal = (staff, tab = "roles") => {
     const target = staff || (staffUsers.length > 0 ? staffUsers[0] : null);
     if (!target) {
       showToast("No staff members available yet", "error");
@@ -396,25 +364,19 @@ export default function AdminDashboardPage() {
     setSelectedUser(target);
     setEditRoles(target.roles || [target.role || "Staff Member"]);
     setEditPermissions(target.permissions || []);
-    setActiveGovernanceTab("roles");
+    setActiveGovernanceTab(tab);
     setModalSearchQuery("");
     setIsStaffDropdownOpen(false);
     setIsEditModalOpen(true);
   };
 
-  const handleOpenPermissionModal = (staff) => {
-    const target = staff || (staffUsers.length > 0 ? staffUsers[0] : null);
-    if (!target) {
-      showToast("No staff members available yet", "error");
-      return;
-    }
-    setSelectedUser(target);
-    setEditRoles(target.roles || [target.role || "Staff Member"]);
-    setEditPermissions(target.permissions || []);
-    setActiveGovernanceTab("permissions");
-    setModalSearchQuery("");
-    setIsStaffDropdownOpen(false);
-    setIsEditModalOpen(true);
+  const handleApplyRecommendedPermissions = () => {
+    const recommended = new Set();
+    editRoles.forEach(r => {
+      (ROLE_DEFAULT_PERMISSIONS[r] || []).forEach(p => recommended.add(p));
+    });
+    setEditPermissions(Array.from(recommended));
+    showToast("Applied recommended permissions for selected roles", "info");
   };
 
   const handleViewStaffProfile = (staff) => {
@@ -431,6 +393,8 @@ export default function AdminDashboardPage() {
     const rawMob = (staff.mobile_no || staff.mobileNo || staff.phone || "").trim();
     setEditStaffMobile(rawMob.includes("@") ? "" : rawMob);
     setEditStaffStatus(staff.status === "Inactive" || staff.active === false ? "Inactive" : "Active");
+    const existingJoin = staff.joined_date || staff.date_of_joining || (staff.createdAt ? staff.createdAt.split('T')[0] : '') || '';
+    setEditStaffJoinedDate(existingJoin);
     setEditStaffPassword("");
     setIsProfileEditOpen(true);
   };
@@ -440,6 +404,7 @@ export default function AdminDashboardPage() {
     if (!editingStaff) return;
     setIsSaving(true);
     try {
+      const cleanJoinDate = editStaffJoinedDate.trim() || editingStaff.joined_date || editingStaff.date_of_joining || (editingStaff.createdAt ? editingStaff.createdAt.split('T')[0] : '');
       await createStaffUser({
         id: editingStaff.id,
         email: editStaffEmail.trim() || editingStaff.email,
@@ -451,8 +416,10 @@ export default function AdminDashboardPage() {
         department: editStaffDepartment,
         designation: editStaffDesignation,
         status: editStaffStatus,
-        createdAt: editingStaff.createdAt || editingStaff.creation || editingStaff.joined_date,
-        creation: editingStaff.creation || editingStaff.createdAt || editingStaff.joined_date
+        joined_date: cleanJoinDate,
+        date_of_joining: cleanJoinDate,
+        createdAt: cleanJoinDate ? `${cleanJoinDate}T08:00:00.000Z` : (editingStaff.createdAt || editingStaff.creation),
+        creation: cleanJoinDate ? `${cleanJoinDate}T08:00:00.000Z` : (editingStaff.creation || editingStaff.createdAt)
       });
 
       addSystemActivityLog("Staff Profile Updated", `${editStaffName} (${editStaffDesignation}) profile details updated`, "user");
@@ -600,47 +567,6 @@ export default function AdminDashboardPage() {
   const nurseCount = staffUsers.filter(s => s.roles?.includes('Nurse')).length;
   const recepCount = staffUsers.filter(s => s.roles?.includes('Receptionist')).length;
 
-  // 1. DYNAMIC DEPARTMENT WISE STAFF CALCULATIONS (Calculated strictly from actual staff data)
-  const deptCountsMap = {};
-  staffUsers.forEach(s => {
-    const dName = s.department?.trim() || (s.roles?.includes('Doctor') ? "General Medicine" : s.roles?.includes('Pharmacist') ? "Pharmacy" : s.roles?.includes('Lab Technician') ? "Laboratory" : "Hospital Administration");
-    deptCountsMap[dName] = (deptCountsMap[dName] || 0) + 1;
-  });
-
-  const deptCount = Object.keys(deptCountsMap).length || 5;
-
-  const deptColorPalette = [
-    "bg-blue-600", "bg-emerald-500", "bg-purple-600", "bg-amber-500", "bg-pink-500", "bg-teal-600", "bg-indigo-600", "bg-slate-500"
-  ];
-
-  const deptDistribution = Object.entries(deptCountsMap).length > 0 
-    ? Object.entries(deptCountsMap)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count], index) => ({
-          name,
-          count,
-          color: deptColorPalette[index % deptColorPalette.length]
-        }))
-    : [
-        { name: "General Medicine", count: doctorsCount || 1, color: "bg-blue-600" },
-        { name: "Pharmacy", count: pharmaCount || 1, color: "bg-emerald-500" },
-        { name: "Laboratory", count: labCount || 1, color: "bg-purple-600" },
-        { name: "Front Desk & Admissions", count: recepCount || 1, color: "bg-amber-500" },
-        { name: "ICU & Wards", count: nurseCount || 1, color: "bg-pink-500" }
-      ];
-
-  const maxDeptCount = Math.max(...deptDistribution.map(d => d.count), 1);
-
-  // 2. DYNAMIC ROLE DISTRIBUTION (Calculated strictly from actual staff data)
-  const roleDistribution = [
-    { name: "Doctors", count: doctorsCount, color: "#2563eb", percent: Math.round((doctorsCount / (totalStaffCount || 1)) * 100) },
-    { name: "Nurses", count: nurseCount, color: "#10b981", percent: Math.round((nurseCount / (totalStaffCount || 1)) * 100) },
-    { name: "Pharmacists", count: pharmaCount, color: "#8b5cf6", percent: Math.round((pharmaCount / (totalStaffCount || 1)) * 100) },
-    { name: "Lab Technicians", count: labCount, color: "#f59e0b", percent: Math.round((labCount / (totalStaffCount || 1)) * 100) },
-    { name: "Receptionists", count: recepCount, color: "#ec4899", percent: Math.round((recepCount / (totalStaffCount || 1)) * 100) },
-    { name: "Others", count: Math.max(0, totalStaffCount - doctorsCount - nurseCount - pharmaCount - labCount - recepCount), color: "#64748b", percent: Math.round((Math.max(0, totalStaffCount - doctorsCount - nurseCount - pharmaCount - labCount - recepCount) / (totalStaffCount || 1)) * 100) }
-  ];
-
   const filteredStaff = staffUsers.filter(staff => {
     const matchesSearch = 
       (staff.full_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -673,17 +599,36 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
-      {/* Page actions */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs text-xs font-semibold text-slate-800">
+      {/* Page Header & Global Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-8.5 h-8.5 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <ShieldCheck className="w-4.5 h-4.5" />
+            </div>
+            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">Staff Administration &amp; Governance</h1>
+          </div>
+          <p className="text-xs text-slate-500 font-medium">Manage hospital personnel roster, clinical credentials, and access permissions</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80 text-xs font-semibold text-slate-600">
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
             <span>{formattedToday}</span>
-            <Calendar className="w-4 h-4 text-blue-600" />
           </div>
 
           <Button
+            onClick={() => handleOpenGovernanceModal()}
+            variant="outline"
+            className="bg-white hover:bg-slate-50 text-slate-800 border-slate-300 gap-2 h-9 px-4 text-xs font-semibold rounded-xl shadow-2xs transition-all cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+            Roles &amp; Permissions
+          </Button>
+
+          <Button
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-9 px-4 text-xs font-semibold rounded-xl shadow-md transition-all cursor-pointer shrink-0"
+            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-9 px-4 text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add New Staff
@@ -691,556 +636,250 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* TOP ROW: 6 METRIC CARDS (Interactive clickable filters with smooth scroll) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        
-        {/* Total Staff */}
-        <Card 
-          onClick={() => handleMetricCardClick('All')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-blue-600 transition-colors">Total Staff</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{totalStaffCount}</h3>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> 12% <span className="text-slate-400 font-normal">from last month</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Doctors */}
-        <Card 
-          onClick={() => handleMetricCardClick('Doctor')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-400 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <Stethoscope className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-blue-600 transition-colors">Doctors</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{doctorsCount}</h3>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> 8% <span className="text-slate-400 font-normal">from last month</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pharmacists */}
-        <Card 
-          onClick={() => handleMetricCardClick('Pharmacist')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-purple-400 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <Pill className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-purple-600 transition-colors">Pharmacists</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{pharmaCount}</h3>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> 5% <span className="text-slate-400 font-normal">from last month</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Lab Technicians */}
-        <Card 
-          onClick={() => handleMetricCardClick('Lab Technician')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <FlaskConical className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-amber-600 transition-colors">Lab Technicians</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{labCount}</h3>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> 7% <span className="text-slate-400 font-normal">from last month</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Nurses */}
-        <Card 
-          onClick={() => handleMetricCardClick('Nurse')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-rose-400 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <UserRoundCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-rose-600 transition-colors">Nurses</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{nurseCount}</h3>
-              <p className="text-[10px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-0.5">
-                <TrendingUp className="w-3 h-3" /> 10% <span className="text-slate-400 font-normal">from last month</span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Departments */}
-        <Card 
-          onClick={() => handleMetricCardClick('Departments')}
-          className="border-slate-200/90 shadow-2xs hover:shadow-md hover:border-teal-400 transition-all bg-white rounded-2xl cursor-pointer group active:scale-98 select-none"
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-500 group-hover:text-teal-600 transition-colors">Departments</p>
-              <h3 className="text-xl font-bold text-slate-900 leading-tight">{deptCount}</h3>
-              <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                No change
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* MIDDLE ROW: 3 COLUMNS GRID (Donut Chart, Department Bars, Recent Activities - Pixel-perfect equal height) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        
-        {/* Column 1 (4/12): Staff Distribution by Role (Donut Chart) */}
-        <Card className="lg:col-span-4 border-slate-200/90 shadow-2xs bg-white rounded-2xl flex flex-col justify-between h-[390px]">
-          <CardHeader className="pb-2 pt-4 px-5 border-b border-slate-100 flex flex-row items-center justify-between shrink-0">
-            <CardTitle className="text-sm font-bold text-slate-900">Staff Distribution by Role</CardTitle>
-            <select 
-              value={selectedMonthFilter}
-              onChange={(e) => setSelectedMonthFilter(e.target.value)}
-              className="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer"
+      {/* Role Filter & Metric Strip */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-1.5">
+        {[
+          { id: 'All', label: 'All Members', count: totalStaffCount, icon: Users },
+          { id: 'Doctor', label: 'Doctors', count: doctorsCount, icon: Stethoscope },
+          { id: 'Pharmacist', label: 'Pharmacists', count: pharmaCount, icon: Pill },
+          { id: 'Lab Technician', label: 'Lab Technicians', count: labCount, icon: FlaskConical },
+          { id: 'Nurse', label: 'Nurses', count: nurseCount, icon: UserRoundCheck },
+          { id: 'Receptionist', label: 'Receptionists', count: recepCount, icon: Building2 },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = roleFilter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleMetricCardClick(tab.id)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
+                isActive
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
             >
-              <option value="this-month">This Month ({currentMonthName})</option>
-              <option value="last-month">Last Month ({lastMonthName})</option>
-              <option value="all-time">All Time</option>
-            </select>
-          </CardHeader>
-
-          <CardContent className="p-5 flex items-center justify-between gap-4 flex-1">
-            {/* Donut Visual */}
-            <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="4"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                {(() => {
-                  let cumulative = 0;
-                  return roleDistribution.map((item) => {
-                    if (!item.count || item.percent <= 0) return null;
-                    const strokeDash = `${item.percent} ${100 - item.percent}`;
-                    const strokeOffset = -cumulative;
-                    cumulative += item.percent;
-                    return (
-                      <path
-                        key={item.name}
-                        stroke={item.color}
-                        strokeDasharray={strokeDash}
-                        strokeDashoffset={strokeOffset}
-                        strokeWidth="4.5"
-                        strokeLinecap="round"
-                        fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        className="transition-all duration-500"
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold text-slate-900 leading-tight">{totalStaffCount}</span>
-                <span className="text-[10px] font-semibold text-slate-400">Total Staff</span>
-              </div>
-            </div>
-
-            {/* Role Legend List */}
-            <div className="flex-1 space-y-1.5 text-xs">
-              {roleDistribution.map((item) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-600 font-medium text-[11px]">{item.name}</span>
-                  </div>
-                  <span className="font-semibold text-slate-800 text-[11px]">{item.count} ({item.percent}%)</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-
-          {/* Bottom Card Footer */}
-          <div className="px-5 py-2.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium shrink-0 rounded-b-2xl">
-            <span>6 Primary Hospital Roles</span>
-            <span className="font-bold text-emerald-600 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Live Calculated
-            </span>
-          </div>
-        </Card>
-
-        {/* Column 2 (4/12): Department Wise Staff (Horizontal Bars with Scroll) */}
-        <Card ref={deptSectionRef} className="lg:col-span-4 border-slate-200/90 shadow-2xs bg-white rounded-2xl flex flex-col justify-between h-[390px] scroll-mt-24">
-          <CardHeader className="pb-2 pt-4 px-5 border-b border-slate-100 flex flex-row items-center justify-between shrink-0">
-            <CardTitle className="text-sm font-bold text-slate-900">Department Wise Staff</CardTitle>
-            <select 
-              value={selectedMonthFilter}
-              onChange={(e) => setSelectedMonthFilter(e.target.value)}
-              className="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="this-month">This Month ({currentMonthName})</option>
-              <option value="last-month">Last Month ({lastMonthName})</option>
-              <option value="all-time">All Time</option>
-            </select>
-          </CardHeader>
-
-          <CardContent className="p-5 space-y-3 flex-1 overflow-y-auto">
-            {deptDistribution.map((dept) => (
-              <div key={dept.name} className="space-y-1">
-                <div className="flex justify-between text-[11px] font-medium text-slate-700">
-                  <span>{dept.name}</span>
-                  <span className="font-bold text-slate-900">{dept.count}</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${dept.color}`} 
-                    style={{ width: `${Math.min(100, Math.max(15, (dept.count / maxDeptCount) * 100))}%` }} 
-                  />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-
-          {/* Bottom Card Footer */}
-          <div className="px-5 py-2.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium shrink-0 rounded-b-2xl">
-            <span>Showing {deptDistribution.length} Active Departments</span>
-            <span className="font-semibold text-blue-600">Top Allocated</span>
-          </div>
-        </Card>
-        {/* Column 3 (4/12): Recent System Activities (Equal Height h-[390px]) */}
-        <Card className="lg:col-span-4 border-slate-200/90 shadow-2xs bg-white rounded-2xl flex flex-col justify-between h-[390px] overflow-hidden">
-          <CardHeader className="pb-2.5 pt-4 px-5 border-b border-slate-100 flex flex-row items-center justify-between bg-slate-50/50 shrink-0">
-            <CardTitle className="text-sm font-bold text-slate-900">Recent System Activities</CardTitle>
-            <button 
-              onClick={() => setIsActivitiesModalOpen(true)}
-              className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
-            >
-              View All
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
+              <span>{tab.label}</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                isActive ? 'bg-slate-800 text-slate-200 border border-slate-700' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {tab.count}
+              </span>
             </button>
-          </CardHeader>
-
-          <CardContent className="p-4 space-y-3 flex-1 overflow-y-auto">
-            {activities.slice(0, 6).map((act) => (
-              <div key={act.id} className="flex items-start justify-between gap-3 pb-2.5 border-b border-slate-100 last:border-0 last:pb-0">
-                <div className="flex items-start gap-2.5">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center border text-xs shrink-0 mt-0.5 ${
-                    act.desc.includes("Doctor") ? "bg-blue-50 text-blue-600 border-blue-200" :
-                    act.desc.includes("Pharmacist") ? "bg-purple-50 text-purple-600 border-purple-200" :
-                    act.desc.includes("Lab Technician") ? "bg-amber-50 text-amber-600 border-amber-200" :
-                    act.desc.includes("Nurse") ? "bg-rose-50 text-rose-600 border-rose-200" :
-                    act.desc.includes("Admin") ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                    act.color
-                  }`}>
-                    {act.desc.includes("Doctor") ? <Stethoscope className="w-3.5 h-3.5" /> :
-                     act.desc.includes("Pharmacist") ? <Pill className="w-3.5 h-3.5" /> :
-                     act.desc.includes("Lab Technician") ? <FlaskConical className="w-3.5 h-3.5" /> :
-                     act.desc.includes("Nurse") ? <UserRoundCheck className="w-3.5 h-3.5" /> :
-                     act.desc.includes("Admin") ? <ShieldCheck className="w-3.5 h-3.5" /> :
-                     act.type === "role" ? <KeyRound className="w-3.5 h-3.5" /> :
-                     act.type === "dept" ? <Building2 className="w-3.5 h-3.5" /> :
-                     <UserPlus className="w-3.5 h-3.5" />}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 leading-tight">{act.title}</div>
-                    <div className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">{act.desc}</div>
-                  </div>
-                </div>
-                <div className="text-[10px] text-slate-400 font-semibold whitespace-nowrap shrink-0 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {formatActivityTime(act)}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-
-          {/* Bottom Card Footer */}
-          <div className="px-5 py-2.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium shrink-0 rounded-b-2xl">
-            <span>Real-time Audit Logs</span>
-            <span className="font-semibold text-emerald-600 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Auto Logged
-            </span>
-          </div>
-        </Card>
-
+          );
+        })}
       </div>
 
-      {/* BOTTOM ROW: 2 COLUMNS GRID (Recent Staff Members Table + Quick Actions Grid - Dynamic height fitting) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      {/* Full-Width Staff Members Directory */}
+      <Card ref={staffTableRef} className="border-slate-200/80 shadow-xs bg-white rounded-2xl overflow-hidden scroll-mt-24">
         
-        {/* Left Column (8/12): Recent Staff Members Table */}
-        <Card ref={staffTableRef} className="lg:col-span-8 border-slate-200/90 shadow-2xs bg-white rounded-2xl overflow-hidden scroll-mt-24">
-          
-          {/* Table Search & Header Bar */}
-          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
-            <div>
-              <CardTitle className="text-sm font-bold text-slate-900">Recent Staff Members</CardTitle>
-              <CardDescription className="text-xs text-slate-500">Official hospital employee registry and status</CardDescription>
+        {/* Table Search & Controls Bar */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/40">
+          <div>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-sm font-bold text-slate-900">Hospital Staff Directory</CardTitle>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded-full">
+                {filteredStaff.length} {filteredStaff.length === 1 ? 'member' : 'members'}
+              </span>
             </div>
-            
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative w-full sm:w-52">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                <Input
-                  placeholder="Search staff..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 text-xs h-8 bg-white border-slate-200 rounded-lg"
-                />
-              </div>
-
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="h-8 text-xs bg-white border border-slate-200 rounded-lg px-2 text-slate-700 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Roles</option>
-                {ALL_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
+            <CardDescription className="text-xs text-slate-500 mt-0.5">Active personnel roster, designations, and clinical credentials</CardDescription>
           </div>
+          
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <Input
+                placeholder="Search by name, email, ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 text-xs h-8.5 bg-white border-slate-200 rounded-xl"
+              />
+            </div>
 
-          <CardContent className="p-0 overflow-x-auto overflow-y-auto max-h-[340px]">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs">
-                <tr className="border-b border-slate-200/80 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4 bg-slate-50">Staff Member</th>
-                  <th className="py-3 px-3 bg-slate-50">Employee ID</th>
-                  <th className="py-3 px-3 bg-slate-50">Role</th>
-                  <th className="py-3 px-3 bg-slate-50">Department</th>
-                  <th className="py-3 px-3 bg-slate-50">Email</th>
-                  <th className="py-3 px-3 bg-slate-50">Status</th>
-                  <th className="py-3 px-3 bg-slate-50">Joined On</th>
-                  <th className="py-3 px-4 text-right bg-slate-50">Actions</th>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-8.5 text-xs bg-white border border-slate-200 rounded-xl px-2.5 text-slate-700 font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="All">All Roles</option>
+              {ALL_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4">Staff Member</th>
+                <th className="py-3 px-3">Employee ID</th>
+                <th className="py-3 px-3">Role</th>
+                <th className="py-3 px-3">Department</th>
+                <th className="py-3 px-3">Contact</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Joined On</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                      <span className="text-xs">Loading staff registry...</span>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStaff.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400 font-medium">
-                      No staff members found matching criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStaff.map((staff) => {
-                    let roleBadge = "bg-blue-50 text-blue-700 border-blue-200/80";
-                    if (staff.roles?.includes("Doctor")) roleBadge = "bg-blue-50 text-blue-700 border-blue-200/80 font-bold";
-                    else if (staff.roles?.includes("Nurse")) roleBadge = "bg-rose-50 text-rose-700 border-rose-200/80 font-bold";
-                    else if (staff.roles?.includes("Pharmacist")) roleBadge = "bg-amber-50 text-amber-800 border-amber-200/80 font-bold";
-                    else if (staff.roles?.includes("Lab Technician")) roleBadge = "bg-emerald-50 text-emerald-700 border-emerald-200/80 font-bold";
-                    else if (staff.roles?.includes("Receptionist")) roleBadge = "bg-purple-50 text-purple-700 border-purple-200/80 font-bold";
+              ) : filteredStaff.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-slate-400 font-medium">
+                    No staff members found matching the selected filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredStaff.map((staff) => {
+                  let roleBadge = "bg-blue-50 text-blue-700 border-blue-200/80";
+                  if (staff.roles?.includes("Doctor")) roleBadge = "bg-blue-50 text-blue-700 border-blue-200/80 font-bold";
+                  else if (staff.roles?.includes("Nurse")) roleBadge = "bg-rose-50 text-rose-700 border-rose-200/80 font-bold";
+                  else if (staff.roles?.includes("Pharmacist")) roleBadge = "bg-amber-50 text-amber-800 border-amber-200/80 font-bold";
+                  else if (staff.roles?.includes("Lab Technician")) roleBadge = "bg-emerald-50 text-emerald-700 border-emerald-200/80 font-bold";
+                  else if (staff.roles?.includes("Receptionist")) roleBadge = "bg-purple-50 text-purple-700 border-purple-200/80 font-bold";
 
-                    const initials = (staff.full_name || staff.email || "US").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
-                    const empIdDisplay = staff.employeeId || staff.employee_id || staff.frappeStaffId || "TH-STF-001";
+                  const initials = (staff.full_name || staff.email || "US").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+                  const empIdDisplay = staff.employeeId || staff.employee_id || staff.frappeStaffId || "TH-STF-001";
+                  const contactMobile = (staff.mobile_no || staff.mobileNo || staff.phone || "").trim();
 
-                    return (
-                      <tr key={staff.id || staff.email} className="hover:bg-slate-50/50 transition-colors">
-                        {/* Member */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
-                              {initials}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900">{staff.full_name}</div>
-                              <div className="text-[10px] text-slate-400 font-medium">{staff.designation || (staff.roles ? staff.roles[0] : "Staff")}</div>
-                            </div>
+                  return (
+                    <tr key={staff.id || staff.email} className="hover:bg-slate-50/70 transition-colors">
+                      {/* Member */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8.5 h-8.5 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-[11px] shrink-0 shadow-2xs">
+                            {initials}
                           </div>
-                        </td>
-
-                        {/* Employee ID */}
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-800">
-                            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
-                              {empIdDisplay}
-                            </span>
-                            {isHospitalAdmin ? (
-                              <button
-                                onClick={() => {
-                                  setStaffToEditEmpId(staff);
-                                  setNewEmpIdInput(empIdDisplay);
-                                  setIsEditEmpIdModalOpen(true);
-                                }}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                                title="Edit Employee ID (Admin Only)"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </button>
-                            ) : (
-                              <Lock className="w-3 h-3 text-slate-400" title="Employee ID Locked" />
-                            )}
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs">{staff.full_name}</div>
+                            <div className="text-[10px] text-slate-400 font-medium">{staff.designation || (staff.roles ? staff.roles[0] : "Staff")}</div>
                           </div>
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Role */}
-                        <td className="py-3 px-3">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] ${roleBadge}`}>
-                            {staff.roles ? staff.roles[0] : "Staff"}
+                      {/* Employee ID */}
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-800">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/80">
+                            {empIdDisplay}
                           </span>
-                        </td>
-
-                        {/* Department */}
-                        <td className="py-3 px-3 text-slate-600 font-medium">
-                          {staff.department || "General Medicine"}
-                        </td>
-
-                        {/* Email */}
-                        <td className="py-3 px-3 text-slate-500 font-mono text-[11px]">
-                          {staff.email}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3 px-3">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Active
-                          </span>
-                        </td>
-
-                        {/* Joined On */}
-                        <td className="py-3 px-3 text-slate-500 font-medium text-[11px]">
-                          {getStaffJoinDate(staff)}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleViewStaffProfile(staff)}
-                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                              title="View Full Profile"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleEditStaffProfile(staff)}
-                              className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                              title="Edit Staff Profile"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
+                          {isHospitalAdmin ? (
                             <button
                               onClick={() => {
-                                setStaffToReset(staff);
-                                setResetNewPassword("");
-                                setResetConfirmPassword("");
-                                setIsResetModalOpen(true);
+                                setStaffToEditEmpId(staff);
+                                setNewEmpIdInput(empIdDisplay);
+                                setIsEditEmpIdModalOpen(true);
                               }}
-                              className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                              title="Reset Staff Password"
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                              title="Edit Employee ID (Admin Only)"
                             >
-                              <KeyRound className="w-4 h-4" />
+                              <Edit3 className="w-3 h-3" />
                             </button>
-                            {(isHospitalAdmin || user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*')) && (
-                              <button
-                                onClick={() => {
-                                  setStaffToDelete(staff);
-                                  setIsDeleteModalOpen(true);
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                title="Delete Staff Member (Admin Only)"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                          ) : (
+                            <Lock className="w-3 h-3 text-slate-400" title="Employee ID Locked" />
+                          )}
+                        </div>
+                      </td>
 
-        {/* Right Column (4/12): Quick Actions (Separated Role vs Permission Modals) */}
-        <Card className="lg:col-span-4 border-slate-200/90 shadow-2xs bg-white rounded-2xl flex flex-col justify-between overflow-hidden">
-          <CardHeader className="pb-3 pt-4 px-5 border-b border-slate-100 bg-slate-50/50">
-            <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
-              <span>Quick Governance Actions</span>
-            </CardTitle>
-            <CardDescription className="text-[11px] text-slate-500">Fast shortcuts for staff creation & security control</CardDescription>
-          </CardHeader>
+                      {/* Role */}
+                      <td className="py-3 px-3">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full border text-[10px] ${roleBadge}`}>
+                          {staff.roles ? staff.roles[0] : "Staff"}
+                        </span>
+                      </td>
 
-          <CardContent className="p-4 space-y-3 flex-1 flex flex-col justify-start">
-            
-            {/* 1. Add New Staff */}
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-r from-blue-50/60 to-white hover:border-blue-400 hover:shadow-md transition-all group cursor-pointer text-left w-full"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-700">Add New Staff User</h4>
-                  <p className="text-[11px] text-slate-500 font-medium">Create credentials & link doctor profile</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
+                      {/* Department */}
+                      <td className="py-3 px-3 text-slate-600 font-medium">
+                        {staff.department || "General Medicine"}
+                      </td>
 
-            {/* 2. Assign Role (Opens Role Assignment View) */}
-            <button
-              onClick={() => handleOpenRoleModal()}
-              className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-r from-amber-50/60 to-white hover:border-amber-400 hover:shadow-md transition-all group cursor-pointer text-left w-full"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700">Assign Roles to Staff</h4>
-                  <p className="text-[11px] text-slate-500 font-medium">Doctor, Pharmacist, Lab Tech, Nurse</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
+                      {/* Contact */}
+                      <td className="py-3 px-3">
+                        <div className="text-slate-700 font-mono text-[11px]">{staff.email || "—"}</div>
+                        {contactMobile && !contactMobile.includes("@") && (
+                          <div className="text-[10px] text-slate-400 font-mono">{contactMobile}</div>
+                        )}
+                      </td>
 
-            {/* 3. Manage Permissions (Opens Page Access Control View) */}
-            <button
-              onClick={() => handleOpenPermissionModal()}
-              className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-r from-emerald-50/60 to-white hover:border-emerald-400 hover:shadow-md transition-all group cursor-pointer text-left w-full"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                  <KeyRound className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Manage Page Permissions</h4>
-                  <p className="text-[11px] text-slate-500 font-medium">Control module & page access rights</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
+                      {/* Status */}
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/70">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Active
+                        </span>
+                      </td>
 
-          </CardContent>
-        </Card>
+                      {/* Joined On */}
+                      <td className="py-3 px-3 text-slate-500 font-medium text-[11px]">
+                        {getStaffJoinDate(staff)}
+                      </td>
 
-      </div>
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleViewStaffProfile(staff)}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="View Full Profile"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditStaffProfile(staff)}
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Staff Profile"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenGovernanceModal(staff)}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                            title="Configure Roles & Permissions"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setStaffToReset(staff);
+                              setResetNewPassword("");
+                              setResetConfirmPassword("");
+                              setIsResetModalOpen(true);
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            title="Reset Staff Password"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+                          {(isHospitalAdmin || user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*')) && (
+                            <button
+                              onClick={() => {
+                                setStaffToDelete(staff);
+                                setIsDeleteModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Staff Member (Admin Only)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       {/* Modal: Add New Staff Member */}
       {isAddModalOpen && (
@@ -1269,7 +908,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="px-3 py-1 bg-white rounded-lg border border-blue-300 text-xs font-mono font-extrabold text-blue-800 flex items-center gap-1.5 shadow-2xs">
                   <IdCard className="w-4 h-4 text-blue-600" />
-                  <span>{generateNextEmployeeId(primaryRole, staffUsers, [], activities)}</span>
+                  <span>{generateNextEmployeeId(primaryRole, staffUsers, [])}</span>
                 </div>
               </div>
 
@@ -1352,6 +991,16 @@ export default function AdminDashboardPage() {
                     </button>
                   </div>
                 </div>
+                
+                <div>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Joined Date</Label>
+                  <Input
+                    type="date"
+                    value={joinedDate}
+                    onChange={(e) => setJoinedDate(e.target.value)}
+                    className="text-xs h-9 bg-white"
+                  />
+                </div>
               </div>
 
               {primaryRole === "Doctor" && (
@@ -1406,18 +1055,21 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Modal: Governance Console (Separated Role Assignment vs Page Permissions Tabs) */}
+      {/* Modal: Unified Roles & Access Permissions Governance */}
       {isEditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            {/* Header */}
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {activeGovernanceTab === "roles" ? <ShieldCheck className="w-5 h-5 text-amber-400" /> : <KeyRound className="w-5 h-5 text-emerald-400" />}
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-400/40 text-blue-300 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-bold text-base">
-                    {activeGovernanceTab === "roles" ? "Assign Hospital Roles" : "Manage Page Access Permissions"}
-                  </h3>
-                  <p className="text-[11px] text-slate-300">{selectedUser.full_name} ({selectedUser.email})</p>
+                  <h3 className="font-bold text-base leading-tight">Staff Roles &amp; Access Permissions</h3>
+                  <p className="text-[11px] text-slate-300">
+                    Configuring access rights for <span className="text-white font-semibold">{selectedUser.full_name}</span> ({selectedUser.employeeId || selectedUser.employee_id || selectedUser.frappeStaffId || selectedUser.email || "TH-STF-001"})
+                  </p>
                 </div>
               </div>
               <button 
@@ -1428,137 +1080,175 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            {/* Modal Tabs Header */}
-            <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2">
-              <button
-                type="button"
-                onClick={() => setActiveGovernanceTab("roles")}
-                className={`pb-2 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
-                  activeGovernanceTab === "roles" ? "border-amber-500 text-amber-700" : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Assign Roles (Doctor, Nurse, etc.)
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveGovernanceTab("permissions")}
-                className={`pb-2 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
-                  activeGovernanceTab === "permissions" ? "border-emerald-500 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Page Permissions (Doctor Consultations, etc.)
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveRolesPermissions} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-              
-              {/* Searchable Target Staff User Selector */}
-              <div className="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
-                    Search & Select Staff Member to Configure
-                  </Label>
-                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                    Active: {selectedUser?.full_name}
-                  </span>
+            {/* Target Staff Member Selector Bar */}
+            <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    {(selectedUser.full_name || selectedUser.email || "U").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <span>{selectedUser.full_name}</span>
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded">
+                        {selectedUser.employeeId || selectedUser.employee_id || selectedUser.frappeStaffId || "TH001"}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-medium">
+                      {selectedUser.department || "General"} • {selectedUser.email || "No email"}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Search Bar Input */}
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                {/* Search & Switch Staff Button/Input */}
+                <div className="relative w-full sm:w-56">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                   <Input
-                    placeholder="Type name, email, or role to search staff..."
+                    placeholder="Switch staff member..."
                     value={modalSearchQuery}
                     onChange={(e) => {
                       setModalSearchQuery(e.target.value);
                       setIsStaffDropdownOpen(true);
                     }}
                     onFocus={() => setIsStaffDropdownOpen(true)}
-                    className="pl-9 pr-8 text-xs h-9 bg-white border-slate-300 font-semibold text-slate-900 focus:ring-1 focus:ring-blue-500 rounded-xl"
+                    className="pl-8 pr-7 text-xs h-8 bg-white border-slate-300 rounded-lg font-medium"
                   />
                   {modalSearchQuery && (
                     <button
                       type="button"
                       onClick={() => setModalSearchQuery("")}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
-                </div>
 
-                {/* Filtered Search Results Dropdown List */}
-                {isStaffDropdownOpen && (
-                  <div className="max-h-44 overflow-y-auto border border-slate-200 bg-white rounded-xl shadow-xl divide-y divide-slate-100 mt-1 animate-in fade-in duration-150">
-                    {staffUsers.filter(s => 
-                      (s.full_name || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
-                      (s.email || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
-                      (s.roles || []).some(r => r.toLowerCase().includes(modalSearchQuery.toLowerCase()))
-                    ).length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-400 font-medium">No matching staff member found.</div>
-                    ) : (
-                      staffUsers.filter(s => 
+                  {/* Dropdown Results */}
+                  {isStaffDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-72 max-h-48 overflow-y-auto border border-slate-200 bg-white rounded-xl shadow-xl divide-y divide-slate-100 z-50 animate-in fade-in duration-150">
+                      {staffUsers.filter(s => 
                         (s.full_name || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
                         (s.email || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
                         (s.roles || []).some(r => r.toLowerCase().includes(modalSearchQuery.toLowerCase()))
-                      ).map((s) => {
-                        const isSelected = selectedUser?.email === s.email;
-                        return (
-                          <div
-                            key={s.email}
-                            onClick={() => {
-                              handleOpenEdit(s);
-                              setIsStaffDropdownOpen(false);
-                              setModalSearchQuery("");
-                            }}
-                            className={`p-2.5 hover:bg-blue-50/80 cursor-pointer flex items-center justify-between transition-colors ${isSelected ? "bg-blue-50 font-bold" : ""}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shrink-0">
-                                {(s.full_name || s.email || "U").charAt(0).toUpperCase()}
+                      ).length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-400 font-medium">No matching staff member found.</div>
+                      ) : (
+                        staffUsers.filter(s => 
+                          (s.full_name || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+                          (s.email || "").toLowerCase().includes(modalSearchQuery.toLowerCase()) ||
+                          (s.roles || []).some(r => r.toLowerCase().includes(modalSearchQuery.toLowerCase()))
+                        ).map((s) => {
+                          const isSelected = (selectedUser.id && s.id && selectedUser.id === s.id) || (selectedUser.email && s.email && selectedUser.email === s.email);
+                          return (
+                            <div
+                              key={s.id || s.email}
+                              onClick={() => {
+                                handleOpenGovernanceModal(s);
+                                setIsStaffDropdownOpen(false);
+                                setModalSearchQuery("");
+                              }}
+                              className={`p-2 hover:bg-blue-50/80 cursor-pointer flex items-center justify-between transition-colors ${isSelected ? "bg-blue-50/90 font-bold" : ""}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[9px] shrink-0">
+                                  {(s.full_name || s.email || "U").charAt(0).toUpperCase()}
+                                </div>
+                                <div className="leading-tight">
+                                  <div className="text-xs text-slate-900 font-bold">{s.full_name}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono">{s.employeeId || s.email}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="text-xs text-slate-900 font-bold">{s.full_name}</div>
-                                <div className="text-[10px] text-slate-500 font-mono">{s.email}</div>
-                              </div>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 stroke-[3]" />}
                             </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-                                {s.roles ? s.roles[0] : "Staff"}
-                              </span>
-                              {isSelected && <Check className="w-4 h-4 text-blue-600 stroke-[3]" />}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
 
-              {/* Roles Selection (Shown when activeGovernanceTab === "roles") */}
+            {/* Segmented Tabs Navigation */}
+            <div className="flex border-b border-slate-200 bg-white px-6 pt-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveGovernanceTab("roles")}
+                className={`flex items-center gap-2 pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  activeGovernanceTab === "roles"
+                    ? "border-amber-500 text-amber-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>1. Assigned Roles</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800">
+                  {editRoles.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveGovernanceTab("permissions")}
+                className={`flex items-center gap-2 pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  activeGovernanceTab === "permissions"
+                    ? "border-emerald-500 text-emerald-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>2. Page &amp; Module Permissions</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                  {editPermissions.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Modal Form Body */}
+            <form onSubmit={handleSaveRolesPermissions} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              
+              {/* TAB 1: Roles Selection */}
               {activeGovernanceTab === "roles" && (
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
-                    Assign Hospital Roles (Multiple Selectable)
-                  </Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {ALL_ROLES.map((r) => {
-                      const isChecked = editRoles.includes(r);
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                        Select Hospital Roles
+                      </Label>
+                      <p className="text-[11px] text-slate-500">Staff member can hold multiple roles simultaneously</p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {editRoles.length} selected
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {ROLE_DEFINITIONS.map((def) => {
+                      const Icon = def.icon;
+                      const isChecked = editRoles.includes(def.role);
                       return (
                         <div
-                          key={r}
-                          onClick={() => handleRoleToggle(r)}
-                          className={`p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-between select-none ${
+                          key={def.role}
+                          onClick={() => handleRoleToggle(def.role)}
+                          className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-3 select-none ${
                             isChecked 
-                              ? "bg-amber-50 border-amber-400 text-amber-900 shadow-2xs" 
-                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                              ? "bg-amber-50/70 border-amber-400 text-amber-950 shadow-2xs" 
+                              : "bg-white border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
                           }`}
                         >
-                          <span>{r}</span>
-                          <div className={`w-4 h-4 rounded-md flex items-center justify-center border ${isChecked ? "bg-amber-500 border-amber-500 text-white" : "border-slate-300"}`}>
-                            {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border mt-0.5 ${
+                            isChecked ? "bg-amber-500 text-white border-amber-500 shadow-2xs" : "bg-slate-100 text-slate-500 border-slate-200"
+                          }`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900">{def.role}</span>
+                              <div className={`w-4 h-4 rounded flex items-center justify-center border ${isChecked ? "bg-amber-500 border-amber-500 text-white" : "border-slate-300"}`}>
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 leading-tight mt-1">{def.desc}</p>
                           </div>
                         </div>
                       );
@@ -1567,28 +1257,47 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              {/* Granular Page Permissions (Shown when activeGovernanceTab === "permissions") */}
+              {/* TAB 2: Granular Page Permissions */}
               {activeGovernanceTab === "permissions" && (
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
-                    Granular Page & Module Access Permissions
-                  </Label>
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/70">
+                    <div>
+                      <Label className="text-xs font-bold text-emerald-950 uppercase tracking-wider block">
+                        Granular Page Access Rights
+                      </Label>
+                      <p className="text-[11px] text-emerald-800">Controls menu visibility and action permissions</p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleApplyRecommendedPermissions}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-semibold h-7 px-2.5 rounded-lg shadow-2xs cursor-pointer shrink-0"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1" />
+                      Apply Role Defaults
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {PERMISSION_OPTIONS.map((p) => {
                       const isChecked = editPermissions.includes(p.id);
                       return (
                         <div
                           key={p.id}
                           onClick={() => handlePermissionToggle(p.id)}
-                          className={`p-2.5 rounded-lg border text-xs font-medium cursor-pointer transition-all flex items-center justify-between select-none ${
+                          className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-2.5 select-none ${
                             isChecked 
-                              ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 font-semibold" 
+                              ? "bg-emerald-50/80 border-emerald-400 text-emerald-950 shadow-2xs" 
                               : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                           }`}
                         >
-                          <span>{p.label}</span>
-                          <div className={`w-4 h-4 rounded-md flex items-center justify-center border ${isChecked ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300"}`}>
+                          <div className={`w-4 h-4 rounded flex items-center justify-center border mt-0.5 shrink-0 ${isChecked ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300"}`}>
                             {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 leading-tight">{p.label}</div>
+                            <div className="text-[10px] text-slate-500 leading-tight mt-0.5">{p.desc}</div>
                           </div>
                         </div>
                       );
@@ -1597,22 +1306,31 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSaving}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-9 px-5 shadow-md cursor-pointer"
-                >
-                  {isSaving ? "Saving..." : "Save Configuration"}
-                </Button>
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Configured: <span className="font-bold text-slate-800">{editRoles.length} Roles</span>, <span className="font-bold text-slate-800">{editPermissions.length} Permissions</span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="h-9 px-4 text-xs font-semibold rounded-xl border-slate-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-9 px-5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                    <span>{isSaving ? "Saving..." : "Save Access Configuration"}</span>
+                  </Button>
+                </div>
               </div>
 
             </form>
@@ -1792,6 +1510,16 @@ export default function AdminDashboardPage() {
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-bold text-slate-700 mb-1 block">Joined Date</Label>
+                  <Input
+                    type="date"
+                    value={editStaffJoinedDate}
+                    onChange={(e) => setEditStaffJoinedDate(e.target.value)}
+                    className="text-xs h-9 bg-white font-medium"
+                  />
                 </div>
 
                 <div>

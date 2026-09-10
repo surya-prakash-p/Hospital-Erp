@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '@/lib/auth-guard';
-import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
+import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity, isProductionEnvironment } from '@/lib/server-user-store';
 import { recordAuditLog, getAuditLogs } from '@/lib/audit-logger';
 
 let frappeConfig = null;
@@ -143,7 +143,7 @@ export async function DELETE(req) {
       metadata: { deletedIdentifier: cleanIdentifier }
     }).catch(() => null);
 
-    if (apiKey && apiSecret) {
+    if (isProductionEnvironment() && apiKey && apiSecret) {
       try {
         await frappeFetch(`/api/resource/User/${encodeURIComponent(cleanIdentifier)}`, {
           method: 'DELETE'
@@ -274,7 +274,7 @@ export async function POST(req) {
     }
 
     let frappeUser = null;
-    if (apiKey && apiSecret) {
+    if (isProductionEnvironment() && apiKey && apiSecret) {
       try {
         let existingUser = null;
         try {

@@ -28,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname, useRouter } from "next/navigation";
-import { AuditLogModal } from "@/components/audit-log-modal";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -42,9 +41,6 @@ export function Header() {
   const { user, logout, updateProfile, hasRole, hasPermission } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-
-  // Audit Logs modal state
-  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   // Permission check: Only Admin can view by default, unless Admin gave 'Audit Logs' permission
   const canViewAuditLogs = Boolean(
@@ -262,7 +258,7 @@ export function Header() {
 
               {canViewAuditLogs && (
                 <DropdownMenuItem 
-                  onClick={() => setIsAuditModalOpen(true)}
+                  onClick={() => router.push('/audit-logs')}
                   className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-blue-900 font-bold hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition-colors"
                 >
                   <Activity className="w-4 h-4 text-blue-600 shrink-0" />
@@ -651,12 +647,6 @@ export function Header() {
           </div>
         </div>
       )}
-
-      {/* Audit & Activity Logs Slide-Over Modal */}
-      <AuditLogModal
-        isOpen={isAuditModalOpen}
-        onClose={() => setIsAuditModalOpen(false)}
-      />
     </>
   );
 }

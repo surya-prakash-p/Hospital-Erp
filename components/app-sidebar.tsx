@@ -10,7 +10,6 @@ import {
   FlaskConical,
   Pill,
   Receipt,
-  UserRound,
   PanelLeft,
   ChevronLeft,
   LayoutDashboard,
@@ -31,7 +30,6 @@ const mainNavigation = [
   { name: "Pharmacy", href: "/pharmacy", icon: Pill, role: "Pharmacist", permission: "Pharmacy Dispensing" },
   { name: "Billing & Pay", href: "/billing", icon: Receipt, role: "Billing Clerk", permission: "Billing & Invoicing" },
   { name: "Finance Ledger", href: "/finance", icon: Wallet, role: "Billing Clerk", permission: "Billing & Invoicing" },
-  { name: "Doctors Registry", href: "/doctors", icon: UserRound, role: "Doctor", permission: "Doctor Consultations" },
   { name: "AI Copilot", href: "/ai-assistant", icon: Bot, role: "Doctor", permission: "Doctor Consultations" },
 ]
 

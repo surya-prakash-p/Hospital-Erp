@@ -32,3 +32,8 @@ frappe_config.json
 __pycache__/
 *.py[cod]
 *.traineddata
+
+# Local dev data stores
+*_dev.json
+thangam_hospital_audit_logs.json
+

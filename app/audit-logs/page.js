@@ -2,42 +2,35 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  Activity, 
   Eye, 
-  UserPlus, 
-  ShieldCheck, 
-  Stethoscope, 
   Search, 
-  RefreshCw, 
   Download, 
-  Clock, 
   Calendar, 
-  User, 
-  Filter, 
   Layers, 
-  CheckCircle2, 
   LogIn, 
-  Receipt, 
   Trash2, 
-  AlertTriangle,
-  FileSpreadsheet,
-  Building2,
-  Sparkles,
-  ArrowRight,
+  FileText, 
+  Lock,
   ChevronLeft,
   ChevronRight,
-  Info,
-  Laptop,
-  Globe,
+  Plus,
+  Edit3,
+  CreditCard,
+  Pill,
+  FlaskConical,
+  TrendingUp,
+  Users,
   Copy,
   Check,
   X,
-  Shield,
-  FileText,
-  Lock
+  IndianRupee,
+  ShieldCheck,
+  Stethoscope,
+  Loader2
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 
@@ -58,49 +51,37 @@ export default function AuditLogsPage() {
     hasPermission?.('Audit')
   );
 
+  // Raw logs from server
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
+
+  // Filters State matching mockup
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-  const [isAutoRefresh, setIsAutoRefresh] = useState(true);
-  
-  // Pagination
+  const [selectedModule, setSelectedModule] = useState("all");
+  const [selectedActionType, setSelectedActionType] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize] = useState(10);
 
   // Inspector Modal State
   const [selectedLog, setSelectedLog] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  // Clear modal state
-  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-
-  const [metrics, setMetrics] = useState({
-    totalRecords: 0,
-    pageVisitsToday: 0,
-    userActionsToday: 0,
-    activeStaffToday: 0
-  });
-
+  // Fetch all logs from server
   const fetchLogs = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (activeTab !== "all") params.set("type", activeTab);
-      if (roleFilter !== "all") params.set("role", roleFilter);
-      if (dateFilter !== "all") params.set("dateRange", dateFilter);
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
-      params.set("limit", "500");
+      params.set("limit", "1000");
 
       const res = await fetch(`/api/logs/list?${params.toString()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
-          setLogs(data.logs || []);
-          if (data.metrics) setMetrics(data.metrics);
+        if (data.success && Array.isArray(data.logs)) {
+          setLogs(data.logs);
         }
       }
     } catch (err) {
@@ -111,146 +92,251 @@ export default function AuditLogsPage() {
   };
 
   useEffect(() => {
-    setCurrentPage(1);
     fetchLogs();
-  }, [activeTab, roleFilter, dateFilter]);
+  }, []);
 
-  // Live auto-refresh interval
+  // Background auto-refresh every 8 seconds
   useEffect(() => {
-    if (!isAutoRefresh) return;
     const interval = setInterval(() => {
       fetchLogs();
-    }, 6000);
+    }, 8000);
     return () => clearInterval(interval);
-  }, [isAutoRefresh, activeTab, roleFilter, dateFilter, searchQuery]);
+  }, []);
 
-  // Paginated logs
-  const totalPages = Math.ceil(logs.length / pageSize) || 1;
+  // Helper 1: Map action type from real log to badge props
+  const mapAction = (log) => {
+    const act = (log.action || "").toLowerCase();
+    const typ = (log.type || "").toLowerCase();
+    const desc = (log.description || "").toLowerCase();
+
+    if (act.includes("delete") || act.includes("remove") || act.includes("purge") || desc.includes("deleted")) {
+      return {
+        label: "Deleted",
+        pillClass: "bg-rose-50 text-rose-600 border-rose-200/80",
+        icon: Trash2
+      };
+    }
+    if (act.includes("payment") || act.includes("paid") || act.includes("collect") || desc.includes("collected") || desc.includes("paid") || typ === "billing") {
+      if (desc.includes("collected") || desc.includes("payment") || act.includes("payment")) {
+        return {
+          label: "Payment Collected",
+          pillClass: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+          icon: IndianRupee
+        };
+      }
+    }
+    if (act.includes("create") || act.includes("add") || act.includes("register") || act.includes("new") || desc.includes("created") || desc.includes("added") || desc.includes("registered") || typ === "user_mgmt") {
+      return {
+        label: "Created",
+        pillClass: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+        icon: Plus
+      };
+    }
+    if (act.includes("update") || act.includes("edit") || act.includes("modify") || act.includes("reset") || act.includes("adjust") || desc.includes("updated") || desc.includes("edited") || desc.includes("reset")) {
+      return {
+        label: "Updated",
+        pillClass: "bg-amber-50 text-amber-700 border-amber-200/80",
+        icon: Edit3
+      };
+    }
+    if (act.includes("dispense") || desc.includes("dispensed")) {
+      return {
+        label: "Dispensed",
+        pillClass: "bg-purple-50 text-purple-700 border-purple-200/80",
+        icon: Pill
+      };
+    }
+    if (act.includes("login") || act.includes("auth") || typ === "auth" || desc.includes("logged in")) {
+      return {
+        label: "Logged In",
+        pillClass: "bg-indigo-50 text-indigo-700 border-indigo-200/80",
+        icon: LogIn
+      };
+    }
+
+    // Default viewed
+    return {
+      label: "Viewed",
+      pillClass: "bg-blue-50 text-blue-600 border-blue-200/80",
+      icon: Eye
+    };
+  };
+
+  // Helper 2: Map module from real log
+  const mapModule = (log) => {
+    const tgt = (log.target || "").toLowerCase();
+    const act = (log.action || "").toLowerCase();
+    const typ = (log.type || "").toLowerCase();
+    const desc = (log.description || "").toLowerCase();
+
+    if (tgt.includes("admin") || tgt.includes("staff") || typ === "user_mgmt" || act.includes("staff") || desc.includes("staff member")) {
+      return { label: "Staff Management", icon: Users };
+    }
+    if (tgt.includes("patient") || tgt.includes("reception") || tgt.includes("walkin") || act.includes("patient") || desc.includes("patient")) {
+      return { label: "Patient", icon: FileText };
+    }
+    if (tgt.includes("appointment") || act.includes("appointment") || desc.includes("appointment")) {
+      return { label: "Appointment", icon: Calendar };
+    }
+    if (tgt.includes("pharmacy") || act.includes("medicine") || act.includes("stock") || desc.includes("medicine") || desc.includes("stock")) {
+      return { label: "Pharmacy", icon: Pill };
+    }
+    if (tgt.includes("lab") || tgt.includes("radiology") || act.includes("lab") || desc.includes("lab report") || desc.includes("diagnostic")) {
+      return { label: "Lab Reports", icon: FlaskConical };
+    }
+    if (tgt.includes("consultation") || act.includes("consultation") || desc.includes("consultation") || typ === "clinical") {
+      return { label: "Consultation", icon: Stethoscope };
+    }
+    if (tgt.includes("billing") || act.includes("invoice") || desc.includes("invoice") || desc.includes("bill")) {
+      return { label: "Billing", icon: CreditCard };
+    }
+    if (tgt.includes("finance") || act.includes("finance") || desc.includes("transaction") || typ === "finance") {
+      return { label: "Finance", icon: TrendingUp };
+    }
+    if (tgt.includes("auth") || tgt.includes("login") || typ === "auth") {
+      return { label: "Authentication", icon: ShieldCheck };
+    }
+    return { label: "System", icon: Layers };
+  };
+
+  // Helper 3: Format Date and Time
+  const formatDateTime = (log) => {
+    let d = null;
+    if (log.timestamp) d = new Date(log.timestamp);
+    else if (log.createdAt) d = new Date(log.createdAt);
+
+    if (d && !isNaN(d.getTime())) {
+      const time = d.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      const date = d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      return { time, date };
+    }
+
+    return {
+      time: log.timeStr || "12:00 PM",
+      date: log.dateStr || "Today"
+    };
+  };
+
+  // Helper 4: Format Staff Member Name & Role
+  const getStaffInfo = (log) => {
+    const actorName = log.actor?.name || log.actor?.full_name || log.actor?.employeeId || "Hospital Admin";
+    const actorRole = log.actor?.role || log.actor?.designation || (log.actor?.department ? `${log.actor.department} Staff` : "Staff");
+    return { name: actorName, role: actorRole };
+  };
+
+  // Filtered Logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const actionObj = mapAction(log);
+      const moduleObj = mapModule(log);
+      const staffObj = getStaffInfo(log);
+      const { date } = formatDateTime(log);
+
+      // Search Query filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = staffObj.name.toLowerCase().includes(query);
+        const matchesRole = staffObj.role.toLowerCase().includes(query);
+        const matchesAction = (log.action || "").toLowerCase().includes(query) || actionObj.label.toLowerCase().includes(query);
+        const matchesModule = moduleObj.label.toLowerCase().includes(query);
+        const matchesDesc = (log.description || "").toLowerCase().includes(query);
+        const matchesTarget = (log.target || "").toLowerCase().includes(query);
+
+        if (!matchesName && !matchesRole && !matchesAction && !matchesModule && !matchesDesc && !matchesTarget) {
+          return false;
+        }
+      }
+
+      // Module Filter
+      if (selectedModule !== "all") {
+        if (moduleObj.label.toLowerCase() !== selectedModule.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Action Type Filter
+      if (selectedActionType !== "all") {
+        if (actionObj.label.toLowerCase() !== selectedActionType.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Date Range Filter
+      if (startDate) {
+        const logDateObj = new Date(log.timestamp || log.createdAt || date);
+        const startObj = new Date(startDate);
+        if (!isNaN(logDateObj.getTime()) && !isNaN(startObj.getTime())) {
+          startObj.setHours(0, 0, 0, 0);
+          if (logDateObj < startObj) return false;
+        }
+      }
+
+      if (endDate) {
+        const logDateObj = new Date(log.timestamp || log.createdAt || date);
+        const endObj = new Date(endDate);
+        if (!isNaN(logDateObj.getTime()) && !isNaN(endObj.getTime())) {
+          endObj.setHours(23, 59, 59, 999);
+          if (logDateObj > endObj) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [logs, searchQuery, selectedModule, selectedActionType, startDate, endDate]);
+
+  // Paginated View
+  const totalPages = Math.ceil(filteredLogs.length / pageSize) || 1;
   const paginatedLogs = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return logs.slice(start, start + pageSize);
-  }, [logs, currentPage, pageSize]);
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
 
+  // Export CSV Handler
   const handleExportCSV = () => {
-    if (!logs.length) return;
-    const headers = ["Timestamp", "Date", "Time", "Category", "Action", "Staff Name", "Employee ID", "Role", "Department", "Target/Page", "Description", "IP Address"];
-    const rows = logs.map(l => [
-      l.timestamp,
-      l.dateStr,
-      l.timeStr,
-      l.type,
-      `"${(l.action || "").replace(/"/g, '""')}"`,
-      `"${(l.actor?.name || "").replace(/"/g, '""')}"`,
-      l.actor?.employeeId || "",
-      l.actor?.role || "",
-      `"${(l.actor?.department || "").replace(/"/g, '""')}"`,
-      `"${(l.target || "").replace(/"/g, '""')}"`,
-      `"${(l.description || "").replace(/"/g, '""')}"`,
-      l.metadata?.ip || "127.0.0.1"
-    ]);
+    if (!filteredLogs.length) return;
+    const headers = ["Timestamp", "Date", "Time", "Staff Name", "Role", "Action Type", "Module", "Details", "IP Address"];
+    const rows = filteredLogs.map((l) => {
+      const { time, date } = formatDateTime(l);
+      const staff = getStaffInfo(l);
+      const action = mapAction(l);
+      const mod = mapModule(l);
+
+      return [
+        l.timestamp || l.createdAt || "",
+        date,
+        time,
+        `"${(staff.name || "").replace(/"/g, '""')}"`,
+        `"${(staff.role || "").replace(/"/g, '""')}"`,
+        `"${action.label}"`,
+        `"${mod.label}"`,
+        `"${(l.description || l.action || "").replace(/"/g, '""')}"`,
+        l.metadata?.ip || "127.0.0.1"
+      ];
+    });
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `hospital_audit_report_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `hospital_audit_log_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const handleConfirmClearLogs = async () => {
-    setIsClearing(true);
-    try {
-      const res = await fetch("/api/logs/list", { method: "DELETE" });
-      if (res.ok) {
-        setIsClearModalOpen(false);
-        await fetchLogs();
-      }
-    } catch (err) {
-      console.error("Failed to clear logs:", err);
-    } finally {
-      setIsClearing(false);
-    }
   };
 
   const copyJsonPayload = (logObj) => {
     navigator.clipboard.writeText(JSON.stringify(logObj, null, 2));
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const getCategoryBadge = (type) => {
-    switch (type) {
-      case "page_visit":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/80 shadow-2xs">
-            <Eye className="w-3 h-3 text-sky-600" />
-            Page Access
-          </span>
-        );
-      case "user_mgmt":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-            <UserPlus className="w-3 h-3 text-emerald-600" />
-            User Governance
-          </span>
-        );
-      case "patient":
-      case "clinical":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/80 shadow-2xs">
-            <Stethoscope className="w-3 h-3 text-purple-600" />
-            Clinical Operation
-          </span>
-        );
-      case "billing":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs">
-            <Receipt className="w-3 h-3 text-amber-600" />
-            Finance & Billing
-          </span>
-        );
-      case "auth":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
-            <LogIn className="w-3 h-3 text-indigo-600" />
-            Security & Session
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs">
-            <Activity className="w-3 h-3 text-slate-500" />
-            System Event
-          </span>
-        );
-    }
-  };
-
-  const getRelativeTime = (timestampStr) => {
-    try {
-      const diffMs = Date.now() - new Date(timestampStr).getTime();
-      const mins = Math.floor(diffMs / 60000);
-      if (mins < 1) return "Just now";
-      if (mins < 60) return `${mins}m ago`;
-      const hours = Math.floor(mins / 60);
-      if (hours < 24) return `${hours}h ago`;
-      const days = Math.floor(hours / 24);
-      return `${days}d ago`;
-    } catch {
-      return "";
-    }
-  };
-
-  const getActorAvatarColor = (role) => {
-    const r = (role || "").toLowerCase();
-    if (r.includes("admin")) return "from-slate-900 to-indigo-950 text-white";
-    if (r.includes("doctor")) return "from-blue-600 to-indigo-600 text-white";
-    if (r.includes("pharm")) return "from-purple-600 to-pink-600 text-white";
-    if (r.includes("lab")) return "from-amber-500 to-orange-600 text-white";
-    if (r.includes("recep")) return "from-teal-600 to-emerald-600 text-white";
-    return "from-slate-700 to-slate-900 text-white";
   };
 
   // If user is not admin and does not have explicit 'Audit Logs' permission
@@ -278,321 +364,242 @@ export default function AuditLogsPage() {
     );
   }
 
-  return (
-    <div className="flex flex-col gap-6 max-w-[1440px] mx-auto pb-14 font-sans text-slate-800 animate-in fade-in duration-300">
-      
-      {/* Page actions */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            onClick={() => setIsAutoRefresh(!isAutoRefresh)}
-            variant={isAutoRefresh ? "default" : "outline"}
-            size="sm"
-            className={`h-9 px-3.5 text-xs font-semibold rounded-xl gap-2 cursor-pointer transition-all shadow-2xs font-sans ${
-              isAutoRefresh ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            <Activity className={`w-3.5 h-3.5 ${isAutoRefresh ? "animate-spin" : ""}`} />
-            <span>{isAutoRefresh ? "Auto-Refresh Live (6s)" : "Auto-Refresh Paused"}</span>
-          </Button>
+  const startRecord = filteredLogs.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = Math.min(currentPage * pageSize, filteredLogs.length);
 
+  return (
+    <div className="flex flex-col gap-5 max-w-[1400px] mx-auto pb-14 font-sans text-slate-800 animate-in fade-in duration-300">
+      
+      {/* 1. HEADER (Icon + Title + Subtitle + Export CSV Button) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs shrink-0">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Audit Log</h1>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Track all system activities and changes</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
           <Button
             onClick={handleExportCSV}
             variant="outline"
-            size="sm"
-            className="h-9 px-3.5 text-xs font-semibold rounded-xl gap-2 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs cursor-pointer font-sans"
+            className="h-10 px-4 text-xs font-bold rounded-xl gap-2 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs cursor-pointer font-sans"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV Ledger</span>
+            <Download className="w-4 h-4 text-slate-600" />
+            <span>Export CSV</span>
           </Button>
-
-          {isHospitalAdmin && (
-            <Button
-              onClick={() => setIsClearModalOpen(true)}
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 text-xs font-semibold rounded-xl gap-1.5 text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer font-sans"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Purge History</span>
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* 2. TOP 4 METRICS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Page Views Today */}
-        <Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow bg-white rounded-2xl overflow-hidden">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Page Navigations Today</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics.pageVisitsToday}</h3>
-              <p className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Live route transitions
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-              <Eye className="w-6 h-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* User Mgmt Today */}
-        <Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow bg-white rounded-2xl overflow-hidden">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Staff Actions Today</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics.userActionsToday}</h3>
-              <p className="text-[11px] font-medium text-slate-500">
-                Staff added, edited or deleted
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <UserPlus className="w-6 h-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Staff */}
-        <Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow bg-white rounded-2xl overflow-hidden">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Staff Accounts</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics.activeStaffToday}</h3>
-              <p className="text-[11px] font-medium text-indigo-600 flex items-center gap-1">
-                <Shield className="w-3.5 h-3.5" />
-                Authenticated users
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-              <User className="w-6 h-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Total Records */}
-        <Card className="border-slate-200/90 shadow-2xs hover:shadow-xs transition-shadow bg-white rounded-2xl overflow-hidden">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Audit Trail</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics.totalRecords}</h3>
-              <p className="text-[11px] font-medium text-slate-500">
-                Persisted in audit database
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-              <Layers className="w-6 h-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
-
-      {/* 3. AUDIT DATA TABLE CARD */}
-      <Card className="border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden flex flex-col">
-        
-        {/* CATEGORY FILTER TABS */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3 overflow-x-auto">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-200/60 rounded-xl">
-            {[
-              { id: "all", label: "All Events", icon: Activity, count: metrics.totalRecords },
-              { id: "page_visit", label: "Page Navigations", icon: Eye, count: metrics.pageVisitsToday },
-              { id: "user_mgmt", label: "Staff Governance", icon: UserPlus, count: metrics.userActionsToday },
-              { id: "patient", label: "Patient & Clinical", icon: Stethoscope },
-              { id: "billing", label: "Billing & Ledger", icon: Receipt },
-              { id: "auth", label: "Security & Sessions", icon: ShieldCheck }
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
+      {/* 2. FILTER BAR (Search, Module, Action Type, Date Range + Apply Button) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          
+          {/* 1. Search */}
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">Search</Label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                type="text"
+                placeholder="Search by name, action, or module..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-8 text-xs h-9.5 bg-white border-slate-200 rounded-xl font-medium placeholder:text-slate-400 focus-visible:ring-blue-500"
+              />
+              {searchQuery && (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap cursor-pointer select-none ${
-                    isActive 
-                      ? "bg-white text-blue-700 shadow-xs" 
-                      : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
-                  }`}
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* SEARCH & SELECTORS TOOLBAR */}
-        <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="relative w-full md:w-96">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by staff name, employee ID, page route, or action..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchLogs()}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-            />
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
+          {/* 2. Module */}
+          <div className="sm:col-span-1 lg:col-span-2">
+            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">Module</Label>
             <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              value={selectedModule}
+              onChange={(e) => {
+                setSelectedModule(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer shadow-2xs truncate"
             >
-              <option value="all">All Roles</option>
-              <option value="Hospital Admin">Hospital Admin</option>
-              <option value="Doctor">Doctor</option>
-              <option value="Pharmacist">Pharmacist</option>
-              <option value="Lab Technician">Lab Technician</option>
-              <option value="Receptionist">Receptionist</option>
-              <option value="Billing Clerk">Billing Clerk</option>
+              <option value="all">All Modules</option>
+              <option value="Staff Management">Staff Management</option>
+              <option value="Patient">Patient</option>
+              <option value="Appointment">Appointment</option>
+              <option value="Pharmacy">Pharmacy</option>
+              <option value="Lab Reports">Lab Reports</option>
+              <option value="Consultation">Consultation</option>
+              <option value="Billing">Billing</option>
+              <option value="Finance">Finance</option>
+              <option value="Authentication">Authentication</option>
+              <option value="System">System</option>
             </select>
+          </div>
 
+          {/* 3. Action Type */}
+          <div className="sm:col-span-1 lg:col-span-2">
+            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">Action Type</Label>
             <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              value={selectedActionType}
+              onChange={(e) => {
+                setSelectedActionType(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full h-9.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer shadow-2xs truncate"
             >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="7days">Last 7 Days</option>
+              <option value="all">All Actions</option>
+              <option value="Created">Created</option>
+              <option value="Updated">Updated</option>
+              <option value="Deleted">Deleted</option>
+              <option value="Viewed">Viewed</option>
+              <option value="Payment Collected">Payment Collected</option>
+              <option value="Dispensed">Dispensed</option>
+              <option value="Logged In">Logged In</option>
             </select>
+          </div>
 
+          {/* 4. Date Range */}
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Label className="text-xs font-bold text-slate-700 mb-1.5 block">Date Range</Label>
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 h-9.5 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="text-[11px] font-semibold text-slate-700 bg-transparent focus:outline-none w-full min-w-0"
+                title="From Date"
+              />
+              <span className="text-slate-300 font-bold shrink-0">–</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="text-[11px] font-semibold text-slate-700 bg-transparent focus:outline-none w-full min-w-0"
+                title="To Date"
+              />
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer"
+                  title="Clear Date Range"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 5. Apply Button */}
+          <div className="sm:col-span-2 lg:col-span-1">
             <Button
-              onClick={fetchLogs}
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
-              title="Refresh Audit Data"
+              type="button"
+              onClick={() => {
+                setCurrentPage(1);
+                fetchLogs();
+              }}
+              className="w-full h-9.5 px-0 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs cursor-pointer flex items-center justify-center transition-all"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? "animate-spin text-blue-600" : ""}`} />
-              <span className="ml-1.5 hidden sm:inline">Refresh</span>
+              Apply
             </Button>
           </div>
-        </div>
 
-        {/* STRUCTURED ENTERPRISE DATA TABLE */}
-        <div className="overflow-x-auto min-h-[420px]">
-          <table className="w-full text-left border-collapse">
+        </div>
+      </div>
+
+      {/* 3. AUDIT DATA TABLE (Clean White Card) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4 w-44">Timestamp & Date</th>
-                <th className="py-3 px-4 w-64">Staff Member / Actor</th>
-                <th className="py-3 px-4 w-44">Category</th>
-                <th className="py-3 px-4">Event Description & Action</th>
-                <th className="py-3 px-4 w-48">Resource / Route</th>
-                <th className="py-3 px-4 w-28 text-center">Inspect</th>
+              <tr className="border-b border-slate-200/80 bg-slate-50/70 text-[11px] font-bold text-slate-600 tracking-wider">
+                <th className="py-3.5 px-5 font-bold">Date &amp; Time</th>
+                <th className="py-3.5 px-4 font-bold">Staff Member</th>
+                <th className="py-3.5 px-4 font-bold">Action</th>
+                <th className="py-3.5 px-4 font-bold">Module</th>
+                <th className="py-3.5 px-5 font-bold">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {loading && logs.length === 0 ? (
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-20 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <RefreshCw className="w-7 h-7 animate-spin text-blue-600" />
-                      <p className="text-xs font-semibold text-slate-600">Querying Audit Ledger...</p>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 font-medium">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                      <span className="text-xs">Loading hospital audit activities...</span>
                     </div>
                   </td>
                 </tr>
               ) : paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-20 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Activity className="w-8 h-8 text-slate-300" />
-                      <p className="text-xs font-bold text-slate-700">No matching audit records found</p>
-                      <p className="text-[11px] text-slate-400">Try adjusting your search query or date filter</p>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 font-medium">
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText className="w-8 h-8 text-slate-300" />
+                      <span className="text-xs font-semibold text-slate-500">No activity logs found matching the selected criteria.</span>
+                      <span className="text-[11px] text-slate-400">Try clearing or adjusting your search filters.</span>
                     </div>
                   </td>
                 </tr>
               ) : (
                 paginatedLogs.map((log) => {
+                  const { time, date } = formatDateTime(log);
+                  const staff = getStaffInfo(log);
+                  const action = mapAction(log);
+                  const mod = mapModule(log);
+                  const ActionIcon = action.icon;
+                  const ModuleIcon = mod.icon;
+
                   return (
                     <tr 
-                      key={log.id} 
-                      className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
+                      key={log.id || `${log.timestamp}-${Math.random()}`}
                       onClick={() => setSelectedLog(log)}
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                     >
-                      {/* 1. Timestamp */}
-                      <td className="py-3 px-4 align-middle whitespace-nowrap">
-                        <div className="font-mono font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{log.timeStr}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                          <span>{log.dateStr}</span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-blue-600 font-semibold">{getRelativeTime(log.timestamp)}</span>
-                        </div>
+                      {/* 1. Date & Time */}
+                      <td className="py-3.5 px-5 whitespace-nowrap">
+                        <div className="font-bold text-slate-900 text-xs">{time}</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5">{date}</div>
                       </td>
 
-                      {/* 2. Staff Member / Actor */}
-                      <td className="py-3 px-4 align-middle">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getActorAvatarColor(log.actor?.role)} flex items-center justify-center font-bold text-xs shadow-2xs shrink-0`}>
-                            {(log.actor?.name || "U").charAt(0).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-900 truncate leading-tight flex items-center gap-1.5">
-                              <span>{log.actor?.name}</span>
-                              <span className="font-mono text-[10px] font-extrabold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                                {log.actor?.employeeId || "SYS"}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                              {log.actor?.role || "Staff Member"} {log.actor?.department ? `• ${log.actor.department}` : ''}
-                            </div>
-                          </div>
-                        </div>
+                      {/* 2. Staff Member */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-bold text-slate-900 text-xs">{staff.name}</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5">{staff.role}</div>
                       </td>
 
-                      {/* 3. Category */}
-                      <td className="py-3 px-4 align-middle whitespace-nowrap">
-                        {getCategoryBadge(log.type)}
+                      {/* 3. Action */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border shadow-2xs ${action.pillClass}`}>
+                          <ActionIcon className="w-3.5 h-3.5" />
+                          <span>{action.label}</span>
+                        </span>
                       </td>
 
-                      {/* 4. Description */}
-                      <td className="py-3 px-4 align-middle">
-                        <div className="font-semibold text-slate-800 leading-snug">
-                          {log.description}
-                        </div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                          <span>Action: {log.action}</span>
-                          {log.metadata?.ip && (
-                            <>
-                              <span>•</span>
-                              <span>IP: {log.metadata.ip}</span>
-                            </>
-                          )}
-                        </div>
+                      {/* 4. Module */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/80">
+                          <ModuleIcon className="w-3.5 h-3.5 text-slate-600" />
+                          <span>{mod.label}</span>
+                        </span>
                       </td>
 
-                      {/* 5. Resource / Target */}
-                      <td className="py-3 px-4 align-middle">
-                        {log.target ? (
-                          <div className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-blue-700 bg-blue-50/80 px-2.5 py-1 rounded-lg border border-blue-200/70 truncate max-w-[180px]" title={log.target}>
-                            {log.target}
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 font-mono text-xs">—</span>
-                        )}
-                      </td>
-
-                      {/* 6. Inspect Action */}
-                      <td className="py-3 px-4 align-middle text-center" onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}>
-                        <button
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 text-xs font-semibold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
-                          title="Inspect Event Payload"
-                        >
-                          <Info className="w-3.5 h-3.5" />
-                          <span>View</span>
-                        </button>
+                      {/* 5. Details */}
+                      <td className="py-3.5 px-5 text-slate-700 font-medium text-xs leading-relaxed max-w-md">
+                        {log.description || log.action || "System activity recorded"}
                       </td>
                     </tr>
                   );
@@ -602,182 +609,128 @@ export default function AuditLogsPage() {
           </table>
         </div>
 
-        {/* PAGINATION FOOTER */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center gap-3">
-            <span>
-              Showing <strong className="text-slate-900">{logs.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</strong> to <strong className="text-slate-900">{Math.min(currentPage * pageSize, logs.length)}</strong> of <strong className="text-slate-900">{logs.length}</strong> records
-            </span>
-            <span className="text-slate-300">|</span>
-            <div className="flex items-center gap-1.5">
-              <span>Rows per page:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs font-semibold cursor-pointer"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
+        {/* 4. TABLE FOOTER (Showing X - Y of Z + Pagination Buttons) */}
+        <div className="p-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="text-slate-500 font-medium text-xs">
+            Showing <strong className="text-slate-900 font-bold">{startRecord}</strong> – <strong className="text-slate-900 font-bold">{endRecord}</strong> of <strong className="text-slate-900 font-bold">{filteredLogs.length}</strong> activities
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              className="h-8 px-2.5 text-xs font-semibold cursor-pointer"
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
             >
-              <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-              Previous
-            </Button>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-            <span className="px-3 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900">
-              Page {currentPage} of {totalPages}
-            </span>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
 
-            <Button
-              variant="outline"
-              size="sm"
+              const isActive = currentPage === pageNum;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-8 h-8 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    isActive 
+                      ? "bg-blue-600 text-white shadow-2xs" 
+                      : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              className="h-8 px-2.5 text-xs font-semibold cursor-pointer"
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
             >
-              Next
-              <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
+      </div>
 
-      </Card>
-
-      {/* 4. EVENT PAYLOAD INSPECTOR MODAL */}
+      {/* 5. LOG INSPECTOR MODAL */}
       {selectedLog && (
-        <div className="fixed inset-0 z-[160] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
-            
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-300 flex items-center justify-center font-bold">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white tracking-wide">Audit Event Inspector</h3>
-                  <p className="text-[11px] text-slate-400 font-mono">ID: {selectedLog.id}</p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <h3 className="font-bold text-sm">Activity Details</h3>
               </div>
-              <button
+              <button 
                 onClick={() => setSelectedLog(null)}
-                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              
-              {/* Event Overview Card */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-slate-900 text-sm">{selectedLog.action}</div>
-                  {getCategoryBadge(selectedLog.type)}
+            <div className="p-5 space-y-3.5 max-h-[80vh] overflow-y-auto text-xs">
+              <div className="grid grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Staff Member</span>
+                  <p className="font-bold text-slate-900">{getStaffInfo(selectedLog).name}</p>
                 </div>
-                <p className="text-xs text-slate-700 font-medium">{selectedLog.description}</p>
-              </div>
-
-              {/* Grid Properties */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Actor / User</div>
-                  <div className="font-bold text-slate-900">{selectedLog.actor?.name}</div>
-                  <div className="text-[11px] text-slate-500 font-mono">ID: {selectedLog.actor?.employeeId} ({selectedLog.actor?.role})</div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Role / Dept</span>
+                  <p className="font-bold text-slate-900">{getStaffInfo(selectedLog).role}</p>
                 </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Timestamp (IST)</div>
-                  <div className="font-bold text-slate-900">{selectedLog.timeStr} • {selectedLog.dateStr}</div>
-                  <div className="text-[11px] text-slate-500 font-mono">{selectedLog.timestamp}</div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Action</span>
+                  <p className="font-bold text-slate-900">{selectedLog.action || "Activity"}</p>
                 </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Resource</div>
-                  <div className="font-mono font-bold text-blue-700 truncate">{selectedLog.target || "N/A"}</div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Client IP / Source</div>
-                  <div className="font-mono font-bold text-slate-800">{selectedLog.metadata?.ip || "127.0.0.1"}</div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Module</span>
+                  <p className="font-bold text-slate-900">{mapModule(selectedLog).label}</p>
                 </div>
               </div>
 
-              {/* Raw Payload JSON */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-600">Full Raw Event Payload</span>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Description</span>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-800 font-medium">
+                  {selectedLog.description || "No description provided."}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Raw Payload</span>
                   <button
                     onClick={() => copyJsonPayload(selectedLog)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer"
                   >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{isCopied ? "Copied!" : "Copy JSON"}</span>
+                    {isCopied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{isCopied ? "Copied" : "Copy JSON"}</span>
                   </button>
                 </div>
-                <pre className="bg-slate-900 text-slate-200 p-3.5 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800 leading-relaxed max-h-52">
+                <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl text-[11px] font-mono overflow-x-auto max-h-48 leading-relaxed">
                   {JSON.stringify(selectedLog, null, 2)}
                 </pre>
               </div>
 
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
-              <Button
-                onClick={() => setSelectedLog(null)}
-                variant="outline"
-                size="sm"
-                className="h-8 px-4 text-xs font-semibold cursor-pointer"
-              >
-                Close Inspector
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* 5. CONFIRM PURGE MODAL */}
-      {isClearModalOpen && (
-        <div className="fixed inset-0 z-[170] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 animate-in zoom-in-95">
-            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">Purge Audit Ledger History?</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              This action will reset the historical audit records. The system will retain system seed baseline entries.
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsClearModalOpen(false)}
-                className="h-9 px-4 text-xs font-semibold cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmClearLogs}
-                disabled={isClearing}
-                className="h-9 px-4 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
-              >
-                {isClearing ? "Clearing..." : "Yes, Purge History"}
-              </Button>
+              <div className="pt-2 border-t flex justify-end">
+                <Button
+                  onClick={() => setSelectedLog(null)}
+                  className="h-8 px-4 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </div>
