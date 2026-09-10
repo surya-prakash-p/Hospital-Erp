@@ -26,7 +26,8 @@ import {
   IndianRupee,
   ShieldCheck,
   Stethoscope,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,9 +71,14 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = useState(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  // Fetch all logs from server
-  const fetchLogs = async () => {
-    setLoading(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch all logs from server (silent avoids resetting table state or showing fullscreen loader)
+  const fetchLogs = async (silent = false) => {
+    if (!silent) {
+      if (logs.length === 0) setLoading(true);
+      else setIsRefreshing(true);
+    }
     try {
       const params = new URLSearchParams();
       params.set("limit", "1000");
@@ -87,19 +93,22 @@ export default function AuditLogsPage() {
     } catch (err) {
       console.warn("Failed to load audit logs:", err);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(false);
   }, []);
 
-  // Background auto-refresh every 8 seconds
+  // Background auto-refresh every 15 seconds silently
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchLogs();
-    }, 8000);
+      fetchLogs(true);
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -384,6 +393,16 @@ export default function AuditLogsPage() {
 
         <div className="flex items-center gap-2.5">
           <Button
+            onClick={() => fetchLogs(false)}
+            variant="outline"
+            disabled={isRefreshing}
+            className="h-10 px-4 text-xs font-bold rounded-xl gap-2 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs cursor-pointer font-sans"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </Button>
+
+          <Button
             onClick={handleExportCSV}
             variant="outline"
             className="h-10 px-4 text-xs font-bold rounded-xl gap-2 bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs cursor-pointer font-sans"
@@ -555,7 +574,7 @@ export default function AuditLogsPage() {
                   </td>
                 </tr>
               ) : (
-                paginatedLogs.map((log) => {
+                paginatedLogs.map((log, idx) => {
                   const { time, date } = formatDateTime(log);
                   const staff = getStaffInfo(log);
                   const action = mapAction(log);
@@ -565,7 +584,7 @@ export default function AuditLogsPage() {
 
                   return (
                     <tr 
-                      key={log.id || `${log.timestamp}-${Math.random()}`}
+                      key={log.id || `${log.timestamp || 'log'}-${idx}`}
                       onClick={() => setSelectedLog(log)}
                       className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                     >

@@ -35,20 +35,20 @@ export function AuditTracker() {
   const lastTrackedRef = useRef<{ path: string; user: string; time: number } | null>(null);
 
   useEffect(() => {
-    // Skip tracking login page or unauthenticated state
-    if (!pathname || pathname === "/login" || !user) {
+    // Skip tracking login page, audit-logs page (to prevent recursive clutter), or unauthenticated state
+    if (!pathname || pathname === "/login" || pathname === "/audit-logs" || !user) {
       return;
     }
 
     const currentEmpId = user.employeeId || user.employee_id || user.email || user.id || "STAFF";
     const now = Date.now();
 
-    // Prevent duplicate logs for the exact same page within 4 seconds
+    // Prevent duplicate logs for the exact same page within 15 seconds
     if (
       lastTrackedRef.current &&
       lastTrackedRef.current.path === pathname &&
       lastTrackedRef.current.user === currentEmpId &&
-      now - lastTrackedRef.current.time < 4000
+      now - lastTrackedRef.current.time < 15000
     ) {
       return;
     }
