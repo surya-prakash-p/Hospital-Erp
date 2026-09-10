@@ -22,7 +22,11 @@ const ROUTE_LABELS: Record<string, string> = {
   "/ambulance": "Ambulance Management",
   "/blood-bank": "Blood Bank Registry",
   "/insurance": "Insurance & TPA Claims",
-  "/inventory": "Hospital Inventory"
+  "/inventory": "Hospital Inventory",
+  "/appointments": "Appointments Management",
+  "/radiology": "Radiology & Diagnostics",
+  "/rooms": "Rooms & Infrastructure",
+  "/staff": "Staff Registry"
 };
 
 export function AuditTracker() {

@@ -9,7 +9,6 @@ import {
   Pill, 
   FlaskConical, 
   UserRoundCheck, 
-  Shield, 
   KeyRound, 
   Search, 
   CheckCircle, 
@@ -20,19 +19,12 @@ import {
   Lock, 
   Check, 
   Building2, 
-  Phone, 
-  Mail, 
   Eye, 
   EyeOff, 
   Calendar, 
   TrendingUp, 
-  Clock, 
-  MoreVertical, 
-  FileText, 
-  Settings, 
   Plus, 
   ChevronRight,
-  Filter,
   AlertTriangle,
   Trash2,
   IdCard
@@ -69,17 +61,11 @@ const PERMISSION_OPTIONS = [
   { id: "Full System Access", label: "Full System Super-Admin Privileges" }
 ];
 
-// Initial fallback activities if local storage is empty
-const INITIAL_SYSTEM_ACTIVITIES = [
-  { id: "act-1", title: "Hospital ERP System Initialized", desc: "Hospital Admin Portal Online", time: "09:00 AM", type: "system", color: "bg-emerald-50 text-emerald-600 border-emerald-200" }
-];
-
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const isHospitalAdmin = Boolean(user?.roles?.includes('Hospital Admin') || user?.permissions?.includes('*') || user?.roles?.includes('Admin'));
   const [staffUsers, setStaffUsers] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
   const [selectedMonthFilter, setSelectedMonthFilter] = useState("this-month");
@@ -231,9 +217,27 @@ export default function AdminDashboardPage() {
     }, 4000);
   };
 
+  const getStaffJoinDate = (staff) => {
+    if (!staff) return "-";
+    const raw = staff.createdAt || staff.creation || staff.joined_date || staff.date_of_joining || staff.updatedAt;
+    if (!raw) return "-";
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return String(raw);
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return String(raw);
+    }
+  };
+
   const addSystemActivityLog = (title, desc, type = "user") => {
     const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    const timeStr = now.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
     
     let color = "bg-blue-50 text-blue-600 border-blue-200";
     if (type === "user") color = "bg-amber-50 text-amber-600 border-amber-200";
@@ -247,18 +251,46 @@ export default function AdminDashboardPage() {
       title,
       desc,
       time: timeStr,
+      createdAt: now.toISOString(),
       type,
       color
     };
 
-    setActivities(prev => {
-      const updated = [newLog, ...prev.slice(0, 9)];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hospital_system_activities', JSON.stringify(updated));
-      }
-      return updated;
-    });
+    setActivities(prev => [newLog, ...prev.slice(0, 29)]);
+
+    fetch('/api/logs/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: type === "user" || type === "role" || type === "profile" ? "user_mgmt" : "system",
+        action: title,
+        description: desc,
+        actor: user ? {
+          employeeId: user.employeeId || user.id || "TH001",
+          name: user.full_name || user.name || "Hospital Admin",
+          role: user.role || "Hospital Admin",
+          email: user.email || ""
+        } : null,
+        target: desc,
+        metadata: { category: type }
+      })
+    }).catch(() => null);
   };
+
+  async function loadDataSilently() {
+    try {
+      const res = await fetch('/api/users/manage', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.users)) {
+          setStaffUsers(data.users);
+          if (Array.isArray(data.activities) && data.activities.length > 0) {
+            setActivities(data.activities);
+          }
+        }
+      }
+    } catch (e) {}
+  }
 
   async function loadData() {
     setLoading(true);
@@ -288,6 +320,10 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(() => {
+      loadDataSilently();
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleAddSubmit = async (e) => {
@@ -414,7 +450,9 @@ export default function AdminDashboardPage() {
         permissions: editingStaff.permissions || [],
         department: editStaffDepartment,
         designation: editStaffDesignation,
-        status: editStaffStatus
+        status: editStaffStatus,
+        createdAt: editingStaff.createdAt || editingStaff.creation || editingStaff.joined_date,
+        creation: editingStaff.creation || editingStaff.createdAt || editingStaff.joined_date
       });
 
       addSystemActivityLog("Staff Profile Updated", `${editStaffName} (${editStaffDesignation}) profile details updated`, "user");
@@ -1080,8 +1118,8 @@ export default function AdminDashboardPage() {
                         </td>
 
                         {/* Joined On */}
-                        <td className="py-3 px-3 text-slate-400 text-[11px]">
-                          {staff.creation ? new Date(staff.creation).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : formattedToday}
+                        <td className="py-3 px-3 text-slate-500 font-medium text-[11px]">
+                          {getStaffJoinDate(staff)}
                         </td>
 
                         {/* Actions */}
@@ -1608,7 +1646,7 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                 <div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Email Address</div>
-                  <div className="font-semibold text-slate-800 break-all">{viewingStaff.email}</div>
+                  <div className="font-semibold text-slate-800 break-all">{viewingStaff.email || "N/A"}</div>
                 </div>
                 <div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">Mobile Number</div>
@@ -1623,6 +1661,10 @@ export default function AdminDashboardPage() {
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 mt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
                   </span>
+                </div>
+                <div className="col-span-2 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Joined Date</div>
+                  <div className="font-semibold text-slate-700 font-mono text-[11px]">{getStaffJoinDate(viewingStaff)}</div>
                 </div>
               </div>
 

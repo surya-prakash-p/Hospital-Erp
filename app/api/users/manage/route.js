@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '@/lib/auth-guard';
 import { saveServerUser, deleteServerUser, readCloudStore, addCloudActivity } from '@/lib/server-user-store';
-import { recordAuditLog } from '@/lib/audit-logger';
+import { recordAuditLog, getAuditLogs } from '@/lib/audit-logger';
 
 let frappeConfig = null;
 try {
@@ -69,10 +69,41 @@ export async function GET(req) {
       };
     });
 
+    let realTimeActivities = [];
+    try {
+      const logsResult = await getAuditLogs({ limit: 40 });
+      if (logsResult && Array.isArray(logsResult.logs) && logsResult.logs.length > 0) {
+        realTimeActivities = logsResult.logs.map(log => {
+          let color = "bg-blue-50 text-blue-600 border-blue-200";
+          if (log.type === "user_mgmt") color = "bg-amber-50 text-amber-600 border-amber-200";
+          else if (log.type === "auth") color = "bg-emerald-50 text-emerald-600 border-emerald-200";
+          else if (log.type === "page_visit") color = "bg-indigo-50 text-indigo-600 border-indigo-200";
+          else if (log.type === "patient") color = "bg-rose-50 text-rose-600 border-rose-200";
+          else if (log.type === "billing") color = "bg-emerald-50 text-emerald-600 border-emerald-200";
+          else if (log.type === "clinical" || log.type === "pharmacy") color = "bg-purple-50 text-purple-600 border-purple-200";
+
+          return {
+            id: log.id,
+            title: log.action || "Activity Recorded",
+            desc: log.description || "",
+            time: log.timeStr || "",
+            createdAt: log.timestamp,
+            dateStr: log.dateStr,
+            type: log.type,
+            actor: log.actor,
+            target: log.target,
+            color
+          };
+        });
+      }
+    } catch (e) {
+      console.warn("Audit logs integration notice in user manage API:", e.message);
+    }
+
     return NextResponse.json({
       success: true,
       users: sanitizedUsers,
-      activities: cloudData.activities || []
+      activities: realTimeActivities.length > 0 ? realTimeActivities : (cloudData.activities || [])
     });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

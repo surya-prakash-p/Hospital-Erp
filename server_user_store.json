@@ -19,6 +19,8 @@
       "designation": "Hospital Admin",
       "sessionVersion": 1,
       "createdAt": "2026-08-24T08:18:16.914Z",
+      "creation": "2026-08-24T08:18:16.914Z",
+      "joined_date": "2026-08-24",
       "updatedAt": "2026-08-28T03:55:03.511Z",
       "userId": "STAFF-ADMIN-1",
       "name": "Surya",
@@ -43,7 +45,11 @@
       "department": "Hospital Administration",
       "designation": "General Manager",
       "sessionVersion": 1,
-      "createdAt": "2026-08-27T08:39:39.097Z"
+      "createdAt": "2026-08-27T08:39:39.097Z",
+      "creation": "2026-08-27T08:39:39.097Z",
+      "joined_date": "2026-08-27",
+      "role": "Hospital Admin",
+      "active": true
     },
     {
       "id": "STAFF-9682",
@@ -63,6 +69,9 @@
       "designation": "Hospital Admin",
       "sessionVersion": 3,
       "active": true,
+      "createdAt": "2026-08-27T08:44:04.875Z",
+      "creation": "2026-08-27T08:44:04.875Z",
+      "joined_date": "2026-08-27",
       "updatedAt": "2026-08-27T08:44:04.875Z"
     },
     {
@@ -83,6 +92,9 @@
       "designation": "Pharmacist",
       "sessionVersion": 1,
       "active": true,
+      "createdAt": "2026-08-27T08:52:00.823Z",
+      "creation": "2026-08-27T08:52:00.823Z",
+      "joined_date": "2026-08-27",
       "updatedAt": "2026-08-27T08:52:00.823Z"
     },
     {
@@ -103,6 +115,9 @@
       "designation": "Doctor",
       "sessionVersion": 1,
       "active": true,
+      "createdAt": "2026-08-27T09:06:35.719Z",
+      "creation": "2026-08-27T09:06:35.719Z",
+      "joined_date": "2026-08-27",
       "updatedAt": "2026-08-27T09:06:35.719Z"
     },
     {
@@ -123,6 +138,9 @@
       "designation": "Receptionist",
       "sessionVersion": 1,
       "active": true,
+      "createdAt": "2026-08-27T09:08:48.778Z",
+      "creation": "2026-08-27T09:08:48.778Z",
+      "joined_date": "2026-08-27",
       "updatedAt": "2026-08-27T09:08:48.778Z"
     },
     {
@@ -138,10 +156,15 @@
       "department": "General Medicine",
       "designation": "Pharmacist",
       "sessionVersion": 2,
+      "createdAt": "2026-08-24T08:35:12.372Z",
+      "creation": "2026-08-24T08:35:12.372Z",
+      "joined_date": "2026-08-24",
       "updatedAt": "2026-08-24T08:35:12.372Z",
       "employeeId": "TH-PHA-001",
       "employee_id": "TH-PHA-001",
-      "frappeStaffId": "TH-PHA-001"
+      "frappeStaffId": "TH-PHA-001",
+      "role": "Pharmacist",
+      "active": true
     },
     {
       "id": "STAFF-5162",
@@ -156,6 +179,9 @@
       "department": "General Medicine",
       "designation": "Hospital Admin",
       "sessionVersion": 2,
+      "createdAt": "2026-08-27T04:56:33.355Z",
+      "creation": "2026-08-27T04:56:33.355Z",
+      "joined_date": "2026-08-27",
       "updatedAt": "2026-08-27T04:56:33.355Z",
       "employeeId": "TH-ADM-003",
       "employee_id": "TH-ADM-003",
@@ -181,6 +207,9 @@
       "designation": "Doctor",
       "sessionVersion": 1,
       "active": true,
+      "createdAt": "2026-09-02T13:19:11.903Z",
+      "creation": "2026-09-02T13:19:11.903Z",
+      "joined_date": "2026-09-02",
       "updatedAt": "2026-09-02T13:19:11.903Z"
     }
   ],
