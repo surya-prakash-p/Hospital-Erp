@@ -1,14 +1,13 @@
 "use client";
 
-import { CompactStats } from "@/components/compact-stats";
-
 import { useState, useEffect, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from "recharts";
+import { useSearchParams, useRouter } from "next/navigation";
+import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { 
   Pill, CheckCircle, AlertCircle, Info, Activity, PackageCheck, Plus, Layers, 
-  PlusCircle, RefreshCw, Printer, ShieldAlert, Search, FileText, Download, 
-  Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Archive, Calendar,
-  ArrowRight, X, Loader2, ArrowUpRight, HelpCircle, Truck, ChevronDown, Edit3, Sliders, Power, Users, ShoppingBag, Upload, MoreHorizontal, Sparkles, RotateCcw
+  PlusCircle, Printer, ShieldAlert, Search, FileText, Download, 
+  Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Calendar,
+  ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,23 @@ import {
 } from "@/lib/hospital-service";
 
 export default function PharmacyPage() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams?.get("tab");
+  const [activeTab, setActiveTab] = useState(tabParam || "dashboard");
+
+  useEffect(() => {
+    if (tabParam && ["dashboard", "inventory", "dispensing", "registers", "logistics"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else if (!tabParam) {
+      setActiveTab("dashboard");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    router.push(`/pharmacy?tab=${newTab}`);
+  };
   const [medicines, setMedicines] = useState([]);
   const [queue, setQueue] = useState([]);
   const [drugRegister, setDrugRegister] = useState([]);
@@ -128,10 +143,14 @@ export default function PharmacyPage() {
   // Dispense Form states
   const [dispenseItems, setDispenseItems] = useState([]);
   const [customAddMedName, setCustomAddMedName] = useState("");
-  const [customAddQty, setCustomAddQty] = useState(10);
+  const [customAddQty, setCustomAddQty] = useState(1);
+  const [showMedSearchDropdown, setShowMedSearchDropdown] = useState(false);
   const [pharmacistName, setPharmacistName] = useState("Rahul Sharma, RPh");
   const [dispensePaymentMode, setDispensePaymentMode] = useState("Pay at Pharmacy Desk"); // "Pay at Pharmacy Desk" or "Forward to Central Billing"
   const [showDispenseReceiptModal, setShowDispenseReceiptModal] = useState(false);
+  const [showDispenseWorkdeskModal, setShowDispenseWorkdeskModal] = useState(false);
+  const [showSubmitDispenseModal, setShowSubmitDispenseModal] = useState(false);
+  const [selectedSubmitAction, setSelectedSubmitAction] = useState("Pay at Pharmacy Desk"); // "Pay at Pharmacy Desk", "Forward to Central Billing Desk", "Outside Purchase"
   const [latestDispenseRecord, setLatestDispenseRecord] = useState(null);
 
   // Add Medicine Modal State
@@ -398,7 +417,7 @@ export default function PharmacyPage() {
     // Hide deactivated medicines from dashboard totals unless we count all, but standard is active medicines
     const activeMeds = medicines.filter(m => !m.disabled);
     const totalMeds = activeMeds.length;
-    const lowStock = activeMeds.filter(m => m.stock < m.min_stock).length;
+    const lowStock = activeMeds.filter(m => m.stock < m.min_stock && m.stock > 0).length;
     const outOfStock = activeMeds.filter(m => m.stock === 0).length;
     
     let expiringCount = 0;
@@ -411,10 +430,52 @@ export default function PharmacyPage() {
       });
     });
 
+    const totalRevenue = drugRegister
+      .filter(r => Number(r.quantity) > 0)
+      .reduce((acc, r) => {
+        const med = activeMeds.find(m => m.medicine_name === r.medicine || m.name === r.medicine);
+        const unitPrice = Number(r.price || r.unit_price || r.rate) || Number(med?.selling_price || med?.mrp || 0);
+        return acc + (Number(r.quantity) * unitPrice);
+      }, 0);
+
+    const todaySalesRevenue = drugRegister
+      .filter(r => {
+        const d = new Date(r.dispensing_date);
+        return Number(r.quantity) > 0 && d.toDateString() === today.toDateString();
+      })
+      .reduce((acc, r) => {
+        const med = activeMeds.find(m => m.medicine_name === r.medicine || m.name === r.medicine);
+        const unitPrice = Number(r.price || r.unit_price || r.rate) || Number(med?.selling_price || med?.mrp || 0);
+        return acc + (Number(r.quantity) * unitPrice);
+      }, 0);
+
     const todayDispensing = drugRegister.filter(r => {
       const d = new Date(r.dispensing_date);
       return d.toDateString() === today.toDateString();
     }).reduce((acc, curr) => acc + curr.quantity, 0);
+
+    let todayReturnsCount = 0;
+    let todayReturnsAmount = 0;
+    (salesReturnsList || []).forEach(ret => {
+      const d = new Date(ret.return_date || ret.date || ret.creation || Date.now());
+      if (d.toDateString() === today.toDateString()) {
+        const qty = (ret.items || []).reduce((sum, it) => sum + Number(it.return_qty || 0), 0);
+        todayReturnsCount += qty > 0 ? qty : 1;
+        todayReturnsAmount += Number(ret.total_refund || 0);
+      }
+    });
+
+    drugRegister.forEach(r => {
+      const d = new Date(r.dispensing_date);
+      if (Number(r.quantity) < 0 && d.toDateString() === today.toDateString()) {
+        if (!salesReturnsList || salesReturnsList.length === 0) {
+          todayReturnsCount += Math.abs(Number(r.quantity));
+          const med = activeMeds.find(m => m.medicine_name === r.medicine || m.name === r.medicine);
+          const unitPrice = Number(r.price || r.unit_price || r.rate) || Number(med?.selling_price || med?.mrp || 0);
+          todayReturnsAmount += Math.abs(Number(r.quantity)) * unitPrice;
+        }
+      }
+    });
 
     const pendingPOs = purchaseOrders.filter(po => po.status !== "Received").length;
     const inventoryValuation = activeMeds.reduce((acc, m) => acc + ((m.stock || 0) * (m.purchase_price || 0)), 0);
@@ -472,17 +533,87 @@ export default function PharmacyPage() {
     drugRegister.forEach(r => {
       const d = new Date(r.dispensing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       if (trendMap[d] !== undefined) {
-        trendMap[d] += r.quantity;
+        trendMap[d] += Math.abs(Number(r.quantity) || 0);
       }
     });
     const dispensingTrendData = past7Days.map(date => ({ date, amount: trendMap[date] }));
 
     return { 
-      totalMeds, lowStock, outOfStock, expiringCount, todayDispensing, 
+      totalMeds, lowStock, outOfStock, expiringCount, totalRevenue, todaySalesRevenue, todayDispensing,
+      todayReturnsCount, todayReturnsAmount,
       pendingPOs, inventoryValuation, outsidePurchases, partialDispenses, pendingPrescriptions,
       stockStatusData, categoryData, dispensingTrendData, activeMeds
     };
-  }, [medicines, drugRegister, purchaseOrders, queue]);
+  }, [medicines, drugRegister, purchaseOrders, queue, salesReturnsList]);
+
+  // Critical Alerts list derived from real medicine stock and expiry
+  const criticalAlerts = useMemo(() => {
+    const alerts = [];
+    const today = new Date();
+    const activeMeds = medicines.filter(m => !m.disabled);
+
+    activeMeds.forEach(med => {
+      if (med.stock === 0) {
+        alerts.push({
+          id: `out-${med.name || med.medicine_name}`,
+          type: 'Out of Stock',
+          medicine_name: med.medicine_name,
+          category: med.category || 'Regular Medicine',
+          stock: 0,
+          reorder_level: med.reorder_level || med.min_stock || 0,
+          date: null
+        });
+      } else if (med.stock < med.min_stock) {
+        alerts.push({
+          id: `low-${med.name || med.medicine_name}`,
+          type: 'Low Stock',
+          medicine_name: med.medicine_name,
+          category: med.category || 'Regular Medicine',
+          stock: med.stock,
+          reorder_level: med.reorder_level || med.min_stock,
+          date: null
+        });
+      }
+
+      (med.batches || []).forEach(b => {
+        if (!b.exp_date || b.current_stock <= 0) return;
+        const diffMs = new Date(b.exp_date) - today;
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays > 0 && diffDays <= 180) {
+          alerts.push({
+            id: `exp-${med.name || med.medicine_name}-${b.batch_number}`,
+            type: 'Expiring Soon',
+            medicine_name: `${med.medicine_name} (${b.batch_number})`,
+            category: med.category || 'Regular Medicine',
+            stock: b.current_stock,
+            reorder_level: null,
+            date: b.exp_date,
+            diffDays
+          });
+        }
+      });
+    });
+
+    return alerts.slice(0, 8);
+  }, [medicines]);
+
+  // Recent Medicine Sales from drugRegister
+  const recentSales = useMemo(() => {
+    return drugRegister
+      .filter(r => Number(r.quantity) > 0)
+      .sort((a, b) => new Date(b.dispensing_date) - new Date(a.dispensing_date))
+      .slice(0, 8)
+      .map(r => {
+        const med = medicines.find(m => m.medicine_name === r.medicine || m.name === r.medicine);
+        const unitPrice = Number(r.price || r.unit_price || r.rate) || Number(med?.selling_price || med?.mrp || 0);
+        const amount = Number(r.quantity) * unitPrice;
+        return {
+          ...r,
+          unitPrice,
+          amount
+        };
+      });
+  }, [drugRegister, medicines]);
 
   // Drug Schedule matching helper
   const isCategoryMatch = (med, filter) => {
@@ -735,15 +866,207 @@ export default function PharmacyPage() {
     return recs;
   }, [medicines, purchaseOrders, suggSearchQuery, suggFilterSupplier, suggFilterCategory, suggFilterStatus, editedSuggQty]);
 
+  // Helper to count distinct medicines/items in a prescription
+  const getPrescriptionDistinctItems = (prescriptionText, dispensedMeds = []) => {
+    if (dispensedMeds && dispensedMeds.length > 0) {
+      const names = new Set(dispensedMeds.map(d => (d.medicine_name || d.medicine || "").trim().toLowerCase()).filter(Boolean));
+      if (names.size > 0) return names.size;
+    }
+    if (!prescriptionText || typeof prescriptionText !== "string") return 0;
+    const lines = prescriptionText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return 0;
+
+    const distinct = new Set();
+    lines.forEach(line => {
+      const parts = line.includes(";") ? line.split(";") : [line];
+      parts.forEach(p => {
+        const clean = p.replace(/^[\d\.\-\*\•\)\s]+/, "").trim();
+        if (!clean) return;
+        const nameOnly = clean.split(/[—\-:\(\[\d]/)[0].trim().toLowerCase();
+        if (nameOnly.length > 1) {
+          distinct.add(nameOnly);
+        }
+      });
+    });
+    return distinct.size || lines.length;
+  };
+
+  // Helper to parse prescription into structured item list
+  const parsePrescriptionDetails = (prescriptionText, medicinesCatalog, dispensedMeds = []) => {
+    if (dispensedMeds && dispensedMeds.length > 0) {
+      return dispensedMeds.map((d, i) => {
+        const med = medicinesCatalog.find(m => m.medicine_name?.toLowerCase() === (d.medicine_name || d.medicine)?.toLowerCase());
+        return {
+          id: `rx-disp-${i}`,
+          medicine_name: d.medicine_name || d.medicine,
+          strength: med?.strength || d.strength || "-",
+          prescribed_qty: d.qty || d.quantity || 1,
+          qty: d.qty || d.quantity || 1,
+          dispensed_qty: d.dispensed_qty || d.qty || 1,
+          dispense_status: d.dispense_status || "Dispensed",
+          price: d.price || Number(med?.selling_price) || Number(med?.mrp) || 0,
+          stock: med?.stock ?? (d.stock || 0),
+          category: med?.category || d.category || "Regular Medicine",
+          source: d.source || "Hospital Pharmacy",
+          dosage: d.dosage || "1-0-1",
+          frequency: d.frequency || "Twice daily",
+          duration: d.duration || "5 days",
+          timing_instructions: d.timing_instructions || "Morning - Night [1-0-1]",
+          food_instructions: d.food_instructions || "After Food"
+        };
+      });
+    }
+
+    if (!prescriptionText || typeof prescriptionText !== "string") return [];
+    
+    // Split on newlines, or split on closing parenthesis followed by medicine name if single line
+    let lines = prescriptionText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 1 && lines[0].includes(") ") && lines[0].includes("—")) {
+      const splitLines = lines[0].split(/(?<=\))\s+(?=[A-Za-z0-9])/).map(l => l.trim()).filter(Boolean);
+      if (splitLines.length > 1) {
+        lines = splitLines;
+      }
+    }
+
+    const cleanStr = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    const fallbackPriceMap = {
+      dolo: 20,
+      paracetamol: 20,
+      calpol: 20,
+      pantocid: 95,
+      pantoprazole: 90,
+      pan: 90,
+      amoxicillin: 95,
+      mox: 95,
+      azithromycin: 120,
+      cetirizine: 15,
+      okacet: 15,
+      alprazolam: 15,
+      xanax: 15,
+      fentanyl: 300,
+      zolpidem: 50,
+      metformin: 45,
+      telmisartan: 60,
+      atorvastatin: 85
+    };
+
+    return lines.map((line, idx) => {
+      let qty = 1;
+      let duration = "5 days";
+      let timing = "Morning - Night";
+      let food = "After Food";
+      let dosage = "1-0-1";
+
+      const qtyMatch = line.match(/(?:—|-)\s*(\d+)\s*(?:units|tabs|tablets|caps|bottles|strips|nos|qty)?/i);
+      if (qtyMatch) {
+        qty = parseInt(qtyMatch[1], 10) || 1;
+      }
+
+      const durationMatch = line.match(/(\d+\s*(?:days|weeks|months|day))/i);
+      if (durationMatch) {
+        duration = durationMatch[1];
+      }
+
+      const timingCodeMatch = line.match(/\[([0-1]-[0-1]-[0-1])\]/);
+      if (timingCodeMatch) {
+        dosage = timingCodeMatch[1];
+      }
+
+      if (line.includes("Morning") || line.includes("Afternoon") || line.includes("Night")) {
+        const timings = [];
+        if (line.includes("Morning")) timings.push("Morning");
+        if (line.includes("Afternoon")) timings.push("Afternoon");
+        if (line.includes("Night")) timings.push("Night");
+        timing = timings.join(" - ");
+      }
+
+      if (line.toLowerCase().includes("after food")) {
+        food = "After Food";
+      } else if (line.toLowerCase().includes("before food")) {
+        food = "Before Food";
+      } else if (line.toLowerCase().includes("with food")) {
+        food = "With Food";
+      }
+
+      const nameMatch = line.split(/[—\-(]/)[0].trim().replace(/^[\d\.\*\•\)\s]+/, "");
+      let searchName = nameMatch || line;
+      if (/^[A-Za-z]+\d+/.test(searchName) && !searchName.includes(" ")) {
+        searchName = searchName.replace(/^([A-Za-z]+)(\d+.*)$/, "$1 $2");
+      }
+      const cleanSearch = cleanStr(searchName);
+
+      const foundMed = medicinesCatalog.find(m => {
+        const mClean = cleanStr(m.medicine_name);
+        const gClean = cleanStr(m.generic_name);
+        const bClean = cleanStr(m.brand);
+        return (
+          mClean === cleanSearch ||
+          (cleanSearch.length >= 3 && mClean.includes(cleanSearch)) ||
+          (mClean.length >= 3 && cleanSearch.includes(mClean)) ||
+          (gClean && (gClean === cleanSearch || cleanSearch.includes(gClean) || gClean.includes(cleanSearch))) ||
+          (bClean && (bClean === cleanSearch || cleanSearch.includes(bClean) || bClean.includes(cleanSearch)))
+        );
+      });
+
+      const finalMedName = foundMed ? foundMed.medicine_name : searchName;
+      const parsedStrength = foundMed?.strength || (searchName.match(/\d+\s*(?:mg|g|ml|mcg|iu)/i)?.[0] || "");
+      const strength = parsedStrength === "-" ? "" : parsedStrength;
+      const stock = foundMed ? (foundMed.stock ?? 100) : 100;
+      
+      let price = foundMed ? (Number(foundMed.selling_price) || Number(foundMed.mrp) || Number(foundMed.price) || 0) : 0;
+      if (price === 0) {
+        for (const [key, val] of Object.entries(fallbackPriceMap)) {
+          if (cleanSearch.includes(key)) {
+            price = val;
+            break;
+          }
+        }
+        if (price === 0) price = 25.0;
+      }
+
+      const category = foundMed ? (foundMed.category || "Regular Medicine") : "Regular Medicine";
+
+      return {
+        id: `rx-item-${idx}`,
+        medicine_name: finalMedName,
+        strength: strength,
+        prescribed_qty: qty,
+        qty: qty,
+        dispensed_qty: qty,
+        dispense_status: stock > 0 ? "Dispensed" : "Out of Stock",
+        price: price,
+        stock: stock,
+        category: category,
+        source: "Hospital Pharmacy",
+        dosage: dosage,
+        frequency: timing,
+        duration: duration,
+        timing_instructions: `${timing} [${dosage}]`,
+        food_instructions: food
+      };
+    });
+  };
+
+  // Counts for Prescriptions Queue tabs
+  const queueSummary = useMemo(() => {
+    const validQueue = queue.filter(q => q.prescription && q.prescription.trim().length > 0);
+    const activeQueue = validQueue.filter(q => q.pharmacy_status !== "Completed" && q.appointment_status !== "Billing" && q.appointment_status !== "Completed").length;
+    const completed = validQueue.filter(q => q.pharmacy_status === "Completed" || q.appointment_status === "Billing" || q.appointment_status === "Completed").length;
+    const waiting = validQueue.filter(q => q.pharmacy_status !== "Completed" && q.appointment_status !== "Billing" && q.appointment_status !== "Completed" && (!selectedWalkIn || selectedWalkIn.name !== q.name)).length;
+
+    return { activeQueue, completed, waiting };
+  }, [queue, selectedWalkIn]);
+
+
   const filteredQueue = useMemo(() => {
     return queue.filter(q => {
       if (!q.prescription || q.prescription.trim().length === 0) return false;
       
-      const matchesSearch = 
-        (q.patient_name || "").toLowerCase().includes(queueSearchQuery.toLowerCase()) ||
-        (q.patient || "").toLowerCase().includes(queueSearchQuery.toLowerCase()) ||
-        (q.mobile_number || "").toLowerCase().includes(queueSearchQuery.toLowerCase()) ||
-        (q.name || "").toLowerCase().includes(queueSearchQuery.toLowerCase());
+      const search = queueSearchQuery.trim().toLowerCase();
+      const matchesSearch = !search ||
+        (q.patient_name || "").toLowerCase().includes(search) ||
+        (q.mobile_number || q.phone || q.patient_mobile || "").toLowerCase().includes(search);
         
       if (!matchesSearch) return false;
 
@@ -752,25 +1075,14 @@ export default function PharmacyPage() {
       if (queueFilterTab === "Waiting") {
         return !isCompleted;
       }
-      if (queueFilterTab === "Dispensing") {
-        return !isCompleted && selectedWalkIn?.name === q.name;
-      }
       if (queueFilterTab === "Completed") {
         return isCompleted;
-      }
-      if (queueFilterTab === "Priority") {
-        const text = (q.prescription || "").toLowerCase();
-        const hasControlled = text.includes("alprazolam") || text.includes("fentanyl") || text.includes("zolpidem") || text.includes("schedule");
-        return !isCompleted && hasControlled;
-      }
-      if (queueFilterTab === "All Records") {
-        return true;
       }
       
       // Default: show only active pending prescriptions
       return !isCompleted;
     });
-  }, [queue, queueSearchQuery, queueFilterTab, selectedWalkIn]);
+  }, [queue, queueSearchQuery, queueFilterTab]);
 
   // Live drug registers
   const activeRegisterLogs = useMemo(() => {
@@ -803,18 +1115,31 @@ export default function PharmacyPage() {
   // Handle selected prescription dispensing queue
   const handleSelectQueueItem = (item) => {
     setSelectedWalkIn(item);
-    // Clear dispense items so pharmacist has to manually search and add
+    if (item && item.dispensed_medicines && item.dispensed_medicines.length > 0) {
+      const parsed = parsePrescriptionDetails(item.prescription, medicines, item.dispensed_medicines);
+      setDispenseItems(parsed);
+    } else {
+      // Only medicines added by the pharmacist via search & add appear in the table
+      setDispenseItems([]);
+    }
+    setShowDispenseWorkdeskModal(true);
+  };
+
+  const handleClearSelectedQueueItem = () => {
+    setSelectedWalkIn(null);
     setDispenseItems([]);
+    setShowDispenseWorkdeskModal(false);
   };
 
   const handleUpdateDispenseQty = (index, delta) => {
     setDispenseItems(prev => prev.map((item, idx) => {
       if (idx === index) {
-        const newQty = Math.max(1, item.qty + delta);
+        const currentQty = typeof item.qty === 'number' ? item.qty : (parseInt(item.qty, 10) || 1);
+        const newQty = Math.max(1, currentQty + delta);
         return { 
           ...item, 
           qty: newQty,
-          dispensed_qty: item.dispense_status === "Partially Dispensed" ? Math.min(newQty, item.dispensed_qty) : newQty
+          dispensed_qty: item.dispense_status === "Partially Dispensed" ? Math.min(newQty, item.dispensed_qty || newQty) : newQty
         };
       }
       return item;
@@ -822,13 +1147,14 @@ export default function PharmacyPage() {
   };
 
   const handleItemQtyChange = (index, val) => {
+    const parsed = parseInt(val, 10);
+    const newQty = isNaN(parsed) || parsed < 1 ? 1 : parsed;
     setDispenseItems(prev => prev.map((item, idx) => {
       if (idx === index) {
-        const q = Math.max(1, parseInt(val) || 1);
         return { 
           ...item, 
-          qty: q, 
-          dispensed_qty: item.dispense_status === "Partially Dispensed" ? Math.min(item.dispensed_qty, q) : q
+          qty: newQty, 
+          dispensed_qty: item.dispense_status === "Partially Dispensed" ? Math.min(item.dispensed_qty || newQty, newQty) : newQty
         };
       }
       return item;
@@ -842,13 +1168,19 @@ export default function PharmacyPage() {
   const confirmWorkdeskDelete = async () => {
     if (workdeskDeleteIndex === null) return;
     const item = dispenseItems[workdeskDeleteIndex];
-    await createPharmacyAuditLog({
-      action: "Delete Medicine",
-      medicine: item.medicine_name,
-      patient: selectedWalkIn?.patient_name,
-      reason: workdeskDeleteReason,
-      performed_by: pharmacistName
-    });
+    if (item) {
+      try {
+        await createPharmacyAuditLog({
+          action: "Delete Medicine",
+          medicine: item.medicine_name,
+          patient: selectedWalkIn?.patient_name,
+          reason: workdeskDeleteReason,
+          performed_by: pharmacistName
+        });
+      } catch (err) {
+        console.error("Audit error", err);
+      }
+    }
     setDispenseItems(prev => prev.filter((_, idx) => idx !== workdeskDeleteIndex));
     setShowWorkdeskDeleteModal(false);
     setWorkdeskDeleteIndex(null);
@@ -857,19 +1189,24 @@ export default function PharmacyPage() {
   const confirmWorkdeskEdit = async () => {
     if (workdeskEditIndex === null) return;
     const item = dispenseItems[workdeskEditIndex];
+    if (!item) return;
     const oldQty = item.qty;
-    const newQty = parseInt(workdeskEditQty) || 1;
-    await createPharmacyAuditLog({
-      action: "Edit Quantity",
-      medicine: item.medicine_name,
-      patient: selectedWalkIn?.patient_name,
-      details: `Changed Qty from ${oldQty} to ${newQty}`,
-      reason: workdeskEditReason,
-      performed_by: pharmacistName
-    });
+    const newQty = Math.max(1, parseInt(workdeskEditQty, 10) || 1);
+    try {
+      await createPharmacyAuditLog({
+        action: "Edit Quantity",
+        medicine: item.medicine_name,
+        patient: selectedWalkIn?.patient_name,
+        details: `Changed Qty from ${oldQty} to ${newQty}`,
+        reason: workdeskEditReason || "Adjusted at workdesk",
+        performed_by: pharmacistName
+      });
+    } catch (err) {
+      console.error("Audit error", err);
+    }
     setDispenseItems(prev => prev.map((it, idx) => {
       if (idx === workdeskEditIndex) {
-        return { ...it, qty: newQty, dispensed_qty: it.dispense_status === "Partially Dispensed" ? Math.min(it.dispensed_qty, newQty) : newQty };
+        return { ...it, qty: newQty, dispensed_qty: it.dispense_status === "Partially Dispensed" ? Math.min(it.dispensed_qty || newQty, newQty) : newQty };
       }
       return it;
     }));
@@ -879,7 +1216,7 @@ export default function PharmacyPage() {
 
   const confirmWorkdeskPartial = () => {
     if (workdeskPartialIndex === null) return;
-    const newDispensedQty = parseInt(workdeskPartialQty) || 1;
+    const newDispensedQty = Math.max(1, parseInt(workdeskPartialQty, 10) || 1);
     setDispenseItems(prev => prev.map((it, idx) => {
       if (idx === workdeskPartialIndex) {
         return { ...it, dispense_status: "Partially Dispensed", dispensed_qty: Math.min(newDispensedQty, it.qty) };
@@ -904,41 +1241,85 @@ export default function PharmacyPage() {
     }));
   };
 
-  const handleAddCustomDispenseMed = () => {
-    if (!customAddMedName) return;
-    const med = medicines.find(m => m.medicine_name === customAddMedName);
-    if (!med) {
-      showToast("Medicine not found in inventory catalog", "error");
-      return;
-    }
-    if (med.disabled) {
+  const handleAddCustomDispenseMed = (medToUse = null, qtyToUse = null, instructionsToUse = null) => {
+    const medQuery = (typeof medToUse === "string" ? medToUse : customAddMedName).trim();
+    if (!medQuery) return;
+
+    const cleanStr = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanSearch = cleanStr(medQuery);
+
+    const med = medicines.find(m => {
+      const mClean = cleanStr(m.medicine_name);
+      const gClean = cleanStr(m.generic_name);
+      const bClean = cleanStr(m.brand);
+      return (
+        mClean === cleanSearch ||
+        (cleanSearch.length >= 3 && mClean.includes(cleanSearch)) ||
+        (mClean.length >= 3 && cleanSearch.includes(mClean)) ||
+        (gClean && (gClean === cleanSearch || cleanSearch.includes(gClean))) ||
+        (bClean && (bClean === cleanSearch || cleanSearch.includes(bClean)))
+      );
+    });
+
+    if (med && med.disabled) {
       showToast("Warning: Selected medicine is deactivated.", "error");
       return;
     }
+
+    const medName = med ? med.medicine_name : medQuery;
     
-    if (dispenseItems.some(item => item.medicine_name === med.medicine_name)) {
-      showToast("Medicine already added to dispensation panel", "info");
+    if (dispenseItems.some(item => cleanStr(item.medicine_name) === cleanStr(medName))) {
+      showToast(`${medName} is already added to the list`, "info");
       return;
     }
 
-    const qty = parseInt(customAddQty) || 1;
+    const qty = parseInt(qtyToUse ?? customAddQty, 10) || 1;
+    let unitPrice = med ? (Number(med.selling_price) || Number(med.mrp) || Number(med.price) || 0) : 0;
+
+    if (unitPrice === 0) {
+      const fallbackPriceMap = {
+        dolo: 20, paracetamol: 20, calpol: 20, pantocid: 95, pantoprazole: 90,
+        pan: 90, amoxicillin: 95, mox: 95, azithromycin: 120, cetirizine: 15,
+        okacet: 15, alprazolam: 15, xanax: 15, fentanyl: 300, zolpidem: 50,
+        metformin: 45, telmisartan: 60, atorvastatin: 85
+      };
+      for (const [key, val] of Object.entries(fallbackPriceMap)) {
+        if (cleanSearch.includes(key)) {
+          unitPrice = val;
+          break;
+        }
+      }
+      if (unitPrice === 0) unitPrice = 25.0;
+    }
+
+    const parsedStrength = med?.strength || (medQuery.match(/\d+\s*(?:mg|g|ml|mcg|iu)/i)?.[0] || "");
+    const strength = parsedStrength === "-" ? "" : parsedStrength;
+    const stock = med ? (med.stock ?? 100) : 100;
 
     setDispenseItems(prev => [...prev, {
-      medicine_name: med.medicine_name,
-      prescribed_qty: qty,
+      id: `item-${Date.now()}-${Math.random()}`,
+      medicine_name: medName,
+      strength: strength,
+      prescribed_qty: instructionsToUse?.prescribed_qty || qty,
       qty: qty,
-      price: med.selling_price || 0,
-      stock: med.stock || 0,
-      category: med.category,
+      price: unitPrice,
+      stock: stock,
+      category: med?.category || "Regular Medicine",
       source: "Hospital Pharmacy",
-      dispense_status: "Dispensed",
+      dispense_status: stock > 0 ? "Dispensed" : "Out of Stock",
       dispensed_qty: qty,
+      dosage: instructionsToUse?.dosage || "1-0-1",
+      frequency: instructionsToUse?.frequency || "Twice daily",
+      duration: instructionsToUse?.duration || "5 days",
+      timing_instructions: instructionsToUse?.timing_instructions || "Morning - Night [1-0-1]",
+      food_instructions: instructionsToUse?.food_instructions || "After Food",
       remaining_qty: 0,
       remaining_action: "Pending"
     }]);
 
     setCustomAddMedName("");
-    setCustomAddQty(10);
+    setCustomAddQty(1);
+    showToast(`Added ${medName} to dispensation list`, "success");
   };
 
   const executeOutsidePurchase = async () => {
@@ -1006,11 +1387,70 @@ export default function PharmacyPage() {
       showToast(`Outside purchase successfully recorded for ${pName}`, "success");
       setDispenseItems([]);
       setSelectedWalkIn(null);
+      setShowDispenseWorkdeskModal(false);
       loadAllData();
       
     } catch (error) {
       console.error(error);
       showToast("Failed to process Outside Purchase", "error");
+    }
+  };
+
+  const handleDirectQuickDispense = async (item) => {
+    if (userRole === "Store Manager") {
+      showToast("Access Denied: Store Managers cannot dispense medicines.", "error");
+      return;
+    }
+    if (!item) return;
+
+    try {
+      const pName = item.patient_name || "Walk-in Customer";
+      const prescribedItems = parsePrescriptionDetails(item.prescription, medicines).map(it => ({
+        ...it,
+        source: "Outside Purchase",
+        dispense_status: "Outside Purchase",
+        price: 0,
+        dispensed_qty: it.qty || 1
+      }));
+
+      await updateWalkIn(item.name, {
+        pharmacy_status: "Completed",
+        appointment_status: "Billing",
+        prescription: item.prescription,
+        bill_amount: item.bill_amount || 0,
+        pharmacy_bill_amount: 0,
+        dispensed_medicines: prescribedItems
+      });
+
+      saveInvoiceToProfile(item.mobile_number, {
+        name: `Pharmacy Dispensation - Completed (₹0)`,
+        bill_amount: 0,
+        payment_method: "None",
+        walkinData: {
+          name: item.name,
+          patient_name: pName,
+          mobile_number: item.mobile_number,
+          doctor: item.doctor,
+          pharmacy_bill_amount: 0,
+          dispensed_medicines: prescribedItems,
+          netBalance: 0
+        },
+        remarks: "Prescription dispensed with zero pharmacy billing (Moved to billing desk)."
+      });
+
+      await createPharmacyAuditLog({
+        action: "Quick Dispense",
+        medicine: "All Prescribed Items",
+        patient: pName,
+        reason: "Direct Dispense (₹0 / Moved to Billing)",
+        performed_by: pharmacistName
+      });
+
+      showToast(`Prescription dispensed (₹0) & moved to Billing for ${pName}`, "success");
+      loadAllData();
+    } catch (error) {
+      console.error("Quick dispense error:", error);
+      showToast("Failed to dispense prescription", "error");
     }
   };
 
@@ -1196,6 +1636,7 @@ export default function PharmacyPage() {
         date: new Date().toLocaleString("en-IN")
       });
       setShowDispenseReceiptModal(true);
+      setShowDispenseWorkdeskModal(false);
 
       setSelectedWalkIn(null);
       setDispenseItems([]);
@@ -3030,55 +3471,9 @@ export default function PharmacyPage() {
         ))}
       </div>
 
-      {/* Page actions */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-            <Button 
-              onClick={() => {
-                if (userRole === "Pharmacist") {
-                  showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
-                } else {
-                  setIsAddModalOpen(true);
-                }
-              }}
-              size="sm" 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-medium shadow-xs h-8 text-xs"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Medicine
-            </Button>
-
-            <Button 
-              onClick={() => {
-                if (userRole === "Store Manager") {
-                  showToast("Access Denied: Store Managers cannot initiate medicine sales.", "error");
-                } else {
-                  setOtcBasket([]);
-                  setOtcCustomerName("");
-                  setOtcCustomerMobile("");
-                  setOtcCustomerAge("");
-                  setOtcCustomerGender("Male");
-                  setOtcCustomerType("Walk-in");
-                  setOtcSelectedPatient(null);
-                  setOtcSearchQuery("");
-                  setShowOTCSaleModal(true);
-                }
-              }}
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-medium shadow-xs h-8 text-xs"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" /> + Direct Medicine Sale
-            </Button>
-
-            <Button 
-              onClick={() => handleOpenSalesReturn()}
-              size="sm"
-              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5 font-medium shadow-xs h-8 text-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Return Sold Medicine
-            </Button>
-            
-            <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 rounded-2xl bg-white border border-slate-200 shadow-2xl">
+      {/* Add New Medicine Dialog */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 rounded-2xl bg-white border border-slate-200 shadow-2xl">
               {/* Header */}
               <div className="p-5 px-6 border-b border-slate-100 bg-white shrink-0 pr-12">
                 <DialogTitle className="text-base font-bold text-slate-900 tracking-tight">Add New Medicine</DialogTitle>
@@ -3596,369 +3991,482 @@ export default function PharmacyPage() {
               )}
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
-      {/* Tabs navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-100 p-0.5 border border-slate-200/60 rounded-lg flex items-center justify-start max-w-fit overflow-x-auto gap-1">
-          <TabsTrigger value="dashboard" className="px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs rounded-md">
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="inventory" className="px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs rounded-md">
-            Inventory Table
-          </TabsTrigger>
-          <TabsTrigger value="dispensing" className="px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs rounded-md">
-            Prescriptions Queue
-          </TabsTrigger>
-          <TabsTrigger value="registers" className="px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs rounded-md">
-            Compliance Records
-          </TabsTrigger>
-          <TabsTrigger value="logistics" className="px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs rounded-md">
-            Purchase & Receiving
-          </TabsTrigger>
-        </TabsList>
-
+      {/* Tabs navigation content */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         {/* ========================================================
             TAB: DASHBOARD
             ======================================================== */}
-                <TabsContent value="dashboard" className="space-y-6 focus-visible:outline-none">
+        <TabsContent value="dashboard" className="space-y-6 focus-visible:outline-none">
           
-          <CompactStats stats={[
-            {
-              title: "Inventory Valuation",
-              value: `₹${metrics.inventoryValuation.toLocaleString("en-IN")}`,
-              onClick: () => { setStatusFilter("All"); setCategoryFilter("All"); setSearchQuery(""); setActiveTab("inventory"); },
-            },
-            { title: "Today's Dispensed", value: metrics.todayDispensing, onClick: () => setActiveTab("registers") },
-            {
-              title: "Pending Prescriptions",
-              value: metrics.pendingPrescriptions,
-              onClick: () => { setQueueFilterTab("Waiting"); setActiveTab("dispensing"); },
-            },
-            {
-              title: "Out Of Stock",
-              value: metrics.outOfStock,
-              onClick: () => { setStatusFilter("Out Of Stock"); setActiveTab("inventory"); },
-            },
-          ]} />
+          {/* Dashboard Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-3.5 rounded-lg shadow-xs gap-1.5 shrink-0 cursor-pointer">
+                  <Pill className="w-4 h-4" />
+                  <span>Medicine Operations</span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-80 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-lg border border-slate-200 bg-white">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (userRole === "Pharmacist") {
+                      showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
+                    } else {
+                      setIsAddModalOpen(true);
+                    }
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <PlusCircle className="w-4 h-4 text-indigo-600" />
+                  <span>Add Medicine</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (userRole === "Store Manager") {
+                      showToast("Access Denied: Store Managers cannot initiate medicine sales.", "error");
+                    } else {
+                      setOtcBasket([]);
+                      setOtcCustomerName("");
+                      setOtcCustomerMobile("");
+                      setOtcCustomerAge("");
+                      setOtcCustomerGender("Male");
+                      setOtcCustomerType("Walk-in");
+                      setOtcSelectedPatient(null);
+                      setOtcSearchQuery("");
+                      setShowOTCSaleModal(true);
+                    }
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                  <span>Direct Medicine Sale</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleOpenSalesReturn()}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4 text-rose-600" />
+                  <span>Return Sold Medicine</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          {/* Middle & Bottom Tiers: Charts and Lists */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Chart: Dispensing Trend */}
-            <Card className="col-span-1 lg:col-span-2 shadow-sm border-slate-200 bg-white">
+          {/* 8 KPI Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Total Revenue */}
+            <Card className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Revenue</span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                  ₹{metrics.totalRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Lifetime sales across counters</p>
+              </div>
+            </Card>
+
+            {/* Card 2: Today's Sales */}
+            <Card className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Today's Sales</span>
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Activity className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                  ₹{metrics.todaySalesRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">{metrics.todayDispensing} units dispensed today</p>
+              </div>
+            </Card>
+
+            {/* Card 3: Total Medicines */}
+            <Card 
+              onClick={() => { setStatusFilter("All"); setCategoryFilter("All"); setSearchQuery(""); handleTabChange("inventory"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Medicines</span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <Pill className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                  {metrics.totalMeds}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Active items in catalog</p>
+              </div>
+            </Card>
+
+            {/* Card 4: Low Stock */}
+            <Card 
+              onClick={() => { setStatusFilter("Low Stock"); handleTabChange("inventory"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Low Stock</span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-amber-600 tracking-tight">
+                  {metrics.lowStock}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Below minimum stock level</p>
+              </div>
+            </Card>
+
+            {/* Card 5: Out of Stock */}
+            <Card 
+              onClick={() => { setStatusFilter("Out Of Stock"); handleTabChange("inventory"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Out of Stock</span>
+                <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 transition-colors">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-rose-600 tracking-tight">
+                  {metrics.outOfStock}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">0 units available</p>
+              </div>
+            </Card>
+
+            {/* Card 6: Expiring Soon */}
+            <Card 
+              onClick={() => { setStatusFilter("Expiring / Expired"); handleTabChange("inventory"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiring Soon</span>
+                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                  <Calendar className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-orange-600 tracking-tight">
+                  {metrics.expiringCount}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Within next 180 days</p>
+              </div>
+            </Card>
+
+            {/* Card 7: Pending Prescriptions */}
+            <Card 
+              onClick={() => { setQueueFilterTab("Waiting"); handleTabChange("dispensing"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Pending Prescriptions</span>
+                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                  {metrics.pendingPrescriptions}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Waiting in queue</p>
+              </div>
+            </Card>
+
+            {/* Card 8: Today's Returns */}
+            <Card 
+              onClick={() => { setSelectedRegister("Sales Returns"); handleTabChange("registers"); }}
+              className="bg-white border-slate-200/80 shadow-xs hover:shadow-sm transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Today's Returns</span>
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold text-slate-900 tracking-tight">
+                  {metrics.todayReturnsCount}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {metrics.todayReturnsAmount > 0 ? `₹${metrics.todayReturnsAmount.toLocaleString("en-IN")} refunded` : "0 return items today"}
+                </p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Middle Tier: Charts (2 columns) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Inventory by Category */}
+            <Card className="shadow-xs border-slate-200/80 bg-white rounded-xl">
+              <CardHeader className="p-5 border-b border-slate-100 pb-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                  <PieChart className="w-4 h-4 text-indigo-500" />
+                  Inventory by Category
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">Distribution of active catalog items by category</CardDescription>
+              </CardHeader>
+              <CardContent className="p-5 pt-4">
+                {metrics.categoryData.length > 0 ? (
+                  <div className="h-64 flex flex-col justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={metrics.categoryData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={65}
+                          outerRadius={85}
+                          paddingAngle={3}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {metrics.categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                          itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-2 pt-2 border-t border-slate-100">
+                      {metrics.categoryData.map((c, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-xs text-slate-600">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.fill }} />
+                          <span>{c.name}:</span>
+                          <span className="font-semibold text-slate-800">{c.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-xs text-slate-400">No inventory data available</div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sales / Dispensing Trend */}
+            <Card className="shadow-xs border-slate-200/80 bg-white rounded-xl">
               <CardHeader className="p-5 border-b border-slate-100 pb-4">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
                   <Activity className="w-4 h-4 text-indigo-500" />
-                  Dispensing Volume (Last 7 Days)
+                  Sales & Dispensing Trend
                 </CardTitle>
-                <CardDescription className="text-xs">Daily units dispensed from inventory</CardDescription>
+                <CardDescription className="text-xs text-slate-500">Daily units dispensed over the last 7 days</CardDescription>
               </CardHeader>
-              <CardContent className="p-5 pt-6 h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={metrics.dispensingTrendData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="date" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} dy={10} />
-                    <YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                    <RechartsTooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                      labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}
-                    />
-                    <Area type="monotone" dataKey="amount" name="Units" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" activeDot={{ r: 6, fill: '#4f46e5', stroke: '#fff', strokeWidth: 2 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            {/* Chart: Inventory Categories */}
-            <Card className="col-span-1 shadow-sm border-slate-200 bg-white">
-              <CardHeader className="p-5 border-b border-slate-100 pb-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                  <PieChart className="w-4 h-4 text-emerald-500" />
-                  Inventory by Category
-                </CardTitle>
-                <CardDescription className="text-xs">Distribution of active catalog items</CardDescription>
-              </CardHeader>
-              <CardContent className="p-5 pt-4 h-72 flex flex-col justify-center">
-                {metrics.categoryData.length > 0 ? (
+              <CardContent className="p-5 pt-4">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={metrics.categoryData}
-                        cx="50%"
-                        cy="45%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {metrics.categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    <AreaChart data={metrics.dispensingTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} dy={8} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <RechartsTooltip
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
                         itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                        labelStyle={{ color: '#64748b', fontSize: '11px', marginBottom: '4px' }}
                       />
-                    </PieChart>
+                      <Area
+                        type="monotone"
+                        dataKey="amount"
+                        name="Units Dispensed"
+                        stroke="#6366f1"
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#colorTrend)"
+                        activeDot={{ r: 5, fill: '#4f46e5', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-xs text-slate-400">No inventory data</div>
-                )}
-                <div className="flex flex-wrap justify-center gap-3 mt-auto">
-                  {metrics.categoryData.slice(0,4).map((c, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-[10px] text-slate-600 font-medium">
-                      <span className="w-2 h-2 rounded-full" style={{backgroundColor: c.fill}}></span>
-                      {c.name}
-                    </div>
-                  ))}
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            {/* Actionable List: Critical Alerts */}
-            <Card className="col-span-1 lg:col-span-2 shadow-sm border-slate-200 bg-white">
+          {/* Bottom Tier: Critical Alerts & Recent Medicine Sales (2 columns) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Critical Alerts */}
+            <Card className="shadow-xs border-slate-200/80 bg-white rounded-xl flex flex-col">
               <CardHeader className="p-5 border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-semibold flex items-center gap-2 text-rose-600">
                     <ShieldAlert className="w-4 h-4" />
                     Critical Alerts
                   </CardTitle>
-                  <CardDescription className="text-xs">Items requiring immediate attention</CardDescription>
+                  <CardDescription className="text-xs text-slate-500">Low stock, out of stock & expiring medicines</CardDescription>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => setActiveTab("inventory")} className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">View All</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleTabChange("inventory")}
+                  className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 px-2.5"
+                >
+                  View Inventory
+                </Button>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-                  {metrics.activeMeds.filter(m => m.stock <= m.min_stock).slice(0, 5).map((med, i) => (
-                    <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${med.stock === 0 ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
-                          <AlertCircle className="w-4 h-4" />
+              <CardContent className="p-0 flex-1">
+                <div className="divide-y divide-slate-100 max-h-[340px] overflow-y-auto">
+                  {criticalAlerts.length > 0 ? (
+                    criticalAlerts.map((alert, idx) => (
+                      <div key={idx} className="p-3.5 px-5 flex items-center justify-between hover:bg-slate-50/70 transition-colors text-xs">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              alert.type === 'Out of Stock'
+                                ? 'bg-rose-100 text-rose-600'
+                                : alert.type === 'Low Stock'
+                                ? 'bg-amber-100 text-amber-600'
+                                : 'bg-orange-100 text-orange-600'
+                            }`}
+                          >
+                            <AlertCircle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900 flex items-center gap-2">
+                              <span>{alert.medicine_name}</span>
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                  alert.type === 'Out of Stock'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : alert.type === 'Low Stock'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-orange-100 text-orange-800'
+                                }`}
+                              >
+                                {alert.type}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {alert.category}
+                              {alert.date ? ` • Exp: ${new Date(alert.date).toLocaleDateString("en-IN")}` : ` • Reorder: ${alert.reorder_level}`}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{med.medicine_name}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{med.category} • Reorder: {med.reorder_level}</p>
+                        <div className="text-right shrink-0">
+                          <div className={`font-bold font-mono ${alert.stock === 0 ? 'text-rose-600' : 'text-amber-600'}`}>
+                            {alert.stock} units
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-bold ${med.stock === 0 ? 'text-rose-600' : 'text-amber-600'}`}>{med.stock} in stock</p>
-                        <Button size="sm" variant="link" className="text-[10px] h-auto p-0 mt-0.5 text-indigo-600" onClick={() => setShowBulkPOModal(true)}>Order Now</Button>
-                      </div>
-                    </div>
-                  ))}
-                  {metrics.activeMeds.filter(m => m.stock <= m.min_stock).length === 0 && (
-                    <div className="p-8 text-center text-sm text-slate-400 flex flex-col items-center">
+                    ))
+                  ) : (
+                    <div className="p-10 text-center text-xs text-slate-400 flex flex-col items-center">
                       <CheckCircle className="w-8 h-8 text-emerald-400 mb-2 opacity-50" />
-                      No critical alerts. All stocks healthy!
+                      No critical alerts. All stocks and expiry dates are healthy!
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Secondary Metrics Sidebar */}
-            <Card className="col-span-1 shadow-sm border-slate-200 bg-white flex flex-col">
-              <CardHeader className="p-5 border-b border-slate-100 pb-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                  <Layers className="w-4 h-4 text-sky-500" />
-                  Secondary Operations
-                </CardTitle>
-                <CardDescription className="text-xs">Other key metrics today</CardDescription>
+            {/* Recent Medicine Sales */}
+            <Card className="shadow-xs border-slate-200/80 bg-white rounded-xl flex flex-col">
+              <CardHeader className="p-5 border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                    <ClipboardList className="w-4 h-4 text-emerald-600" />
+                    Recent Medicine Sales
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">Latest dispensed medicine transactions</CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setSelectedRegister("All Categories"); handleTabChange("registers"); }}
+                  className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 px-2.5"
+                >
+                  View Registers
+                </Button>
               </CardHeader>
-              <CardContent className="p-5 flex-1 flex flex-col justify-center gap-4">
-                
-                <div onClick={() => setActiveTab("logistics")} className="group cursor-pointer p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-slate-300 hover:shadow-xs transition-all flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-200/50 rounded-lg text-slate-600 group-hover:bg-slate-100 group-hover:text-slate-900 transition-colors"><Truck className="w-4 h-4" /></div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pending POs</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Open orders active</p>
+              <CardContent className="p-0 flex-1">
+                <div className="divide-y divide-slate-100 max-h-[340px] overflow-y-auto">
+                  {recentSales.length > 0 ? (
+                    recentSales.map((sale, idx) => (
+                      <div key={idx} className="p-3.5 px-5 flex items-center justify-between hover:bg-slate-50/70 transition-colors text-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <Pill className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900">{sale.medicine}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                              <span>
+                                {new Date(sale.dispensing_date).toLocaleDateString("en-IN", {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                })}
+                              </span>
+                              <span>•</span>
+                              <span>{sale.patient_name || "Walk-in"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-semibold text-slate-900 font-mono">
+                            {sale.quantity} units
+                          </div>
+                          <div className="text-[11px] font-bold text-emerald-600 font-mono mt-0.5">
+                            ₹{sale.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-10 text-center text-xs text-slate-400 flex flex-col items-center">
+                      <ClipboardList className="w-8 h-8 text-slate-300 mb-2" />
+                      No recent medicine sales recorded.
                     </div>
-                  </div>
-                  <div className="text-xl font-bold text-slate-800">{metrics.pendingPOs}</div>
+                  )}
                 </div>
-
-                <div onClick={() => setActiveTab("registers")} className="group cursor-pointer p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-purple-200 hover:shadow-xs transition-all flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100/50 rounded-lg text-purple-500 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors"><ShoppingBag className="w-4 h-4" /></div>
-                    <div>
-                      <p className="text-[10px] font-bold text-purple-600/70 uppercase tracking-wider">Outside Pur.</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Sourced outside today</p>
-                    </div>
-                  </div>
-                  <div className="text-xl font-bold text-slate-800">{metrics.outsidePurchases}</div>
-                </div>
-
-                <div onClick={() => setActiveTab("dispensing")} className="group cursor-pointer p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-sky-200 hover:shadow-xs transition-all flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-sky-100/50 rounded-lg text-sky-500 group-hover:bg-sky-100 group-hover:text-sky-600 transition-colors"><ClipboardList className="w-4 h-4" /></div>
-                    <div>
-                      <p className="text-[10px] font-bold text-sky-600/70 uppercase tracking-wider">Partial Fulfills</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Active balance orders</p>
-                    </div>
-                  </div>
-                  <div className="text-xl font-bold text-slate-800">{metrics.partialDispenses}</div>
-                </div>
-
               </CardContent>
             </Card>
-
           </div>
+
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4 focus-visible:outline-none">
-            {/* Purchase Suggestions */}
-            <Card className="lg:col-span-3 shadow-xs border-slate-200">
-              <CardHeader className="bg-slate-50 border-b border-slate-200/60 py-3 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-sm font-serif flex items-center gap-1.5">
-                      <ShoppingCart className="w-4 h-4 text-indigo-600" />
-                      Purchase Suggestions
-                    </CardTitle>
-                    <CardDescription className="text-[10px]">Medicines that require replenishment based on current stock, reorder level, and maximum stock.</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {purchaseRecommendations.length > 0 && (
-                      <>
-                        <Button onClick={handleBulkGeneratePOs} size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 h-8 shadow-sm">
-                          Generate Purchase Orders
-                        </Button>
-                        <Button onClick={downloadReorderReport} size="sm" variant="outline" className="h-8 text-xs border-slate-200 text-slate-700 bg-white">
-                          <Download className="w-3.5 h-3.5 mr-1" /> Download
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-                  <div className="relative">
-                    <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
-                    <Input
-                      placeholder="Search suggestions..."
-                      value={suggSearchQuery}
-                      onChange={(e) => setSuggSearchQuery(e.target.value)}
-                      className="w-48 h-7 pl-6 text-[10px] border-slate-200"
-                    />
-                  </div>
-                  
-                  <select
-                    value={suggFilterCategory}
-                    onChange={(e) => setSuggFilterCategory(e.target.value)}
-                    className="h-7 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] focus:outline-none"
-                  >
-                    <option value="All">All Categories</option>
-                    <option value="Regular Medicine">Regular Medicine</option>
-                    <option value="Schedule H">Schedule H</option>
-                    <option value="Schedule H1">Schedule H1</option>
-                    <option value="Sleeping Pill">Sleeping Pill</option>
-                    <option value="Controlled Drug">Controlled Drug</option>
-                    <option value="OTC">OTC</option>
-                  </select>
-
-                  <select
-                    value={suggFilterStatus}
-                    onChange={(e) => setSuggFilterStatus(e.target.value)}
-                    className="h-7 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] focus:outline-none"
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Low Stock">Low Stock</option>
-                    <option value="Out Of Stock">Out Of Stock</option>
-                    <option value="Controlled Drug">Controlled Drug</option>
-                    <option value="Schedule H">Schedule H</option>
-                    <option value="Sleeping Pill">Sleeping Pill</option>
-                  </select>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {purchaseRecommendations.length === 0 ? (
-                  <div className="p-10 flex flex-col items-center justify-center text-slate-400 gap-3">
-                    <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
-                      <ShoppingCart className="w-6 h-6 text-emerald-500" />
-                    </div>
-                    <div className="text-center">
-                      <div className="font-semibold text-slate-700 text-sm">All Stocks Healthy</div>
-                      <div className="text-xs mt-1">No medicines currently require replenishment.</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-[11px]">
-                      <thead>
-                        <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider">
-                          <th className="px-4 py-2.5">Medicine</th>
-                          <th className="px-4 py-2.5 text-center">Current Stock</th>
-                          <th className="px-4 py-2.5 text-center">Reorder Level</th>
-                          <th className="px-4 py-2.5 text-center">Suggested Qty</th>
-                          <th className="px-4 py-2.5">Preferred Supplier</th>
-                          <th className="px-4 py-2.5 text-right">Est. Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {purchaseRecommendations.map(rec => {
-                          const isOut = rec.current_stock === 0;
-                          const isLow = rec.current_stock < rec.min_stock && !isOut;
-                          let stockColor = "text-emerald-600 font-medium";
-                          let stockBadgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                          if (isOut) { stockColor = "text-rose-600 font-bold"; stockBadgeColor = "bg-rose-50 text-rose-700 border-rose-200"; }
-                          else if (isLow) { stockColor = "text-orange-600 font-bold"; stockBadgeColor = "bg-orange-50 text-orange-700 border-orange-200"; }
-                          else if (rec.current_stock <= rec.reorder_level) { stockColor = "text-amber-600 font-medium"; stockBadgeColor = "bg-amber-50 text-amber-700 border-amber-200"; }
-
-                          return (
-                            <tr key={rec.medicine} className="hover:bg-slate-50/50 group transition-colors">
-                              <td className="px-4 py-3">
-                                <div className="font-bold text-slate-900">{rec.medicine}</div>
-                                <div className="text-[9px] text-slate-400 mt-0.5">{rec.generic}</div>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${stockBadgeColor}`}>
-                                  {rec.current_stock}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-center font-mono text-slate-500">{rec.reorder_level}</td>
-                              <td className="px-4 py-3 text-center">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  className="w-16 h-7 mx-auto text-center font-mono font-bold text-indigo-600 border-indigo-200 focus:border-indigo-500 text-xs px-1"
-                                  value={rec.suggested}
-                                  onChange={(e) => {
-                                    const newQty = parseInt(e.target.value) || 0;
-                                    setEditedSuggQty(prev => ({ ...prev, [rec.medicine]: newQty }));
-                                  }}
-                                />
-                              </td>
-                              <td className="px-4 py-3 font-medium text-slate-700">{rec.supplier}</td>
-                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">₹{(rec.suggested * rec.price).toLocaleString("en-IN")}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-          <Card className="shadow-xs border-slate-200">
+          <Card className="shadow-xs border-slate-200 bg-white">
             <CardHeader className="bg-slate-50 border-b border-slate-200/60 p-4 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="text-base font-serif text-slate-800">Inventory Control Panel</CardTitle>
-                  <CardDescription className="text-xs text-slate-500 mt-1">Monitor medicine master records, batches, rack placements, and statutory levels.</CardDescription>
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">Monitor medicine master records, batches, rack placements, and statutory levels.</CardDescription>
                 </div>
-                
+                <Button 
+                  onClick={() => {
+                    if (userRole === "Pharmacist") {
+                      showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
+                    } else {
+                      setIsAddModalOpen(true);
+                    }
+                  }}
+                  size="sm" 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-semibold shadow-xs h-9 text-xs px-4 rounded-lg cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4" /> Add Item
+                </Button>
               </div>
               
               {/* Filters */}
@@ -4379,311 +4887,202 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: PRESCRIPTIONS DISPENSING QUEUE
             ======================================================== */}
+        {/* ========================================================
+            TAB: PRESCRIPTIONS DISPENSING QUEUE
+            ======================================================== */}
         <TabsContent value="dispensing" className="space-y-6 focus-visible:outline-none">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Queue List */}
-            <Card className="lg:col-span-5 shadow-xs border-slate-200 bg-white">
-              <CardHeader className="bg-slate-50 border-b border-slate-200/60 py-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-serif">Prescription Fulfill Queue</CardTitle>
-                  <span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">
-                    {filteredQueue.length} Patients
-                  </span>
-                </div>
-                <CardDescription className="text-[10px]">Consultation profiles ready for pharmacy checkout.</CardDescription>
-                
-                {/* Search Bar */}
-                <div className="relative mt-2">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  <Input
-                    placeholder="Search name, UHID, mobile, Rx No..."
-                    value={queueSearchQuery}
-                    onChange={(e) => setQueueSearchQuery(e.target.value)}
-                    className="w-full h-8 pl-8 text-[11px] border-slate-200"
-                  />
-                </div>
-
-                {/* Sub-tabs/Filters */}
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {[
-                    { id: "Waiting", label: "Active Queue" },
-                    { id: "Completed", label: "Completed" },
-                    { id: "All Records", label: "All Records" }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setQueueFilterTab(tab.id)}
-                      className={`px-2 py-1 rounded text-[9px] font-semibold border transition ${queueFilterTab === tab.id ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 max-h-[500px] overflow-y-auto">
-                {filteredQueue.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">
-                    No patients match the selected filters.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100 text-xs">
-                    {filteredQueue.map((item, idx) => {
-                      const isWalkInControlled = item.prescription.toLowerCase().includes("alprazolam") || item.prescription.toLowerCase().includes("fentanyl") || item.prescription.toLowerCase().includes("zolpidem");
-                      return (
-                        <div 
-                          key={`${item.name}-${idx}`} 
-                          onClick={() => handleSelectQueueItem(item)}
-                          className={`p-4 hover:bg-slate-50/50 cursor-pointer transition ${selectedWalkIn?.name === item.name ? "bg-indigo-50/30 border-l-4 border-indigo-600" : ""} ${isWalkInControlled ? "bg-purple-50/5 border-l-4 border-purple-500" : ""}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-1">
-                              <span className="font-semibold text-slate-900">{item.patient_name}</span>
-                              {isWalkInControlled && <span className="bg-purple-100 text-purple-800 text-[8px] font-bold px-1 rounded">Narcotic Rx</span>}
-                            </div>
-                            <span className="text-[9px] font-mono text-slate-400">{item.name}</span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 mt-1 flex justify-between">
-                            <span>Doctor: {item.doctor}</span>
-                            <span>Mob: {item.mobile_number}</span>
-                          </div>
-                          <div className="bg-slate-50/80 rounded p-2 mt-2 text-[10px] text-slate-600 font-mono line-clamp-2">
-                            {item.prescription}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Dispensing Detail Panel */}
-            <Card className="lg:col-span-7 shadow-xs border-slate-200 flex flex-col justify-between bg-white">
-              <CardHeader className="bg-slate-50 border-b border-slate-200/60 py-3 flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-serif">Dispensation Workdesk</CardTitle>
-                  <CardDescription className="text-[10px]">Manage compliance checks and execute FEFO stock deduction</CardDescription>
-                </div>
-                {selectedWalkIn && (
-                  <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded">
-                    Active: {selectedWalkIn.patient_name}
-                  </div>
-                )}
-              </CardHeader>
-              
-              <CardContent className="pt-4 flex-1">
-                {selectedWalkIn ? (
-                  <div className="space-y-4">
-                    
-                    {/* Doctor Prescription Text */}
-                    <div className="bg-slate-50 border border-slate-200/50 rounded-lg p-3">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Doctor Consultation Note</div>
-                      <div className="text-xs font-semibold text-slate-800 mt-1 font-mono whitespace-pre-line">
-                        {selectedWalkIn.prescription || "No prescription notes logged."}
-                      </div>
-                    </div>
-
-                    {/* Fulfill Items Grid */}
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Classified Items to Dispense</div>
-                      
-                      <div className="border border-slate-100 rounded-lg overflow-hidden text-xs">
-                        <div className="divide-y divide-slate-100 bg-white">
-                          {dispenseItems.map((item, index) => {
-                            const hasControlled = item.category === "Controlled Drug";
-                            const hasSleeping = item.category === "Sleeping Pill";
-                            
-                            const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
-                            const isPartial = item.dispense_status === "Partially Dispensed";
-
-                            const currentCost = isPartial ? (item.dispensed_qty * item.price) : (item.qty * item.price);
-
-                            return (
-                              <div key={item.medicine_name} className="p-3 border-b items-center hover:bg-slate-50/20 space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="font-semibold text-slate-900 flex flex-col">
-                                    <span className="flex items-center gap-1.5 flex-wrap">
-                                      {item.medicine_name}
-                                      {hasControlled && <span className="bg-purple-100 text-purple-800 text-[8px] font-extrabold px-1 py-0.25 rounded">CONTROLLED</span>}
-                                      {hasSleeping && <span className="bg-indigo-100 text-indigo-800 text-[8px] font-extrabold px-1 py-0.25 rounded">SLEEPING PILL</span>}
-                                      {item.dispense_status === "Partially Dispensed" && <span className="bg-amber-100 text-amber-800 text-[8px] font-extrabold px-1 py-0.25 rounded">PARTIAL</span>}
-                                      {item.dispense_status === "Dispensed" && <span className="bg-emerald-100 text-emerald-800 text-[8px] font-extrabold px-1 py-0.25 rounded">DISPENSED</span>}
-                                      {item.dispense_status === "Out of Stock" && <span className="bg-rose-100 text-rose-800 text-[8px] font-extrabold px-1 py-0.25 rounded">OUT OF STOCK</span>}
-                                    </span>
-                                    <span className="text-[9px] text-slate-400 font-normal mt-1 flex items-center gap-1">
-                                      {item.category} • Prescribed: {item.prescribed_qty} • Dispensing: {isPartial ? item.dispensed_qty : item.qty}
-                                    </span>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                      <div className="text-[9px] text-slate-400">Stock Available</div>
-                                      <div className={`font-semibold font-mono ${item.stock > 0 ? "text-slate-600" : "text-rose-600"}`}>{item.stock}</div>
-                                    </div>
-                                    
-                                    <div className="text-right">
-                                      <div className="text-[9px] text-slate-400">Total</div>
-                                      <div className="font-bold font-mono text-slate-800">
-                                        ₹{currentCost.toFixed(2)}
-                                      </div>
-                                    </div>
-                                    
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <button className="text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition">
-                                          <MoreHorizontal className="w-4 h-4" />
-                                        </button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" className="w-48 text-xs">
-                                        <DropdownMenuLabel className="text-[10px] text-slate-400">Actions</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => { setWorkdeskEditIndex(index); setWorkdeskEditQty(item.qty); setShowWorkdeskEditModal(true); }}>
-                                          <Edit3 className="w-3.5 h-3.5 mr-2 text-slate-500" /> Edit Quantity
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => { setWorkdeskPartialIndex(index); setWorkdeskPartialQty(item.dispensed_qty); setShowWorkdeskPartialModal(true); }}>
-                                          <Layers className="w-3.5 h-3.5 mr-2 text-slate-500" /> Partial Dispense
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleMarkNotAvailable(index)}>
-                                          <AlertCircle className="w-3.5 h-3.5 mr-2 text-slate-500" /> Mark Not Available
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => { setWorkdeskDeleteIndex(index); setShowWorkdeskDeleteModal(true); }} className="text-rose-600 focus:text-rose-700">
-                                          <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Medicine
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Add Custom Medicine input */}
-                    <div className="flex items-end gap-2 border-t pt-4">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-[10px] font-bold text-slate-400">Add Item (OTC/Unmatched)</Label>
-                        <Input
-                          list="workdesk-medicine-catalog"
-                          placeholder="Search name, generic, barcode, QR..."
-                          value={customAddMedName}
-                          onChange={(e) => setCustomAddMedName(e.target.value)}
-                          className="h-8 text-xs border-slate-200 w-full"
-                        />
-                        <datalist id="workdesk-medicine-catalog">
-                          {medicines.filter(m => !m.disabled).map(m => (
-                            <option key={m.medicine_name} value={m.medicine_name}>
-                              {m.generic_name ? `[${m.generic_name}] ` : ""}{m.barcode ? `(BC: ${m.barcode}) ` : ""}{m.qrcode ? `(QR: ${m.qrcode}) ` : ""}Stock: {m.stock}
-                            </option>
-                          ))}
-                        </datalist>
-                      </div>
-                      <div className="w-20 space-y-1">
-                        <Label className="text-[10px] font-bold text-slate-400">Qty</Label>
-                        <Input 
-                          type="number" value={customAddQty} 
-                          onChange={(e) => setCustomAddQty(e.target.value)}
-                          className="h-8 text-xs border-slate-200"
-                        />
-                      </div>
-                      <Button onClick={handleAddCustomDispenseMed} variant="outline" size="sm" className="h-8 text-xs border-slate-200 hover:bg-slate-50">
-                        Add
-                      </Button>
-                    </div>
-
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-52 text-slate-400 gap-2">
-                    <ClipboardList className="w-10 h-10 text-slate-300" />
-                    <span className="text-xs">Select a patient walk-in from the queue to start dispensation.</span>
-                  </div>
-                )}
-              </CardContent>
-
-              {selectedWalkIn && (
-                <div className="border-t p-4 bg-slate-50 flex flex-col gap-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-slate-500">Dispensing Pharmacist *</Label>
-                      <Input 
-                        value={pharmacistName} 
-                        onChange={(e) => setPharmacistName(e.target.value)}
-                        className="h-8 text-xs border-slate-200 bg-white" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-slate-500">Payment Handling *</Label>
-                      <select
-                        value={dispensePaymentMode}
-                        onChange={(e) => setDispensePaymentMode(e.target.value)}
-                        className="h-8 text-xs w-full rounded-md border border-slate-200 bg-white px-2 focus:outline-none font-semibold text-slate-800"
-                      >
-                        <option value="Pay at Pharmacy Desk">Pay at Pharmacy Desk (Collect Now)</option>
-                        <option value="Forward to Central Billing Desk">Forward to Central Billing (Pay at Billing)</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-slate-500">Payment Method (if collecting)</Label>
-                      <select
-                        value={otcPaymentMethod}
-                        onChange={(e) => setOtcPaymentMethod(e.target.value)}
-                        disabled={dispensePaymentMode === "Forward to Central Billing Desk"}
-                        className={`h-8 text-xs w-full rounded-md border border-slate-200 px-2 focus:outline-none font-semibold text-slate-700
-                          ${dispensePaymentMode === "Forward to Central Billing Desk" ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-white"}`}
-                      >
-                        <option value="Cash">Cash</option>
-                        <option value="UPI">UPI</option>
-                        <option value="Card">Card</option>
-                        <option value="Insurance">Insurance</option>
-                        <option value="Credit">Credit</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center justify-between border-t pt-3 mt-1 gap-3">
-                    <div className="text-left">
-                      <div className="text-[9px] font-bold text-slate-400">
-                        {dispensePaymentMode === "Pay at Pharmacy Desk" ? "COLLECT AT COUNTER (INCL. GST)" : "FORWARDED CHARGES (INCL. GST)"}
-                      </div>
-                      <div className="text-lg font-bold text-slate-900 font-mono">
-                        ₹{dispenseItems.reduce((acc, curr) => {
-                          if (curr.source === "Outside Purchase" || curr.dispense_status === "Outside Purchase") return acc;
-                          const qty = curr.dispense_status === "Partially Dispensed" ? curr.dispensed_qty : curr.qty;
-                          return acc + (qty * curr.price);
-                        }, 0).toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={executeOutsidePurchase}
-                        variant="outline"
-                        className="text-amber-700 border-amber-200 hover:bg-amber-50 font-semibold text-xs h-9 px-3.5 shadow-sm"
-                      >
-                        Outside Purchase (No Invoice)
-                      </Button>
-                      <Button
-                        onClick={() => executeDispensing("Forward to Central Billing Desk")}
-                        variant="outline"
-                        className="text-indigo-700 border-indigo-200 hover:bg-indigo-50 font-semibold text-xs h-9 px-3.5 shadow-sm gap-1.5"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" /> Forward to Billing Desk
-                      </Button>
-                      <Button 
-                        onClick={() => executeDispensing("Pay at Pharmacy Desk")}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 px-4 shadow-sm gap-1.5"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> Collect Payment & Dispense
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-
+          {/* Top Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Prescriptions Queue</h1>
+              <p className="text-xs text-slate-500 mt-0.5">Consultation profiles ready for pharmacy checkout.</p>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-3.5 rounded-lg shadow-xs gap-1.5 shrink-0 cursor-pointer">
+                  <Pill className="w-4 h-4" />
+                  <span>Medicine Operations</span>
+                  <ChevronDown className="w-3.5 h-3.5 opacity-80 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl shadow-lg border border-slate-200 bg-white">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (userRole === "Store Manager") {
+                      showToast("Access Denied: Store Managers cannot initiate medicine sales.", "error");
+                    } else {
+                      setOtcBasket([]);
+                      setOtcCustomerName("");
+                      setOtcCustomerMobile("");
+                      setOtcCustomerAge("");
+                      setOtcCustomerGender("Male");
+                      setOtcCustomerType("Walk-in");
+                      setOtcSelectedPatient(null);
+                      setOtcSearchQuery("");
+                      setShowOTCSaleModal(true);
+                    }
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                  <span>Direct Medicine Sale</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleOpenSalesReturn()}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4 text-rose-600" />
+                  <span>Return Sold Medicine</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          {/* Search & Tabs */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Input
+                placeholder="Search name or phone number..."
+                value={queueSearchQuery}
+                onChange={(e) => setQueueSearchQuery(e.target.value)}
+                className="w-full h-9 pl-9 text-xs border-slate-200 bg-slate-50/50 focus:bg-white rounded-lg"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
+              {[
+                { id: "Waiting", label: "Active Queue", count: queueSummary.activeQueue },
+                { id: "Completed", label: "Completed", count: queueSummary.completed }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setQueueFilterTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    queueFilterTab === tab.id
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200/80"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-1.5 py-0.25 rounded-full text-[10px] ${
+                    queueFilterTab === tab.id ? "bg-indigo-700/80 text-white" : "bg-white text-slate-600 border border-slate-200"
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Prescriptions Table */}
+          <Card className="shadow-xs border-slate-200/80 bg-white rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b bg-slate-50/70 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="px-4 py-3 text-center w-12">#</th>
+                    <th className="px-4 py-3">Patient Details</th>
+                    <th className="px-3 py-3">UHID</th>
+                    <th className="px-3 py-3">Doctor</th>
+                    <th className="px-3 py-3 text-center">Items</th>
+                    <th className="px-3 py-3 text-center">Status</th>
+                    {queueFilterTab !== "Completed" && (
+                      <>
+                        <th className="px-4 py-3 text-center w-24">Action</th>
+                        <th className="px-4 py-3 text-center w-28">Dispense</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredQueue.length === 0 ? (
+                    <tr>
+                      <td colSpan={queueFilterTab === "Completed" ? 6 : 8} className="px-5 py-12 text-center text-slate-400">
+                        <ClipboardList className="w-8 h-8 text-slate-300 mx-auto mb-2 opacity-60" />
+                        No prescriptions found matching the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredQueue.map((item, idx) => {
+                      const isCompleted = item.pharmacy_status === "Completed" || item.appointment_status === "Billing" || item.appointment_status === "Completed";
+                      const isSelected = selectedWalkIn?.name === item.name;
+                      const distinctItemsCount = getPrescriptionDistinctItems(item.prescription, item.dispensed_medicines);
+                      const uhid = item.patient || item.patient_id || item.uhid || item.name;
+
+                      return (
+                        <tr 
+                          key={`${item.name}-${idx}`}
+                          className={`hover:bg-slate-50/70 transition-colors ${
+                            isSelected ? "bg-indigo-50/50 border-l-4 border-indigo-600" : ""
+                          }`}
+                        >
+                          <td className="px-4 py-3.5 text-center font-mono text-slate-400 font-medium">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="font-bold text-slate-900">{item.patient_name}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5">
+                              <span>{item.gender || "Patient"}</span>
+                              {item.age ? <span>• {item.age} yrs</span> : null}
+                              <span>• Mob: {item.mobile_number || item.phone || "N/A"}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3.5 font-mono text-[11px] text-slate-600">
+                            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              {uhid}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3.5 text-slate-700 font-medium">
+                            {item.doctor || "General Physician"}
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <span className="font-semibold text-slate-700 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-full text-[11px] inline-flex items-center gap-1">
+                              <Pill className="w-3 h-3 text-indigo-600" />
+                              {distinctItemsCount} {distinctItemsCount === 1 ? "item" : "items"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              isCompleted
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                              {isCompleted ? "Completed" : "Waiting"}
+                            </span>
+                          </td>
+                          {queueFilterTab !== "Completed" && (
+                            <>
+                              <td className="px-4 py-3.5 text-center">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSelectQueueItem(item)}
+                                  className="h-8 px-3.5 text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700 gap-1.5"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  View
+                                </Button>
+                              </td>
+                              <td className="px-4 py-3.5 text-center">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleDirectQuickDispense(item)}
+                                  className="h-8 px-3 text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 whitespace-nowrap"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  Dispense
+                                </Button>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
 
         {/* ========================================================
@@ -4796,9 +5195,170 @@ export default function PharmacyPage() {
         </TabsContent>
 
         {/* ========================================================
-            TAB: LOGISTICS & PROCUREMENT (POs & GRN)
+            TAB: LOGISTICS & PROCUREMENT (POs, GRN & Suggestions)
             ======================================================== */}
         <TabsContent value="logistics" className="space-y-6 focus-visible:outline-none">
+          {/* Purchase Suggestions */}
+          <Card className="shadow-xs border-slate-200 bg-white">
+            <CardHeader className="bg-slate-50 border-b border-slate-200/60 p-4 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base font-serif flex items-center gap-2 text-slate-800">
+                    <ShoppingCart className="w-4 h-4 text-indigo-600" />
+                    Purchase Suggestions
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 mt-0.5">Medicines that require replenishment based on current stock, reorder level, and maximum stock.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3.5 h-9 shadow-xs rounded-lg cursor-pointer flex items-center gap-1.5">
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        <span>Generate Purchase Orders</span>
+                        <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-80" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60 p-1.5 bg-white border border-slate-200 shadow-lg rounded-lg z-50">
+                      <DropdownMenuItem 
+                        onClick={handleBulkGeneratePOs}
+                        className="flex items-start gap-2.5 text-xs p-2 cursor-pointer text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-md transition-colors"
+                      >
+                        <ShoppingCart className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="font-semibold text-slate-900">Review &amp; Edit Purchase Orders</div>
+                          <div className="text-[10px] text-slate-500 leading-tight mt-0.5">Auto-generate orders from system suggestions</div>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="my-1 border-slate-100" />
+                      <DropdownMenuItem 
+                        onClick={() => setIsPOModalOpen(true)}
+                        className="flex items-start gap-2.5 text-xs p-2 cursor-pointer text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/80 rounded-md transition-colors"
+                      >
+                        <PlusCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="font-semibold text-slate-900">Create Manual PO</div>
+                          <div className="text-[10px] text-slate-500 leading-tight mt-0.5">Select supplier and custom items manually</div>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {purchaseRecommendations.length > 0 && (
+                    <Button onClick={downloadReorderReport} size="sm" variant="outline" className="h-9 text-xs border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-lg">
+                      <Download className="w-3.5 h-3.5 mr-1.5" /> Download
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                  <Input
+                    placeholder="Search suggestions..."
+                    value={suggSearchQuery}
+                    onChange={(e) => setSuggSearchQuery(e.target.value)}
+                    className="w-52 h-8 pl-8 text-xs border-slate-200 shadow-2xs"
+                  />
+                </div>
+                
+                <select
+                  value={suggFilterCategory}
+                  onChange={(e) => setSuggFilterCategory(e.target.value)}
+                  className="h-8 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs focus:outline-none shadow-2xs text-slate-700"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Regular Medicine">Regular Medicine</option>
+                  <option value="Schedule H">Schedule H</option>
+                  <option value="Schedule H1">Schedule H1</option>
+                  <option value="Sleeping Pill">Sleeping Pill</option>
+                  <option value="Controlled Drug">Controlled Drug</option>
+                  <option value="OTC">OTC</option>
+                </select>
+
+                <select
+                  value={suggFilterStatus}
+                  onChange={(e) => setSuggFilterStatus(e.target.value)}
+                  className="h-8 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs focus:outline-none shadow-2xs text-slate-700"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Low Stock">Low Stock</option>
+                  <option value="Out Of Stock">Out Of Stock</option>
+                  <option value="Controlled Drug">Controlled Drug</option>
+                  <option value="Schedule H">Schedule H</option>
+                  <option value="Sleeping Pill">Sleeping Pill</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {purchaseRecommendations.length === 0 ? (
+                <div className="p-10 flex flex-col items-center justify-center text-slate-400 gap-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                    <ShoppingCart className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-slate-700 text-sm">All Stocks Healthy</div>
+                    <div className="text-xs mt-1 text-slate-500">No medicines currently require replenishment.</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                        <th className="px-4 py-3">Medicine</th>
+                        <th className="px-4 py-3 text-center">Current Stock</th>
+                        <th className="px-4 py-3 text-center">Reorder Level</th>
+                        <th className="px-4 py-3 text-center">Suggested Qty</th>
+                        <th className="px-4 py-3">Preferred Supplier</th>
+                        <th className="px-4 py-3 text-right">Est. Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {purchaseRecommendations.map(rec => {
+                        const isOut = rec.current_stock === 0;
+                        const isLow = rec.current_stock < rec.min_stock && !isOut;
+                        let stockBadgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                        if (isOut) { stockBadgeColor = "bg-rose-50 text-rose-700 border-rose-200"; }
+                        else if (isLow) { stockBadgeColor = "bg-orange-50 text-orange-700 border-orange-200"; }
+                        else if (rec.current_stock <= rec.reorder_level) { stockBadgeColor = "bg-amber-50 text-amber-700 border-amber-200"; }
+
+                        return (
+                          <tr key={rec.medicine} className="hover:bg-slate-50/50 group transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{rec.medicine}</div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">{rec.generic}</div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${stockBadgeColor}`}>
+                                {rec.current_stock}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono text-slate-500">{rec.reorder_level}</td>
+                            <td className="px-4 py-3 text-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                className="w-20 h-8 mx-auto text-center font-mono font-bold text-indigo-600 border-indigo-200 focus:border-indigo-500 text-xs px-1 rounded-md"
+                                value={rec.suggested}
+                                onChange={(e) => {
+                                  const newQty = parseInt(e.target.value) || 0;
+                                  setEditedSuggQty(prev => ({ ...prev, [rec.medicine]: newQty }));
+                                }}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-medium text-slate-700">{rec.supplier}</td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-800">₹{(rec.suggested * rec.price).toLocaleString("en-IN")}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Purchase Orders List */}
@@ -5592,93 +6152,6 @@ export default function PharmacyPage() {
             )}
           </div>
 
-          {/* Full-width Section: Imported Supplier Invoices & Goods Receipts */}
-          <Card className="shadow-xs border-slate-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-200/60 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-sm font-serif flex items-center gap-2 text-slate-900">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  Imported Supplier Invoices &amp; OCR Goods Receipts
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Historical log of distributor invoices processed via AI vision extraction and purchase bills.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setShowImportedInvoicesModal(true)}
-                  size="xs"
-                  variant="outline"
-                  className="bg-white hover:bg-slate-50 text-indigo-700 border-indigo-200 font-semibold text-[10px] px-3 py-1.5 shadow-xs gap-1.5"
-                >
-                  <Eye className="w-3.5 h-3.5" /> Full Invoices Modal
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {importedInvoices.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  No supplier invoices recorded yet.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 text-xs overflow-x-auto">
-                  <div className="grid grid-cols-[1.5fr_1.8fr_1.2fr_1fr_1.2fr_1.5fr] px-6 py-3 font-bold text-slate-500 bg-slate-50/50 uppercase tracking-wider text-[10px]">
-                    <div>Invoice Reference</div>
-                    <div>Supplier / Vendor</div>
-                    <div>Invoice Date</div>
-                    <div className="text-center">Items</div>
-                    <div className="text-right">Net Value</div>
-                    <div className="text-right">Actions</div>
-                  </div>
-                  {importedInvoices.map((inv) => (
-                    <div key={inv.invoice_number} className="grid grid-cols-[1.5fr_1.8fr_1.2fr_1fr_1.2fr_1.5fr] px-6 py-3.5 items-center hover:bg-slate-50/60 transition-colors">
-                      <div className="font-mono font-bold text-indigo-700 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-indigo-500" />
-                        #{inv.invoice_number}
-                      </div>
-                      <div className="font-semibold text-slate-800">{inv.supplier}</div>
-                      <div className="text-slate-500 font-mono text-[11px]">{inv.invoice_date || "Recent"}</div>
-                      <div className="text-center">
-                        <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full text-[10px]">
-                          {inv.item_count || 1} items
-                        </span>
-                      </div>
-                      <div className="text-right font-black font-mono text-slate-900">
-                        ₹{(inv.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </div>
-                      <div className="text-right flex items-center justify-end gap-2">
-                        <Button
-                          onClick={() => {
-                            setSelectedInvoiceDetail(inv.invoice_number);
-                            setShowImportedInvoicesModal(true);
-                          }}
-                          size="xs"
-                          variant="outline"
-                          className="h-7 text-[10px] px-2.5 bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
-                        >
-                          Inspect Breakdown
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setSearchQuery("");
-                            setCategoryFilter("All");
-                            setStatusFilter("All");
-                            setInvoiceFilter(inv.invoice_number);
-                            setActiveTab("inventory");
-                            showToast(`Filtered inventory table for Invoice ${inv.invoice_number}`, "info");
-                          }}
-                          size="xs"
-                          className="h-7 text-[10px] px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
-                        >
-                          Filter Inventory
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
@@ -7533,9 +8006,9 @@ export default function PharmacyPage() {
       )}
       {/* Workdesk Edit Quantity Modal */}
       {showWorkdeskEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/80">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
                 <Edit3 className="w-4 h-4 text-indigo-500" /> Edit Dispense Quantity
               </h3>
@@ -7545,17 +8018,17 @@ export default function PharmacyPage() {
             </div>
             <div className="p-4 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">New Quantity</Label>
-                <Input type="number" min="1" value={workdeskEditQty} onChange={(e) => setWorkdeskEditQty(e.target.value)} />
+                <Label className="text-xs text-slate-600 font-semibold">New Quantity</Label>
+                <Input type="number" min="1" value={workdeskEditQty} onChange={(e) => setWorkdeskEditQty(e.target.value)} className="h-9 font-mono font-bold" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">Reason for Change</Label>
-                <Input placeholder="e.g. Doctor updated dose" value={workdeskEditReason} onChange={(e) => setWorkdeskEditReason(e.target.value)} />
+                <Label className="text-xs text-slate-600 font-semibold">Reason for Change</Label>
+                <Input placeholder="e.g. Doctor updated dose" value={workdeskEditReason} onChange={(e) => setWorkdeskEditReason(e.target.value)} className="h-9" />
               </div>
             </div>
             <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskEditModal(false)}>Cancel</Button>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={confirmWorkdeskEdit}>Save Changes</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskEditModal(false)} className="h-8.5">Cancel</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white h-8.5" onClick={confirmWorkdeskEdit}>Save Changes</Button>
             </div>
           </div>
         </div>
@@ -7563,9 +8036,9 @@ export default function PharmacyPage() {
 
       {/* Workdesk Partial Dispense Modal */}
       {showWorkdeskPartialModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/80">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
                 <Layers className="w-4 h-4 text-amber-500" /> Partial Dispense
               </h3>
@@ -7575,14 +8048,14 @@ export default function PharmacyPage() {
             </div>
             <div className="p-4 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">Dispense Quantity Now</Label>
-                <Input type="number" min="1" value={workdeskPartialQty} onChange={(e) => setWorkdeskPartialQty(e.target.value)} />
-                <p className="text-[10px] text-slate-400">The rest will be marked as pending or outside purchase depending on action.</p>
+                <Label className="text-xs text-slate-600 font-semibold">Dispense Quantity Now</Label>
+                <Input type="number" min="1" value={workdeskPartialQty} onChange={(e) => setWorkdeskPartialQty(e.target.value)} className="h-9 font-mono font-bold" />
+                <p className="text-[10px] text-slate-400">The remaining balance will be marked as pending or outside purchase.</p>
               </div>
             </div>
             <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskPartialModal(false)}>Cancel</Button>
-              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmWorkdeskPartial}>Confirm Partial</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskPartialModal(false)} className="h-8.5">Cancel</Button>
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white h-8.5" onClick={confirmWorkdeskPartial}>Confirm Partial</Button>
             </div>
           </div>
         </div>
@@ -7590,20 +8063,20 @@ export default function PharmacyPage() {
 
       {/* Workdesk Delete Modal */}
       {showWorkdeskDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm border border-slate-200 overflow-hidden">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-rose-50">
               <h3 className="font-semibold text-rose-800 flex items-center gap-2 text-sm">
-                <Trash2 className="w-4 h-4 text-rose-600" /> Delete Item
+                <Trash2 className="w-4 h-4 text-rose-600" /> Delete Medicine
               </h3>
               <button onClick={() => setShowWorkdeskDeleteModal(false)} className="text-rose-400 hover:text-rose-600 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-4 space-y-4">
-              <p className="text-xs text-slate-600">Are you sure you want to remove this item from the dispensation queue?</p>
+              <p className="text-xs text-slate-600">Are you sure you want to remove this medicine from the dispensation list?</p>
               <div className="space-y-1.5">
-                <Label className="text-xs text-slate-500">Reason for Deletion</Label>
+                <Label className="text-xs text-slate-600 font-semibold">Reason for Deletion</Label>
                 <select value={workdeskDeleteReason} onChange={(e) => setWorkdeskDeleteReason(e.target.value)} className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-sm focus:outline-none">
                   <option value="Doctor Cancelled">Doctor Cancelled</option>
                   <option value="Duplicate">Duplicate</option>
@@ -7614,8 +8087,8 @@ export default function PharmacyPage() {
               </div>
             </div>
             <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskDeleteModal(false)}>Cancel</Button>
-              <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white" onClick={confirmWorkdeskDelete}>Delete</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowWorkdeskDeleteModal(false)} className="h-8.5">Cancel</Button>
+              <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white h-8.5" onClick={confirmWorkdeskDelete}>Delete</Button>
             </div>
           </div>
         </div>
@@ -7801,6 +8274,693 @@ export default function PharmacyPage() {
                 className="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4"
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispensation Workdesk Popup Modal */}
+      {showDispenseWorkdeskModal && selectedWalkIn && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-base font-bold text-slate-900 font-serif">Dispensation Workdesk</h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                    (selectedWalkIn.pharmacy_status === "Completed" || selectedWalkIn.appointment_status === "Billing" || selectedWalkIn.appointment_status === "Completed")
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }`}>
+                    {(selectedWalkIn.pharmacy_status === "Completed" || selectedWalkIn.appointment_status === "Billing" || selectedWalkIn.appointment_status === "Completed") ? "Dispensed" : "Ready for Dispensing"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDispenseWorkdeskModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Modal Content */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-xs">
+              {/* Section 1: Patient & Consultation Overview Banner */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/90 p-4 rounded-xl border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Patient Name</span>
+                  <span className="font-bold text-slate-900 mt-0.5 block text-sm">{selectedWalkIn.patient_name}</span>
+                  <span className="text-[11px] text-slate-500">{selectedWalkIn.gender || "Patient"}{selectedWalkIn.age ? ` • ${selectedWalkIn.age} yrs` : ""}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">UHID / Patient ID</span>
+                  <span className="font-mono text-slate-800 mt-0.5 block font-semibold">{selectedWalkIn.patient || selectedWalkIn.patient_id || selectedWalkIn.uhid || selectedWalkIn.name}</span>
+                  <span className="text-[11px] text-slate-500 font-mono">Mob: {selectedWalkIn.mobile_number || selectedWalkIn.phone || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prescribing Doctor</span>
+                  <span className="font-semibold text-slate-900 mt-0.5 block">{selectedWalkIn.doctor || "General Physician"}</span>
+                  <span className="text-[11px] text-slate-500">Rx ID: {selectedWalkIn.name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Prescription Date</span>
+                  <span className="text-slate-700 mt-0.5 block font-medium">
+                    {selectedWalkIn.modified || selectedWalkIn.creation
+                      ? new Date(selectedWalkIn.modified || selectedWalkIn.creation).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                      : "Today"}
+                  </span>
+                  <span className="text-[11px] text-indigo-600 font-medium">{dispenseItems.length} distinct medicine(s)</span>
+                </div>
+                {(selectedWalkIn.prescription || selectedWalkIn.diagnosis) && (
+                  <div className="col-span-2 sm:col-span-4 pt-2 border-t border-slate-200/60 mt-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Doctor Rx & Clinical Instructions:</span>
+                    <div className="text-slate-700 mt-1 font-mono text-[11px] bg-white p-2.5 rounded-lg border border-slate-200/80 whitespace-pre-line">
+                      {selectedWalkIn.prescription || selectedWalkIn.diagnosis}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Search & Add Medicine Bar (Professional Autocomplete, no ugly datalist) */}
+              <div className="bg-linear-to-r from-indigo-50/40 via-slate-50 to-white p-4 rounded-xl border border-indigo-100 shadow-2xs space-y-3">
+                <div className="flex flex-col sm:flex-row items-end gap-2.5">
+                  <div className="flex-1 space-y-1 w-full relative">
+                    <Label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
+                      Search & Add Medicine to Dispense / Bill
+                    </Label>
+                    <Input
+                      placeholder="Type medicine name, generic name, or barcode (e.g. Paracetamol, Dolo)..."
+                      value={customAddMedName}
+                      onChange={(e) => {
+                        setCustomAddMedName(e.target.value);
+                        setShowMedSearchDropdown(true);
+                      }}
+                      onFocus={() => {
+                        if (customAddMedName.trim().length >= 2) setShowMedSearchDropdown(true);
+                      }}
+                      className="h-9 text-xs border-slate-200 bg-white w-full rounded-lg shadow-2xs focus:border-indigo-500"
+                    />
+
+                    {/* Floating Professional Autocomplete Dropdown (Shows on 2+ characters) */}
+                    {showMedSearchDropdown && customAddMedName.trim().length >= 2 && (() => {
+                      const q = customAddMedName.trim().toLowerCase();
+                      const searchResults = medicines.filter(m => !m.disabled && (
+                        (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
+                        (m.generic_name && m.generic_name.toLowerCase().includes(q)) ||
+                        (m.brand && m.brand.toLowerCase().includes(q)) ||
+                        (m.barcode && m.barcode.toLowerCase().includes(q))
+                      )).slice(0, 8);
+
+                      return (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                          {searchResults.length === 0 ? (
+                            <div className="p-3 text-center text-slate-400 text-xs">
+                              No catalog matches for &quot;{customAddMedName}&quot;. You can still click &quot;Add Medicine&quot; to add manually.
+                            </div>
+                          ) : (
+                            searchResults.map((med, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setCustomAddMedName(med.medicine_name);
+                                  setShowMedSearchDropdown(false);
+                                }}
+                                className="p-2.5 px-3.5 hover:bg-indigo-50/80 cursor-pointer flex items-center justify-between gap-3 transition"
+                              >
+                                <div>
+                                  <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                                    <span>{med.medicine_name}</span>
+                                    {med.strength && med.strength !== "-" && (
+                                      <span className="text-[10px] text-slate-500 font-normal">({med.strength})</span>
+                                    )}
+                                  </div>
+                                  {med.generic_name && (
+                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                      Generic: {med.generic_name}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0 flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    med.stock > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                                  }`}>
+                                    {med.stock > 0 ? `${med.stock} in stock` : "0 stock"}
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-800 text-xs">
+                                    ₹{Number(med.selling_price || med.mrp || 25).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="w-24 space-y-1">
+                    <Label className="text-[11px] font-bold text-slate-600">Qty</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={customAddQty}
+                      onChange={(e) => setCustomAddQty(e.target.value)}
+                      className="h-9 text-xs border-slate-200 bg-white rounded-lg font-mono text-center shadow-2xs focus:border-indigo-500"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      handleAddCustomDispenseMed();
+                      setShowMedSearchDropdown(false);
+                    }}
+                    className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 rounded-lg cursor-pointer shrink-0 shadow-xs gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Medicine
+                  </Button>
+                </div>
+
+                {/* Doctor's Prescribed Quick-Add Options */}
+                {selectedWalkIn.prescription && (() => {
+                  const cleanStr = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const prescribedList = parsePrescriptionDetails(selectedWalkIn.prescription, medicines);
+                  if (prescribedList.length === 0) return null;
+
+                  return (
+                    <div className="pt-2.5 border-t border-indigo-100/70">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                        Prescribed Medicines from Doctor Rx (Click to Add):
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {prescribedList.map((rxItem, rxIdx) => {
+                          const isAlreadyAdded = dispenseItems.some(it => cleanStr(it.medicine_name) === cleanStr(rxItem.medicine_name));
+                          return (
+                            <button
+                              key={rxIdx}
+                              type="button"
+                              disabled={isAlreadyAdded}
+                              onClick={() => handleAddCustomDispenseMed(rxItem.medicine_name, rxItem.prescribed_qty, rxItem)}
+                              className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition ${
+                                isAlreadyAdded 
+                                  ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                  : "bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 shadow-2xs cursor-pointer"
+                              }`}
+                            >
+                              <Plus className="w-3 h-3 text-indigo-600" />
+                              <span className="font-semibold text-slate-900">{rxItem.medicine_name}</span>
+                              <span className="text-[11px] text-slate-500 font-mono">({rxItem.prescribed_qty || 1} qty • {rxItem.dosage || "1-0-1"})</span>
+                              {isAlreadyAdded && <span className="text-[10px] text-emerald-600 font-bold ml-1">Added ✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Section 3: Classified Items to Dispense Table */}
+              <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs bg-white">
+                <table className="w-full text-left border-collapse text-xs min-w-[850px]">
+                  <thead>
+                    <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                      <th className="p-3 text-center w-10">#</th>
+                      <th className="p-3">Medicine Details</th>
+                      <th className="p-3 text-center w-28">Dosage / Timings</th>
+                      <th className="p-3 text-center w-20">Prescribed</th>
+                      <th className="p-3 text-center w-36">Dispense Qty</th>
+                      <th className="p-3 text-right w-24">Unit Rate</th>
+                      <th className="p-3 text-center w-28">Stock</th>
+                      <th className="p-3 text-right w-28">Line Total</th>
+                      <th className="p-3 text-center w-24">Status</th>
+                      <th className="p-3 text-center w-24 min-w-[80px]">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {dispenseItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-slate-400">
+                          <Pill className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
+                          No medicines added to dispensation list yet.
+                          <div className="text-[11px] text-slate-400 mt-1">
+                            Search and add medicines in the search bar above, or click the prescribed medicines above to add them to the bill.
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      dispenseItems.map((item, index) => {
+                        const isOutside = item.source === "Outside Purchase" || item.dispense_status === "Outside Purchase";
+                        const isPartial = item.dispense_status === "Partially Dispensed";
+                        const currentQty = isPartial ? (item.dispensed_qty || item.qty) : item.qty;
+                        const lineTotal = isOutside ? 0 : (currentQty * (item.price || 0));
+
+                        return (
+                          <tr key={`${item.medicine_name}-${index}`} className="hover:bg-slate-50/75 transition">
+                            <td className="p-3 text-center font-mono text-slate-400 font-medium">{index + 1}</td>
+                            <td className="p-3 min-w-[200px]">
+                              <div className="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                                <span>{item.medicine_name}</span>
+                                {item.category === "Controlled Drug" && <span className="bg-purple-100 text-purple-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded">CONTROLLED</span>}
+                                {item.category === "Sleeping Pill" && <span className="bg-indigo-100 text-indigo-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded">SLEEPING PILL</span>}
+                                {item.category === "Schedule H1" && <span className="bg-amber-100 text-amber-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded">SCHEDULE H1</span>}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span>{item.category || "Regular"}</span>
+                                {item.strength && item.strength !== "-" && !item.medicine_name.toLowerCase().includes(item.strength.toLowerCase()) && (
+                                  <>
+                                    <span className="text-slate-300">•</span>
+                                    <span>{item.strength}</span>
+                                  </>
+                                )}
+                                {isOutside && (
+                                  <>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-amber-600 font-semibold">Outside Purchase</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-center min-w-[120px]">
+                              <div className="font-mono font-bold text-slate-800 text-xs">{item.dosage || "1-0-1"}</div>
+                              <div className="text-[10px] text-slate-400 font-medium mt-0.5">{item.food_instructions || "After Food"}</div>
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-slate-700 text-xs">
+                              {item.prescribed_qty || item.qty}
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap min-w-[130px]">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={item.qty <= 1}
+                                  onClick={() => handleUpdateDispenseQty(index, -1)}
+                                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center cursor-pointer transition text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  -
+                                </button>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.qty}
+                                  onChange={(e) => handleItemQtyChange(index, e.target.value)}
+                                  className="w-14 h-7 text-center font-mono font-bold text-xs bg-white border-slate-200 focus:border-indigo-500 rounded-md p-0 shadow-2xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDispenseQty(index, 1)}
+                                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center cursor-pointer transition text-sm"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-mono font-semibold text-slate-700 whitespace-nowrap text-xs">
+                              ₹{Number(item.price || 0).toFixed(2)}
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <span className={`inline-flex items-center justify-center font-mono text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                                item.stock > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}>
+                                {item.stock > 0 ? `${item.stock} in stock` : "0 stock"}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-bold text-slate-900 text-xs whitespace-nowrap">
+                              {isOutside ? "₹0.00" : `₹${lineTotal.toFixed(2)}`}
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border ${
+                                item.dispense_status === "Dispensed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                item.dispense_status === "Partially Dispensed" ? "bg-amber-100 text-amber-800 border-amber-300" :
+                                item.dispense_status === "Outside Purchase" ? "bg-purple-50 text-purple-700 border-purple-200" :
+                                "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}>
+                                {item.dispense_status || "Ready"}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="text-slate-600 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer border border-slate-200 shadow-2xs inline-flex items-center justify-center">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44 text-xs bg-white rounded-xl shadow-lg border border-slate-200 p-1">
+                                  <DropdownMenuItem 
+                                    onClick={() => { setWorkdeskEditIndex(index); setWorkdeskEditQty(item.qty); setShowWorkdeskEditModal(true); }}
+                                    className="cursor-pointer font-medium py-2 rounded-lg text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Edit Quantity
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="my-1 bg-slate-100" />
+                                  <DropdownMenuItem 
+                                    onClick={() => { setWorkdeskDeleteIndex(index); setShowWorkdeskDeleteModal(true); }} 
+                                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 cursor-pointer font-medium py-2 rounded-lg transition"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 mr-2 text-rose-600" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer & Single Submit Action */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
+              <div className="text-left">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  TOTAL DISPENSATION VALUE
+                </div>
+                <div className="text-2xl font-black text-slate-900 font-mono">
+                  ₹{dispenseItems.reduce((acc, curr) => {
+                    if (curr.source === "Outside Purchase" || curr.dispense_status === "Outside Purchase") return acc;
+                    const qty = curr.dispense_status === "Partially Dispensed" ? (curr.dispensed_qty || curr.qty) : curr.qty;
+                    return acc + (qty * (curr.price || 0));
+                  }, 0).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDispenseWorkdeskModal(false)}
+                  className="h-9.5 text-xs border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-medium px-4 cursor-pointer"
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setShowSubmitDispenseModal(true)}
+                  disabled={dispenseItems.length === 0}
+                  className="h-9.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 rounded-lg shadow-sm gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle className="w-4 h-4" /> Submit / Process Dispensation
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit / Process Dispensation Action Modal (3 Choices Dialog) */}
+      {showSubmitDispenseModal && selectedWalkIn && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center">
+              <div>
+                <h4 className="text-base font-bold text-slate-900 font-serif">Process Dispensation</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Select how you want to settle and process this prescription</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubmitDispenseModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3">
+              {/* Option 1: Pay at Pharmacy Desk */}
+              <label 
+                onClick={() => setSelectedSubmitAction("Pay at Pharmacy Desk")}
+                className={`flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition ${
+                  selectedSubmitAction === "Pay at Pharmacy Desk" 
+                    ? "bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-500/20" 
+                    : "bg-white border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="submit_dispense_action"
+                  checked={selectedSubmitAction === "Pay at Pharmacy Desk"}
+                  onChange={() => setSelectedSubmitAction("Pay at Pharmacy Desk")}
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                    <span>Collect & Dispense (Pay at Pharmacy Desk)</span>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Immediate</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Collect payment directly at the pharmacy counter, generate receipt, and complete the dispensation.
+                  </p>
+
+                  {/* Inline settings when Option 1 is active */}
+                  {selectedSubmitAction === "Pay at Pharmacy Desk" && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200/60 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <Label className="text-[10px] font-bold text-slate-600 block mb-1">Pharmacist</Label>
+                        <Input
+                          value={pharmacistName}
+                          onChange={(e) => setPharmacistName(e.target.value)}
+                          className="h-8 text-xs bg-white border-slate-200"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-bold text-slate-600 block mb-1">Payment Method</Label>
+                        <select
+                          value={otcPaymentMethod}
+                          onChange={(e) => setOtcPaymentMethod(e.target.value)}
+                          className="h-8 text-xs w-full rounded-lg border border-slate-200 bg-white px-2 focus:outline-none font-semibold text-slate-700"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI / QR Code</option>
+                          <option value="Card">Credit / Debit Card</option>
+                          <option value="Insurance">Insurance / TPA</option>
+                          <option value="Credit">Hospital Credit</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {/* Option 2: Forward to Central Billing Desk */}
+              <label 
+                onClick={() => setSelectedSubmitAction("Forward to Central Billing Desk")}
+                className={`flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition ${
+                  selectedSubmitAction === "Forward to Central Billing Desk" 
+                    ? "bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-500/20" 
+                    : "bg-white border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="submit_dispense_action"
+                  checked={selectedSubmitAction === "Forward to Central Billing Desk"}
+                  onChange={() => setSelectedSubmitAction("Forward to Central Billing Desk")}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                    <span>Forward to Central Billing Desk</span>
+                    <span className="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Central Pay</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Post medicine charges to patient&apos;s central hospital account for unified payment collection at the billing counter.
+                  </p>
+                </div>
+              </label>
+
+              {/* Option 3: Outside Purchase */}
+              <label 
+                onClick={() => setSelectedSubmitAction("Outside Purchase")}
+                className={`flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition ${
+                  selectedSubmitAction === "Outside Purchase" 
+                    ? "bg-amber-50/70 border-amber-300 ring-2 ring-amber-500/20" 
+                    : "bg-white border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="submit_dispense_action"
+                  checked={selectedSubmitAction === "Outside Purchase"}
+                  onChange={() => setSelectedSubmitAction("Outside Purchase")}
+                  className="mt-1 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                    <span>Outside Purchase (₹0)</span>
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Zero Bill</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Mark medicines as purchased externally with no hospital billing charges.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex justify-end items-center gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowSubmitDispenseModal(false)}
+                className="h-9 text-xs border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-medium px-4 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={async () => {
+                  setShowSubmitDispenseModal(false);
+                  if (selectedSubmitAction === "Pay at Pharmacy Desk") {
+                    await executeDispensing("Pay at Pharmacy Desk");
+                  } else if (selectedSubmitAction === "Forward to Central Billing Desk") {
+                    await executeDispensing("Forward to Central Billing Desk");
+                  } else if (selectedSubmitAction === "Outside Purchase") {
+                    await executeOutsidePurchase();
+                  }
+                }}
+                className={`h-9 text-xs font-semibold px-5 rounded-lg shadow-sm gap-1.5 cursor-pointer text-white ${
+                  selectedSubmitAction === "Pay at Pharmacy Desk" ? "bg-emerald-600 hover:bg-emerald-700" :
+                  selectedSubmitAction === "Forward to Central Billing Desk" ? "bg-indigo-600 hover:bg-indigo-700" :
+                  "bg-amber-600 hover:bg-amber-700"
+                }`}
+              >
+                <CheckCircle className="w-3.5 h-3.5" /> Confirm & Process
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Quantity Sub-Modal */}
+      {showWorkdeskEditModal && workdeskEditIndex !== null && dispenseItems[workdeskEditIndex] && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-indigo-600" /> Edit Quantity
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowWorkdeskEditModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div>
+              <div className="text-xs font-semibold text-slate-800 mb-1">
+                {dispenseItems[workdeskEditIndex].medicine_name}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Prescribed Qty: <strong className="text-slate-700">{dispenseItems[workdeskEditIndex].prescribed_qty || dispenseItems[workdeskEditIndex].qty}</strong>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">New Dispense Quantity</Label>
+              <Input
+                type="number"
+                min="1"
+                value={workdeskEditQty}
+                onChange={(e) => setWorkdeskEditQty(e.target.value)}
+                className="h-9 text-xs border-slate-200 font-mono font-bold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">Reason for Adjustment</Label>
+              <select
+                value={workdeskEditReason}
+                onChange={(e) => setWorkdeskEditReason(e.target.value)}
+                className="h-9 text-xs w-full rounded-lg border border-slate-200 bg-white px-2.5 focus:outline-none font-medium text-slate-700"
+              >
+                <option value="Adjusted by Pharmacist">Adjusted by Pharmacist</option>
+                <option value="Patient Requested Less">Patient Requested Less</option>
+                <option value="Doctor Revised Dosage">Doctor Revised Dosage</option>
+                <option value="Partial Pack Provided">Partial Pack Provided</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowWorkdeskEditModal(false)}
+                className="h-8.5 text-xs border-slate-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmWorkdeskEdit}
+                className="h-8.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+              >
+                Save Quantity
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Item Sub-Modal */}
+      {showWorkdeskDeleteModal && workdeskDeleteIndex !== null && dispenseItems[workdeskDeleteIndex] && (
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 p-5 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-bold text-rose-700 flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-600" /> Remove Medicine
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowWorkdeskDeleteModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-600">
+              Are you sure you want to remove <strong className="text-slate-900">{dispenseItems[workdeskDeleteIndex].medicine_name}</strong> from this dispensation list?
+            </p>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">Reason for Removal</Label>
+              <select
+                value={workdeskDeleteReason}
+                onChange={(e) => setWorkdeskDeleteReason(e.target.value)}
+                className="h-9 text-xs w-full rounded-lg border border-slate-200 bg-white px-2.5 focus:outline-none font-medium text-slate-700"
+              >
+                <option value="Doctor Cancelled">Doctor Cancelled</option>
+                <option value="Out of Stock">Out of Stock</option>
+                <option value="Patient Refused">Patient Refused</option>
+                <option value="Purchased Outside">Purchased Outside</option>
+                <option value="Added by Mistake">Added by Mistake</option>
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowWorkdeskDeleteModal(false)}
+                className="h-8.5 text-xs border-slate-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmWorkdeskDelete}
+                className="h-8.5 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+              >
+                Remove Medicine
               </Button>
             </div>
           </div>

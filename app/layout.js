@@ -17,14 +17,20 @@ export const metadata = {
   description: 'Integrated Hospital ERP Portal',
 };
 
+import { Suspense } from 'react';
+
 function MainLayoutContent({ children }) {
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <AppSidebar />
+      <Suspense fallback={null}>
+        <AppSidebar />
+      </Suspense>
       <main className="flex-1 min-w-0 flex flex-col">
         <Header />
         <div className="p-6 flex-1 overflow-y-auto">
-          {children}
+          <Suspense fallback={<div className="p-8 text-center text-xs text-slate-400">Loading module...</div>}>
+            {children}
+          </Suspense>
         </div>
       </main>
     </div>
