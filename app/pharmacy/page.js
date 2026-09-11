@@ -5369,14 +5369,7 @@ export default function PharmacyPage() {
                   <CardDescription className="text-[10px]">Track supply chains from purchase recommendation to goods arrival</CardDescription>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Dialog open={isPOModalOpen} onOpenChange={setIsPOModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="xs" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] px-2.5 py-1 shadow-sm">
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Create Manual PO
-                      </Button>
-                    </DialogTrigger>
-                    {/* ... dialog content remains the same */}
+                <Dialog open={isPOModalOpen} onOpenChange={setIsPOModalOpen}>
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle className="font-serif text-sm">Create Replenishment Purchase Order</DialogTitle>
@@ -5461,7 +5454,6 @@ export default function PharmacyPage() {
                     </form>
                   </DialogContent>
                 </Dialog>
-              </div>
               </CardHeader>
               <CardContent className="p-0">
                 {purchaseOrders.length === 0 ? (
