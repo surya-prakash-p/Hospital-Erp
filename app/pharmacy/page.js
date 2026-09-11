@@ -4001,7 +4001,7 @@ export default function PharmacyPage() {
           
           {/* Dashboard Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Pharmacy</h1>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-9 px-3.5 rounded-lg shadow-xs gap-1.5 shrink-0 cursor-pointer">
