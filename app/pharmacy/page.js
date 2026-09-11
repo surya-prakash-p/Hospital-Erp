@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -5369,7 +5369,8 @@ export default function PharmacyPage() {
                   <CardDescription className="text-[10px]">Track supply chains from purchase recommendation to goods arrival</CardDescription>
                 </div>
                 
-                <Dialog open={isPOModalOpen} onOpenChange={setIsPOModalOpen}>
+                <div className="flex items-center gap-2">
+                  <Dialog open={isPOModalOpen} onOpenChange={setIsPOModalOpen}>
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle className="font-serif text-sm">Create Replenishment Purchase Order</DialogTitle>
@@ -5454,6 +5455,7 @@ export default function PharmacyPage() {
                     </form>
                   </DialogContent>
                 </Dialog>
+              </div>
               </CardHeader>
               <CardContent className="p-0">
                 {purchaseOrders.length === 0 ? (
