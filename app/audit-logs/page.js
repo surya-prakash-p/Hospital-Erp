@@ -73,6 +73,20 @@ export default function AuditLogsPage() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Initialize logs from client cache on mount for instant rendering
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('hospital_audit_logs_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setLogs(parsed);
+          setLoading(false);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
   // Fetch all logs from server (silent avoids resetting table state or showing fullscreen loader)
   const fetchLogs = async (silent = false) => {
     if (!silent) {
@@ -88,10 +102,22 @@ export default function AuditLogsPage() {
         const data = await res.json();
         if (data.success && Array.isArray(data.logs)) {
           setLogs(data.logs);
+          try {
+            localStorage.setItem('hospital_audit_logs_cache', JSON.stringify(data.logs));
+          } catch (e) {}
         }
       }
     } catch (err) {
       console.warn("Failed to load audit logs:", err);
+      try {
+        const cached = localStorage.getItem('hospital_audit_logs_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLogs(parsed);
+          }
+        }
+      } catch (e) {}
     } finally {
       if (!silent) {
         setLoading(false);
