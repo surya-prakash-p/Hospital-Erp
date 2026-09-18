@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { 
   Pill, CheckCircle, AlertCircle, Info, Activity, PackageCheck, Plus, Layers, 
   PlusCircle, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Calendar,
-  ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw
+  ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw,
+  Keyboard
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,17 @@ export default function PharmacyPage() {
   const [invoiceFilter, setInvoiceFilter] = useState("All");
   const [showImportedInvoicesModal, setShowImportedInvoicesModal] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState(null);
+
+  // Keyboard Shortcuts States & Refs
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [showDownloadReportsModal, setShowDownloadReportsModal] = useState(false);
+  const [selectedReportType, setSelectedReportType] = useState("inventory");
+  const [reportScheduleCategory, setReportScheduleCategory] = useState("All");
+  const [reportExpiringDays, setReportExpiringDays] = useState(90);
+  const [selectedInvRowIndex, setSelectedInvRowIndex] = useState(-1);
+  const [selectedQueueRowIndex, setSelectedQueueRowIndex] = useState(-1);
+  const inventorySearchInputRef = useRef(null);
+  const workdeskSearchInputRef = useRef(null);
 
   // Registers Tab filter
   const [selectedRegister, setSelectedRegister] = useState("All Categories");
@@ -2447,6 +2459,183 @@ export default function PharmacyPage() {
     showToast("Reorder report downloaded successfully", "success");
   };
 
+  const downloadInventoryExport = () => {
+    const activeMeds = medicines.filter(m => !m.disabled);
+    if (activeMeds.length === 0) {
+      showToast("No active medicines to export", "info");
+      return;
+    }
+    const headers = ["Medicine Name", "Generic Name", "Brand", "Schedule / Category", "Batch Number", "Current Stock", "Min Stock", "Reorder Level", "Rack Location", "Purchase Price (INR)", "MRP / Selling Price (INR)", "Total Valuation (INR)", "Status"];
+    const rows = [];
+    activeMeds.forEach(m => {
+      const batches = (m.batches && m.batches.length > 0) ? m.batches : [{ batch_number: m.batch_number || "N/A", current_stock: m.stock || 0, purchase_price: m.purchase_price || 0, mrp: m.selling_price || m.mrp || 0, rack_location: m.rack_location || "A-1" }];
+      batches.forEach(b => {
+        const stock = b.current_stock ?? m.stock ?? 0;
+        const pPrice = parseFloat(b.purchase_price || m.purchase_price || 0);
+        const sPrice = parseFloat(b.mrp || m.selling_price || m.mrp || 0);
+        const valuation = (stock * pPrice).toFixed(2);
+        rows.push([
+          `"${(m.medicine_name || "").replace(/"/g, '""')}"`,
+          `"${(m.generic_name || "").replace(/"/g, '""')}"`,
+          `"${(m.brand || "").replace(/"/g, '""')}"`,
+          `"${(m.category || "Regular Medicine").replace(/"/g, '""')}"`,
+          `"${(b.batch_number || "N/A").replace(/"/g, '""')}"`,
+          stock,
+          m.min_stock || 0,
+          m.reorder_level || 0,
+          `"${(b.rack_location || m.rack_location || "A-1").replace(/"/g, '""')}"`,
+          pPrice.toFixed(2),
+          sPrice.toFixed(2),
+          valuation,
+          stock === 0 ? "Out of Stock" : (stock < (m.min_stock || 0) ? "Low Stock" : "In Stock")
+        ]);
+      });
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `master_pharmacy_inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Master Pharmacy Inventory exported successfully", "success");
+  };
+
+  const downloadExpiringExport = (timeframeDays = 90) => {
+    const today = new Date();
+    const expiringRows = [];
+    medicines.forEach(m => {
+      (m.batches || []).forEach(b => {
+        if (!b.exp_date || (b.current_stock || 0) <= 0) return;
+        const diffMs = new Date(b.exp_date) - today;
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays > 0 && diffDays <= timeframeDays) {
+          expiringRows.push([
+            `"${(m.medicine_name || "").replace(/"/g, '""')}"`,
+            `"${(m.generic_name || "").replace(/"/g, '""')}"`,
+            `"${(b.batch_number || "").replace(/"/g, '""')}"`,
+            b.current_stock || 0,
+            b.exp_date,
+            diffDays,
+            `"${(b.supplier || m.supplier || "Supplier").replace(/"/g, '""')}"`,
+            `"${(b.rack_location || m.rack_location || "A-1").replace(/"/g, '""')}"`
+          ]);
+        }
+      });
+    });
+
+    if (expiringRows.length === 0) {
+      showToast(`No batches expiring within next ${timeframeDays} days`, "info");
+      return;
+    }
+
+    const headers = ["Medicine Name", "Generic Name", "Batch Number", "Stock Units", "Expiry Date", "Days Remaining", "Supplier", "Rack Location"];
+    const csvContent = "\uFEFF" + [headers.join(","), ...expiringRows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `expiring_medicines_${timeframeDays}days_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Expiring medicines report (${timeframeDays} days) exported successfully`, "success");
+  };
+
+  const downloadDailySalesExport = () => {
+    if (drugRegister.length === 0) {
+      showToast("No sales or dispensing logs to export", "info");
+      return;
+    }
+    const headers = ["Dispensing ID / Invoice", "Dispensing Date", "Patient Name", "Patient UHID", "Doctor", "Medicine", "Category", "Batch Number", "Quantity Dispensed", "Unit Price (INR)", "Total Value (INR)", "Dispensing Pharmacist"];
+    const rows = drugRegister.map(r => {
+      const med = medicines.find(m => m.medicine_name === r.medicine || m.name === r.medicine);
+      const unitRate = Number(r.price || r.unit_price || r.rate) || Number(med?.selling_price || med?.mrp || 0);
+      const qty = Number(r.quantity) || 0;
+      const total = qty * unitRate;
+      return [
+        `"${(r.invoice_number || r.name || "").replace(/"/g, '""')}"`,
+        `"${new Date(r.dispensing_date || Date.now()).toLocaleString("en-IN")}"`,
+        `"${(r.patient_name || "").replace(/"/g, '""')}"`,
+        `"${(r.patient_id || r.uhid || "N/A").replace(/"/g, '""')}"`,
+        `"${(r.doctor || "").replace(/"/g, '""')}"`,
+        `"${(r.medicine || "").replace(/"/g, '""')}"`,
+        `"${(r.drug_category || med?.category || "Regular").replace(/"/g, '""')}"`,
+        `"${(r.batch_number || "").replace(/"/g, '""')}"`,
+        qty,
+        unitRate.toFixed(2),
+        total.toFixed(2),
+        `"${(r.pharmacist || pharmacistName || "").replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `pharmacy_dispensing_sales_register_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Daily Sales & Dispensing Register exported successfully", "success");
+  };
+
+  const downloadReturnsExport = () => {
+    if (salesReturnsList.length === 0) {
+      showToast("No sales returns recorded to export", "info");
+      return;
+    }
+    const headers = ["Return Invoice", "Date", "Patient Name", "Mobile / ID", "Total Refund (INR)", "Refund Method", "Restocked", "Pharmacist", "Items Summary", "Notes"];
+    const rows = salesReturnsList.map(ret => [
+      `"${(ret.invoice_number || ret.name || "").replace(/"/g, '""')}"`,
+      `"${new Date(ret.date || Date.now()).toLocaleDateString("en-IN")}"`,
+      `"${(ret.patient_name || "").replace(/"/g, '""')}"`,
+      `"${(ret.patient_id || "").replace(/"/g, '""')}"`,
+      Number(ret.total_refund || 0).toFixed(2),
+      `"${(ret.refund_method || "Cash").replace(/"/g, '""')}"`,
+      ret.restock_inventory ? "Yes" : "No",
+      `"${(ret.pharmacist || "").replace(/"/g, '""')}"`,
+      `"${(ret.items || []).map(i => `${i.medicine_name} (${i.return_qty} tabs)`).join("; ").replace(/"/g, '""')}"`,
+      `"${(ret.notes || "").replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `pharmacy_sales_returns_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Sales returns register exported successfully", "success");
+  };
+
+  const handleExecuteDownloadReport = () => {
+    if (selectedReportType === "inventory") {
+      downloadInventoryExport();
+    } else if (selectedReportType === "low_stock") {
+      downloadReorderReport();
+    } else if (selectedReportType === "expiring") {
+      downloadExpiringExport(reportExpiringDays);
+    } else if (selectedReportType === "drug_register") {
+      handlePrintRegister(reportScheduleCategory);
+    } else if (selectedReportType === "daily_sales") {
+      downloadDailySalesExport();
+    } else if (selectedReportType === "returns") {
+      downloadReturnsExport();
+    }
+    setShowDownloadReportsModal(false);
+  };
+
   const handleAddPOItem = () => {
     if (!poAddMedName) return;
     const med = medicines.find(m => m.medicine_name === poAddMedName);
@@ -3449,6 +3638,414 @@ export default function PharmacyPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // ============================================================================
+  // GLOBAL KEYBOARD SHORTCUTS & ARROW NAVIGATION LISTENER
+  // ============================================================================
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const target = e.target;
+      const isInput = target && (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.tagName === 'SELECT' || 
+        target.isContentEditable
+      );
+
+      const isAlt = e.altKey;
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+      const key = e.key;
+
+      // 1. Shift + / or '?' -> Open Keyboard Shortcuts Cheat Sheet
+      if ((key === '?' || (e.shiftKey && key === '/')) && !isInput) {
+        e.preventDefault();
+        setShowShortcutsModal(prev => !prev);
+        return;
+      }
+
+      // 2. Escape -> Close active modal / clear search where appropriate
+      if (key === 'Escape') {
+        if (showShortcutsModal) {
+          e.preventDefault();
+          setShowShortcutsModal(false);
+          return;
+        }
+        if (showDownloadReportsModal) {
+          e.preventDefault();
+          setShowDownloadReportsModal(false);
+          return;
+        }
+        if (showSubmitDispenseModal) {
+          e.preventDefault();
+          setShowSubmitDispenseModal(false);
+          return;
+        }
+        if (showWorkdeskDeleteModal) {
+          e.preventDefault();
+          setShowWorkdeskDeleteModal(false);
+          return;
+        }
+        if (showWorkdeskEditModal) {
+          e.preventDefault();
+          setShowWorkdeskEditModal(false);
+          return;
+        }
+        if (showWorkdeskPartialModal) {
+          e.preventDefault();
+          setShowWorkdeskPartialModal(false);
+          return;
+        }
+        if (showDispenseWorkdeskModal) {
+          e.preventDefault();
+          setShowDispenseWorkdeskModal(false);
+          return;
+        }
+        if (showOTCSaleModal) {
+          e.preventDefault();
+          setShowOTCSaleModal(false);
+          return;
+        }
+        if (isAddModalOpen) {
+          e.preventDefault();
+          setIsAddModalOpen(false);
+          return;
+        }
+        if (isPOModalOpen) {
+          e.preventDefault();
+          setIsPOModalOpen(false);
+          return;
+        }
+        if (showBulkPOModal) {
+          e.preventDefault();
+          setShowBulkPOModal(false);
+          return;
+        }
+        if (showAdjustModal) {
+          e.preventDefault();
+          setShowAdjustModal(false);
+          return;
+        }
+        if (showEditMedModal) {
+          e.preventDefault();
+          setShowEditMedModal(false);
+          return;
+        }
+        if (showSalesReturnModal) {
+          e.preventDefault();
+          setShowSalesReturnModal(false);
+          return;
+        }
+        if (selectedMedicine) {
+          e.preventDefault();
+          setSelectedMedicine(null);
+          return;
+        }
+        if (isInput) {
+          target.blur();
+          return;
+        }
+      }
+
+      // 3. Ctrl + Enter -> Submit Dispensation or Confirm
+      if (isCtrlOrMeta && key === 'Enter') {
+        if (showSubmitDispenseModal) {
+          e.preventDefault();
+          setShowSubmitDispenseModal(false);
+          if (selectedSubmitAction === "Pay at Pharmacy Desk") {
+            executeDispensing("Pay at Pharmacy Desk");
+          } else if (selectedSubmitAction === "Forward to Central Billing Desk") {
+            executeDispensing("Forward to Central Billing Desk");
+          } else if (selectedSubmitAction === "Outside Purchase") {
+            executeOutsidePurchase();
+          }
+          return;
+        }
+        if (showDispenseWorkdeskModal && dispenseItems.length > 0) {
+          e.preventDefault();
+          setShowSubmitDispenseModal(true);
+          return;
+        }
+      }
+
+      // 4. Focus Medicine Search (Alt + S OR '/' when not inside input)
+      if ((isAlt && (key.toLowerCase() === 's' || key === 's')) || (key === '/' && !isInput)) {
+        e.preventDefault();
+        if (showDispenseWorkdeskModal) {
+          workdeskSearchInputRef.current?.focus();
+          workdeskSearchInputRef.current?.select();
+        } else {
+          if (activeTab !== 'inventory') {
+            handleTabChange('inventory');
+          }
+          setTimeout(() => {
+            inventorySearchInputRef.current?.focus();
+            inventorySearchInputRef.current?.select();
+          }, 50);
+        }
+        return;
+      }
+
+      // 5. Alt + 1-5 -> Fast Tab Switching
+      if (isAlt && ['1', '2', '3', '4', '5'].includes(key)) {
+        e.preventDefault();
+        const tabMap = {
+          '1': 'dashboard',
+          '2': 'inventory',
+          '3': 'dispensing',
+          '4': 'registers',
+          '5': 'logistics'
+        };
+        const targetTab = tabMap[key];
+        if (targetTab) {
+          handleTabChange(targetTab);
+        }
+        return;
+      }
+
+      // 6. Alt + L -> Low Stock Filter & View
+      if (isAlt && (key.toLowerCase() === 'l' || key === 'l')) {
+        e.preventDefault();
+        setStatusFilter("Low Stock");
+        if (activeTab !== 'inventory') {
+          handleTabChange('inventory');
+        }
+        showToast("Filtered Inventory: Low Stock Items", "info");
+        return;
+      }
+
+      // 7. Alt + E -> Expiry Filter & View
+      if (isAlt && (key.toLowerCase() === 'e' || key === 'e')) {
+        e.preventDefault();
+        setStatusFilter("Expiring / Expired");
+        if (activeTab !== 'inventory') {
+          handleTabChange('inventory');
+        }
+        showToast("Filtered Inventory: Expiring / Expired Items", "info");
+        return;
+      }
+
+      // 8. Alt + + / Alt + = / + (not in input) -> Add Medicine
+      if ((isAlt && (key === '+' || key === '=')) || (key === '+' && !isInput)) {
+        e.preventDefault();
+        if (userRole === "Pharmacist") {
+          showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
+        } else {
+          setIsAddModalOpen(true);
+        }
+        return;
+      }
+
+      // 9. Alt + R -> Return Sold Medicine
+      if (isAlt && (key.toLowerCase() === 'r' || key === 'r')) {
+        e.preventDefault();
+        handleOpenSalesReturn();
+        return;
+      }
+
+      // 10. Alt + D -> Open Download Reports & Export Modal
+      if (isAlt && (key.toLowerCase() === 'd' || key === 'd')) {
+        e.preventDefault();
+        setShowDownloadReportsModal(true);
+        return;
+      }
+
+      // 11. Alt + Q -> Select Next Patient in Queue / Open Dispensation
+      if (isAlt && (key.toLowerCase() === 'q' || key === 'q')) {
+        e.preventDefault();
+        if (showDispenseWorkdeskModal) return;
+        const waitingQueue = queue.filter(item => item.appointment_status === 'Pharmacy' || item.status === 'Waiting');
+        const nextPatient = waitingQueue[0] || queue[0];
+        if (nextPatient) {
+          handleSelectQueueItem(nextPatient);
+        } else {
+          showToast("No waiting patients in prescription queue.", "info");
+        }
+        return;
+      }
+
+      // 12. Alt + C -> Collect & Dispense
+      if (isAlt && key.toLowerCase() === 'c') {
+        e.preventDefault();
+        if (showDispenseWorkdeskModal || showSubmitDispenseModal) {
+          setSelectedSubmitAction("Pay at Pharmacy Desk");
+          if (!showSubmitDispenseModal) setShowSubmitDispenseModal(true);
+        }
+        return;
+      }
+
+      // 13. Alt + F -> Forward to Billing
+      if (isAlt && key.toLowerCase() === 'f') {
+        e.preventDefault();
+        if (showDispenseWorkdeskModal || showSubmitDispenseModal) {
+          setSelectedSubmitAction("Forward to Central Billing Desk");
+          if (!showSubmitDispenseModal) setShowSubmitDispenseModal(true);
+        }
+        return;
+      }
+
+      // 14. Alt + O -> Outside Purchase
+      if (isAlt && key.toLowerCase() === 'o') {
+        e.preventDefault();
+        if (showDispenseWorkdeskModal || showSubmitDispenseModal) {
+          setSelectedSubmitAction("Outside Purchase");
+          if (!showSubmitDispenseModal) setShowSubmitDispenseModal(true);
+        }
+        return;
+      }
+
+      // 15. Alt + N -> Quick OTC Sale
+      if (isAlt && key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setOtcBasket([]);
+        setOtcCustomerName("");
+        setOtcCustomerMobile("");
+        setOtcCustomerAge("");
+        setOtcCustomerGender("Male");
+        setOtcCustomerType("Walk-in");
+        setOtcSelectedPatient(null);
+        setOtcSearchQuery("");
+        setShowOTCSaleModal(true);
+        return;
+      }
+
+      // 16. Alt + A -> Add Medicine
+      if (isAlt && key.toLowerCase() === 'a') {
+        e.preventDefault();
+        if (userRole === "Pharmacist") {
+          showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
+        } else {
+          setIsAddModalOpen(true);
+        }
+        return;
+      }
+
+      // 17. Alt + P -> Generate Purchase Order
+      if (isAlt && key.toLowerCase() === 'p') {
+        e.preventDefault();
+        if (activeTab !== 'logistics') {
+          handleTabChange('logistics');
+        }
+        handleBulkGeneratePOs();
+        return;
+      }
+
+      // 18. ARROW KEYS NAVIGATION: ArrowLeft / ArrowRight -> Cycle Tabs
+      const isAnyModalOpen = showShortcutsModal || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
+      if (!isInput && !isAnyModalOpen && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+        e.preventDefault();
+        const tabOrder = ['dashboard', 'inventory', 'dispensing', 'registers', 'logistics'];
+        const curIdx = tabOrder.indexOf(activeTab);
+        if (curIdx !== -1) {
+          const nextIdx = key === 'ArrowRight' 
+            ? (curIdx + 1) % tabOrder.length 
+            : (curIdx - 1 + tabOrder.length) % tabOrder.length;
+          handleTabChange(tabOrder[nextIdx]);
+        }
+        return;
+      }
+
+      // 19. ARROW KEYS NAVIGATION: ArrowUp / ArrowDown
+      if (showSubmitDispenseModal) {
+        e.preventDefault();
+        const options = ["Pay at Pharmacy Desk", "Forward to Central Billing Desk", "Outside Purchase"];
+        const currentIdx = options.indexOf(selectedSubmitAction);
+        const nextIdx = key === 'ArrowDown' 
+          ? (currentIdx + 1) % options.length 
+          : (currentIdx - 1 + options.length) % options.length;
+        setSelectedSubmitAction(options[nextIdx]);
+        return;
+      }
+
+      if (showDownloadReportsModal) {
+        e.preventDefault();
+        const repOptions = ["inventory", "low_stock", "expiring", "drug_register", "daily_sales", "returns"];
+        const currentIdx = repOptions.indexOf(selectedReportType);
+        const nextIdx = key === 'ArrowDown' 
+          ? (currentIdx + 1) % repOptions.length 
+          : (currentIdx - 1 + repOptions.length) % repOptions.length;
+        setSelectedReportType(repOptions[nextIdx]);
+        return;
+      }
+
+      if (activeTab === 'dispensing' && !isInput && !showDispenseWorkdeskModal && (key === 'ArrowUp' || key === 'ArrowDown')) {
+        if (filteredQueue.length > 0) {
+          e.preventDefault();
+          let nextIdx = selectedQueueRowIndex;
+          if (key === 'ArrowDown') {
+            nextIdx = selectedQueueRowIndex < filteredQueue.length - 1 ? selectedQueueRowIndex + 1 : 0;
+          } else {
+            nextIdx = selectedQueueRowIndex > 0 ? selectedQueueRowIndex - 1 : filteredQueue.length - 1;
+          }
+          setSelectedQueueRowIndex(nextIdx);
+          return;
+        }
+      }
+
+      if (activeTab === 'inventory' && !isInput && !selectedMedicine && (key === 'ArrowUp' || key === 'ArrowDown')) {
+        if (filteredMedicines.length > 0) {
+          e.preventDefault();
+          let nextIdx = selectedInvRowIndex;
+          if (key === 'ArrowDown') {
+            nextIdx = selectedInvRowIndex < filteredMedicines.length - 1 ? selectedInvRowIndex + 1 : 0;
+          } else {
+            nextIdx = selectedInvRowIndex > 0 ? selectedInvRowIndex - 1 : filteredMedicines.length - 1;
+          }
+          setSelectedInvRowIndex(nextIdx);
+          return;
+        }
+      }
+
+      // 20. Enter key on highlighted row or report modal
+      if (key === 'Enter' && !isInput && !isCtrlOrMeta) {
+        if (showDownloadReportsModal) {
+          e.preventDefault();
+          handleExecuteDownloadReport();
+          return;
+        }
+        if (activeTab === 'dispensing' && selectedQueueRowIndex >= 0 && filteredQueue[selectedQueueRowIndex]) {
+          e.preventDefault();
+          handleSelectQueueItem(filteredQueue[selectedQueueRowIndex]);
+          return;
+        }
+        if (activeTab === 'inventory' && selectedInvRowIndex >= 0 && filteredMedicines[selectedInvRowIndex]) {
+          e.preventDefault();
+          setSelectedMedicine(filteredMedicines[selectedInvRowIndex]);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    activeTab, 
+    queue, 
+    filteredQueue,
+    dispenseItems, 
+    selectedSubmitAction, 
+    showShortcutsModal, 
+    showDownloadReportsModal,
+    selectedReportType,
+    reportScheduleCategory,
+    reportExpiringDays,
+    selectedInvRowIndex,
+    selectedQueueRowIndex,
+    filteredMedicines,
+    showSubmitDispenseModal, 
+    showWorkdeskDeleteModal, 
+    showWorkdeskEditModal, 
+    showWorkdeskPartialModal, 
+    showDispenseWorkdeskModal, 
+    showOTCSaleModal, 
+    isAddModalOpen, 
+    isPOModalOpen, 
+    showBulkPOModal, 
+    showAdjustModal, 
+    showEditMedModal, 
+    showSalesReturnModal, 
+    selectedMedicine,
+    userRole
+  ]);
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-300 font-sans">
@@ -4474,7 +5071,8 @@ export default function PharmacyPage() {
                 <div className="relative w-full sm:max-w-[240px]">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                   <Input
-                    placeholder="Search name, generic, batch..."
+                    ref={inventorySearchInputRef}
+                    placeholder="Search medicine... (Alt + S)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full h-9 pl-9 text-xs border-slate-200 shadow-sm"
@@ -4685,7 +5283,7 @@ export default function PharmacyPage() {
                         }
 
                         return (
-                          <tr key={med.medicine_name} className={`hover:bg-slate-50/50 transition-colors ${med.disabled ? "bg-slate-50/50 opacity-60" : ""}`}>
+                          <tr key={med.medicine_name} className={`hover:bg-slate-50/50 transition-colors ${med.disabled ? "bg-slate-50/50 opacity-60" : ""} ${index === selectedInvRowIndex ? "bg-indigo-50/90 ring-2 ring-indigo-500/60 ring-inset" : ""}`}>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-900">{med.medicine_name}</div>
                               <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || "Generics"}</div>
@@ -5015,7 +5613,7 @@ export default function PharmacyPage() {
                           key={`${item.name}-${idx}`}
                           className={`hover:bg-slate-50/70 transition-colors ${
                             isSelected ? "bg-indigo-50/50 border-l-4 border-indigo-600" : ""
-                          }`}
+                          } ${idx === selectedQueueRowIndex ? "bg-indigo-50/90 ring-2 ring-indigo-500/60 ring-inset" : ""}`}
                         >
                           <td className="px-4 py-3.5 text-center font-mono text-slate-400 font-medium">
                             {idx + 1}
@@ -8351,7 +8949,8 @@ export default function PharmacyPage() {
                       Search & Add Medicine to Dispense / Bill
                     </Label>
                     <Input
-                      placeholder="Type medicine name, generic name, or barcode (e.g. Paracetamol, Dolo)..."
+                      ref={workdeskSearchInputRef}
+                      placeholder="Type medicine name, generic name, or barcode... (Alt + S)"
                       value={customAddMedName}
                       onChange={(e) => {
                         setCustomAddMedName(e.target.value);
@@ -8662,6 +9261,7 @@ export default function PharmacyPage() {
                   className="h-9.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 rounded-lg shadow-sm gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle className="w-4 h-4" /> Submit / Process Dispensation
+                  <kbd className="hidden sm:inline-block ml-1 text-[10px] font-sans font-semibold bg-indigo-500/80 text-white px-1.5 py-0.5 rounded border border-indigo-400">Ctrl + ↵</kbd>
                 </Button>
               </div>
             </div>
@@ -8705,9 +9305,12 @@ export default function PharmacyPage() {
                   className="mt-1 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                    <span>Collect & Dispense (Pay at Pharmacy Desk)</span>
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Immediate</span>
+                  <div className="font-bold text-slate-900 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span>Collect & Dispense (Pay at Pharmacy Desk)</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Immediate</span>
+                    </div>
+                    <kbd className="text-[10px] font-sans font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">Alt + C</kbd>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Collect payment directly at the pharmacy counter, generate receipt, and complete the dispensation.
@@ -8760,9 +9363,12 @@ export default function PharmacyPage() {
                   className="mt-1 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                    <span>Forward to Central Billing Desk</span>
-                    <span className="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Central Pay</span>
+                  <div className="font-bold text-slate-900 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span>Forward to Central Billing Desk</span>
+                      <span className="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Central Pay</span>
+                    </div>
+                    <kbd className="text-[10px] font-sans font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">Alt + F</kbd>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Post medicine charges to patient&apos;s central hospital account for unified payment collection at the billing counter.
@@ -8787,9 +9393,12 @@ export default function PharmacyPage() {
                   className="mt-1 text-amber-600 focus:ring-amber-500 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                    <span>Outside Purchase (₹0)</span>
-                    <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Zero Bill</span>
+                  <div className="font-bold text-slate-900 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span>Outside Purchase (₹0)</span>
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Zero Bill</span>
+                    </div>
+                    <kbd className="text-[10px] font-sans font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">Alt + O</kbd>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Mark medicines as purchased externally with no hospital billing charges.
@@ -8826,6 +9435,7 @@ export default function PharmacyPage() {
                 }`}
               >
                 <CheckCircle className="w-3.5 h-3.5" /> Confirm & Process
+                <kbd className="hidden sm:inline-block ml-1 text-[10px] font-sans font-semibold bg-black/20 text-white px-1.5 py-0.5 rounded border border-white/20">Ctrl + ↵</kbd>
               </Button>
             </div>
           </div>
@@ -8955,6 +9565,415 @@ export default function PharmacyPage() {
                 className="h-8.5 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold"
               >
                 Remove Medicine
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Keyboard Shortcuts Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setShowShortcutsModal(true)}
+        className="fixed bottom-6 right-6 z-40 bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl border border-slate-700/60 flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 group"
+        title="Keyboard Shortcuts (Press ?)"
+      >
+        <Keyboard className="w-4 h-4 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+        <span className="text-xs font-semibold pr-1 hidden sm:inline-block">Shortcuts</span>
+        <kbd className="hidden sm:inline-block bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded border border-slate-700 font-mono">?</kbd>
+      </button>
+
+      {/* Download & Export Pharmacy Reports Modal (Alt + D) */}
+      {showDownloadReportsModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 font-serif">Download &amp; Export Pharmacy Reports</h3>
+                  <p className="text-[11px] text-slate-500">Select what data to export and choose your preferred format (Alt + D)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDownloadReportsModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                1. Select Report Type (Use ↑ / ↓ Arrow Keys or Click to choose):
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Master Inventory */}
+                <div
+                  onClick={() => setSelectedReportType("inventory")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "inventory"
+                      ? "bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Pill className="w-3.5 h-3.5 text-indigo-600" /> Master Stock &amp; Inventory
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                      {medicines.filter(m => !m.disabled).length} meds
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Full catalog with batch numbers, rack locations, valuation, purchase prices &amp; MRPs.
+                  </p>
+                </div>
+
+                {/* 2. Low Stock & Reorder */}
+                <div
+                  onClick={() => setSelectedReportType("low_stock")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "low_stock"
+                      ? "bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Low Stock &amp; Reorder
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                      {purchaseRecommendations.length} reorders
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Medicines below minimum threshold, safety buffer &amp; suggested PO quantities.
+                  </p>
+                </div>
+
+                {/* 3. Expiring Medicines */}
+                <div
+                  onClick={() => setSelectedReportType("expiring")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "expiring"
+                      ? "bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-rose-600" /> Expiring Batches Risk
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded">
+                      {metrics.expiringCount} batches
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Batches expiring in upcoming months with days remaining and distributor details.
+                  </p>
+                </div>
+
+                {/* 4. Statutory Drug Register */}
+                <div
+                  onClick={() => setSelectedReportType("drug_register")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "drug_register"
+                      ? "bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-purple-600" /> Statutory Drug Register
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                      Govt Compliance
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Schedule H, H1, X &amp; NDPS Narcotics compliance format with stamp and sign verification.
+                  </p>
+                </div>
+
+                {/* 5. Daily Sales & Dispensing */}
+                <div
+                  onClick={() => setSelectedReportType("daily_sales")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "daily_sales"
+                      ? "bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Dispensing &amp; Sales Log
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      {drugRegister.length} records
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Detailed breakdown of patient consultations, OTC sales, and cash/UPI settlement logs.
+                  </p>
+                </div>
+
+                {/* 6. Sales Returns */}
+                <div
+                  onClick={() => setSelectedReportType("returns")}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between gap-2 ${
+                    selectedReportType === "returns"
+                      ? "bg-cyan-50/80 border-cyan-500 ring-2 ring-cyan-500/20 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 text-cyan-600" /> Sales Returns &amp; Refunds
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-cyan-100 text-cyan-800 px-1.5 py-0.5 rounded">
+                      {salesReturnsList.length} returns
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Return slips, restocked inventory counts, refund cash flow, and reason logs.
+                  </p>
+                </div>
+              </div>
+
+              {/* Dynamic Filter Controls based on Selection */}
+              {selectedReportType === "expiring" && (
+                <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-200/80 space-y-1.5 animate-in fade-in duration-150">
+                  <Label className="text-[11px] font-bold text-rose-900">Expiring Window Timeframe</Label>
+                  <div className="flex gap-2">
+                    {[30, 60, 90, 180].map(days => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => setReportExpiringDays(days)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition ${
+                          reportExpiringDays === days
+                            ? "bg-rose-600 text-white border-rose-700 shadow-2xs"
+                            : "bg-white text-rose-800 border-rose-200 hover:bg-rose-100/60"
+                        }`}
+                      >
+                        Next {days} Days
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedReportType === "drug_register" && (
+                <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/80 space-y-1.5 animate-in fade-in duration-150">
+                  <Label className="text-[11px] font-bold text-purple-900">Drug Schedule Filter</Label>
+                  <select
+                    value={reportScheduleCategory}
+                    onChange={(e) => setReportScheduleCategory(e.target.value)}
+                    className="h-8 text-xs w-full rounded-lg border border-purple-200 bg-white px-2.5 font-semibold text-purple-900 focus:outline-none"
+                  >
+                    <option value="All">All Schedules (Master Register)</option>
+                    <option value="Schedule H">Statutory Schedule H</option>
+                    <option value="Schedule H1">Statutory Schedule H1 (Sleeping Pills)</option>
+                    <option value="Schedule X">Statutory Schedule X (Narcotics)</option>
+                    <option value="Controlled Drug">Controlled Drug Register</option>
+                    <option value="OTC">OTC Inventory Register</option>
+                    <option value="Regular Medicine">Regular Medicine Register</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+              <span className="text-[11px] text-slate-500">
+                Press <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 font-bold text-slate-800">Enter</kbd> to export or <kbd className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 font-bold text-slate-800">Esc</kbd> to cancel.
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDownloadReportsModal(false)}
+                  className="h-9 text-xs border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-medium px-4 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleExecuteDownloadReport}
+                  className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 rounded-lg shadow-sm gap-2 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download / Export Report
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Cheat Sheet Modal */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Keyboard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 font-serif">Pharmacy Keyboard Shortcuts</h3>
+                  <p className="text-[11px] text-slate-500">Fast keyboard-driven ergonomics &amp; operational hotkeys</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+              {/* Group 1: Workspace Navigation */}
+              <div>
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5" /> Workspace Navigation
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 sm:col-span-2">
+                    <span className="text-slate-700 font-medium">Direct Tab Jump (Dashboard, Inventory, Queue, Compliance, Logistics)</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + 1-5</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 2: Quick Search & Filters */}
+              <div>
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Search className="w-3.5 h-3.5" /> Search, Filters &amp; Reports
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Focus Medicine Search</span>
+                    <div className="flex items-center gap-1">
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + S</kbd>
+                      <span className="text-slate-400 text-[10px]">or</span>
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">/</kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Download &amp; Export Reports Modal</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + D</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Filter Low Stock Medicines</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + L</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Filter Expiring Soon Medicines</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + E</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 3: Dispensation Workdesk */}
+              <div>
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Pill className="w-3.5 h-3.5" /> Dispensation Workdesk
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Select Next Patient / Open Rx</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + Q</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Submit / Settle Dispensation</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Ctrl + Enter</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Collect &amp; Dispense (Pay Counter)</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + C</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Forward to Central Billing</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + F</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 sm:col-span-2">
+                    <span className="text-slate-700 font-medium">Outside Purchase (Zero Bill)</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + O</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 4: Sales, Catalog & Operations */}
+              <div>
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <ShoppingBag className="w-3.5 h-3.5" /> Sales &amp; Operations
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Add Medicine Record</span>
+                    <div className="flex items-center gap-1">
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + +</kbd>
+                      <span className="text-slate-400 text-[10px]">or</span>
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + A</kbd>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Return Sold Medicine (Sales Return)</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + R</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Quick OTC Direct Sale</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + N</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Generate Bulk Purchase Orders</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + P</kbd>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 5: General Controls */}
+              <div>
+                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5" /> General Controls
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Close Active Modal / Clear Search</span>
+                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Esc</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
+                    <span className="text-slate-700 font-medium">Open Shortcuts Cheat Sheet</span>
+                    <div className="flex items-center gap-1">
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Shift + /</kbd>
+                      <span className="text-slate-400 text-[10px]">or</span>
+                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">?</kbd>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+              <span className="text-[11px] text-slate-500">Shortcuts are available throughout the Pharmacy workspace.</span>
+              <Button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="h-8.5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 cursor-pointer"
+              >
+                Got it
               </Button>
             </div>
           </div>
