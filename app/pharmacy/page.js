@@ -2945,7 +2945,7 @@ export default function PharmacyPage() {
   };
 
   // PDF Generation - Invoice Print Format
-  const generatePDFInvoice = async (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Cash", isPaidAtCounter = true) => {
+  const generatePDFInvoice = async (invNo, pName, pMobile, docName, items, totalVal, paymentMethod = "Cash", statusParam = "Paid") => {
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
@@ -3072,20 +3072,29 @@ export default function PharmacyPage() {
       posY += 10;
 
       // Bottom Stamp
-      if (isPaidAtCounter) {
+      const isPaid = statusParam === "Paid" || statusParam === true;
+      const isFwd = statusParam === "ForwardedToBilling";
+      if (isPaid) {
         doc.setDrawColor(16, 185, 129); // emerald-500
         doc.setLineWidth(0.5);
         doc.rect(45, posY, 58, 10);
         doc.setTextColor(16, 185, 129);
         doc.setFontSize(9);
         doc.text("PAID & DISPENSED", 74, posY + 6, { align: "center" });
-      } else {
+      } else if (isFwd) {
         doc.setDrawColor(245, 158, 11); // amber-500
         doc.setLineWidth(0.5);
         doc.rect(36, posY, 76, 10);
         doc.setTextColor(217, 119, 6);
         doc.setFontSize(8.5);
         doc.text("FORWARDED TO BILLING DESK", 74, posY + 6, { align: "center" });
+      } else {
+        doc.setDrawColor(239, 68, 68); // rose-500
+        doc.setLineWidth(0.5);
+        doc.rect(40, posY, 68, 10);
+        doc.setTextColor(220, 38, 38);
+        doc.setFontSize(8.5);
+        doc.text("PAYMENT DUE — UNPAID", 74, posY + 6, { align: "center" });
       }
 
       doc.save(`pharmacy_invoice_${invNo}.pdf`);
@@ -3933,7 +3942,7 @@ export default function PharmacyPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-2.5 w-full max-w-full mx-auto animate-in fade-in duration-300 font-sans text-slate-800 antialiased select-none">
+    <div className="flex flex-col justify-between w-full h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] overflow-hidden font-sans text-slate-800 antialiased select-none -my-3 -mx-2 md:-mx-4 px-2 md:px-4">
       
       {/* Toast Alert System */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
@@ -4475,11 +4484,11 @@ export default function PharmacyPage() {
           </Dialog>
 
       {/* Tabs navigation content */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-2.5">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col space-y-0 overflow-hidden">
         {/* ========================================================
             TAB: DASHBOARD
             ======================================================== */}
-        <TabsContent value="dashboard" className="space-y-4 focus-visible:outline-none">
+        <TabsContent value="dashboard" className="flex-1 min-h-0 flex flex-col overflow-hidden focus-visible:outline-none h-full">
           <PharmacyPOSView
             medicines={medicines}
             queue={queue}
@@ -4536,7 +4545,7 @@ export default function PharmacyPage() {
           />
         </TabsContent>
 
-        <TabsContent value="inventory" className="space-y-2 focus-visible:outline-none">
+        <TabsContent value="inventory" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -5000,7 +5009,7 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: PRESCRIPTIONS DISPENSING QUEUE
             ======================================================== */}
-        <TabsContent value="dispensing" className="space-y-2 focus-visible:outline-none">
+        <TabsContent value="dispensing" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -5217,7 +5226,7 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: DRUG REGISTERS
             ======================================================== */}
-        <TabsContent value="registers" className="space-y-2 focus-visible:outline-none">
+        <TabsContent value="registers" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -5350,7 +5359,7 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: LOGISTICS & PROCUREMENT (POs, GRN & Suggestions)
             ======================================================== */}
-        <TabsContent value="logistics" className="space-y-2 focus-visible:outline-none">
+        <TabsContent value="logistics" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
           {/* Section 1: Purchase Suggestions Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -7802,19 +7811,26 @@ export default function PharmacyPage() {
                 <p className="text-[10px] text-slate-400">GSTIN: 33AAAAA1111A1Z1 | Pharmacy License: DL-COI-90823H</p>
                 <div className="pt-1.5 flex justify-center">
                   <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1 rounded-full border
-                    ${latestDispenseRecord.isPaidAtPharmacy 
+                    ${latestDispenseRecord.paymentStatus === "Paid" || (latestDispenseRecord.isPaidAtPharmacy && latestDispenseRecord.paymentStatus !== "Unpaid")
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                      : "bg-amber-50 text-amber-700 border-amber-200"}`}
+                      : latestDispenseRecord.paymentStatus === "ForwardedToBilling"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-rose-50 text-rose-700 border-rose-200"}`}
                   >
-                    {latestDispenseRecord.isPaidAtPharmacy ? (
+                    {latestDispenseRecord.paymentStatus === "Paid" || (latestDispenseRecord.isPaidAtPharmacy && latestDispenseRecord.paymentStatus !== "Unpaid") ? (
                       <>
                         <CheckCircle className="w-3.5 h-3.5" />
                         PAID AT PHARMACY COUNTER
                       </>
-                    ) : (
+                    ) : latestDispenseRecord.paymentStatus === "ForwardedToBilling" ? (
                       <>
                         <ArrowRight className="w-3.5 h-3.5" />
                         FORWARDED TO CENTRAL BILLING DESK (DUE AT BILLING)
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        BILL GENERATED — PAYMENT DUE (UNPAID)
                       </>
                     )}
                   </span>
@@ -7899,11 +7915,17 @@ export default function PharmacyPage() {
               <div className="flex justify-between items-center pt-2 px-1">
                 <div>
                   <div className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5
-                    ${latestDispenseRecord.isPaidAtPharmacy 
+                    ${latestDispenseRecord.paymentStatus === "Paid" || (latestDispenseRecord.isPaidAtPharmacy && latestDispenseRecord.paymentStatus !== "Unpaid")
                       ? "border-emerald-500 text-emerald-700 bg-emerald-50" 
-                      : "border-amber-500 text-amber-700 bg-amber-50"}`}
+                      : latestDispenseRecord.paymentStatus === "ForwardedToBilling"
+                      ? "border-amber-500 text-amber-700 bg-amber-50"
+                      : "border-rose-500 text-rose-700 bg-rose-50"}`}
                   >
-                    {latestDispenseRecord.isPaidAtPharmacy ? "PAID & DISPENSED" : "FORWARDED TO CENTRAL BILLING"}
+                    {latestDispenseRecord.paymentStatus === "Paid" || (latestDispenseRecord.isPaidAtPharmacy && latestDispenseRecord.paymentStatus !== "Unpaid")
+                      ? "PAID & DISPENSED" 
+                      : latestDispenseRecord.paymentStatus === "ForwardedToBilling"
+                      ? "FORWARDED TO CENTRAL BILLING"
+                      : "PAYMENT DUE (UNPAID)"}
                   </div>
                 </div>
                 <div className="text-right">
@@ -7935,7 +7957,7 @@ export default function PharmacyPage() {
                     latestDispenseRecord.items,
                     latestDispenseRecord.totalVal,
                     latestDispenseRecord.paymentMethod,
-                    latestDispenseRecord.isPaidAtPharmacy
+                    latestDispenseRecord.paymentStatus || (latestDispenseRecord.isPaidAtPharmacy ? "Paid" : "ForwardedToBilling")
                   );
                   showToast("Invoice PDF downloaded!", "success");
                 }}
@@ -9645,38 +9667,36 @@ export default function PharmacyPage() {
         </div>
       )}
 
-      {/* Global Bottom Pharmacy Module Navigation Bar */}
-      {activeTab !== "dashboard" && (
-        <div className="w-full mt-2 bg-slate-900 text-white rounded-lg border border-slate-800 p-1.5 shadow-sm">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
-            {[
-              { id: "dashboard", label: "Pharmacy", shortcut: "Alt + 1" },
-              { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
-              { id: "dispensing", label: "Prescriptions Queue", shortcut: "Alt + 3" },
-              { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
-              { id: "logistics", label: "Purchase & Receiving", shortcut: "Alt + 5" }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange?.(tab.id)}
-                className={`px-3 py-2 rounded text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer w-full text-center ${
-                  activeTab === tab.id
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span className={`text-[9px] font-mono px-1 rounded ${
-                  activeTab === tab.id ? "bg-blue-800 text-white" : "bg-slate-950 text-slate-400"
-                }`}>
-                  {tab.shortcut}
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs */}
+      <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
+          {[
+            { id: "dashboard", label: "Pharmacy", shortcut: "Alt + 1" },
+            { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
+            { id: "dispensing", label: "Prescription Queue", shortcut: "Alt + 3" },
+            { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
+            { id: "logistics", label: "Purchase & Receiving", shortcut: "Alt + 5" }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabChange?.(tab.id)}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer w-full text-center ${
+                activeTab === tab.id
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`text-[9px] font-mono px-1 rounded ${
+                activeTab === tab.id ? "bg-blue-800 text-white" : "bg-slate-950 text-slate-400"
+              }`}>
+                {tab.shortcut}
+              </span>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
     </div>
   );

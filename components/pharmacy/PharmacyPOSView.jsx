@@ -32,7 +32,10 @@ export function printPharmacyInvoiceReceipt(record) {
     iframe.style.border = "0";
     document.body.appendChild(iframe);
 
-    const isPaid = Boolean(record.isPaidAtPharmacy);
+    const paymentStatus = record.paymentStatus || (record.isPaidAtPharmacy ? "Paid" : "ForwardedToBilling");
+    const isPaid = paymentStatus === "Paid";
+    const isForwarded = paymentStatus === "ForwardedToBilling";
+    const isUnpaid = !isPaid && !isForwarded;
     const hasDoctor = Boolean(record.doctorName && record.doctorName.trim() && !record.doctorName.toLowerCase().includes("walk-in") && !record.doctorName.toLowerCase().includes("otc") && !record.doctorName.toLowerCase().includes("general"));
 
     const rowsHtml = (record.items || []).map((item) => {
@@ -57,6 +60,11 @@ export function printPharmacyInvoiceReceipt(record) {
       `;
     }).join("");
 
+    const badgeClass = isPaid ? 'badge-paid' : isForwarded ? 'badge-fwd' : 'badge-unpaid';
+    const badgeText = isPaid ? 'PAID AT PHARMACY COUNTER' : isForwarded ? 'FORWARDED TO CENTRAL BILLING' : 'BILL GENERATED — PAYMENT DUE (UNPAID)';
+    const stampText = isPaid ? 'PAID & DISPENSED' : isForwarded ? 'FORWARDED TO BILLING' : 'PAYMENT DUE — UNPAID';
+    const stampColor = isPaid ? '#16a34a' : isForwarded ? '#d97706' : '#dc2626';
+
     const doc = iframe.contentWindow.document;
     doc.open();
     doc.write(`
@@ -75,6 +83,7 @@ export function printPharmacyInvoiceReceipt(record) {
             .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; margin-top: 6px; }
             .badge-paid { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
             .badge-fwd { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+            .badge-unpaid { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
             .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; font-size: 10.5px; }
             .meta-item { display: flex; justify-content: space-between; }
             .meta-lbl { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 9px; }
@@ -84,7 +93,7 @@ export function printPharmacyInvoiceReceipt(record) {
             .summary-box { border-top: 2px solid #0f172a; padding-top: 8px; margin-bottom: 12px; }
             .sum-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
             .grand-total { font-size: 14px; font-weight: 900; color: #0f172a; border-top: 1px solid #e2e8f0; padding-top: 4px; margin-top: 4px; }
-            .stamp { text-align: center; border: 2px dashed ${isPaid ? '#16a34a' : '#d97706'}; color: ${isPaid ? '#16a34a' : '#d97706'}; padding: 6px 12px; border-radius: 6px; font-weight: 900; font-size: 12px; letter-spacing: 1px; width: fit-content; margin: 10px auto; }
+            .stamp { text-align: center; border: 2px dashed ${stampColor}; color: ${stampColor}; padding: 6px 12px; border-radius: 6px; font-weight: 900; font-size: 12px; letter-spacing: 1px; width: fit-content; margin: 10px auto; }
             .footer { text-align: center; font-size: 9.5px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 8px; margin-top: 10px; }
           </style>
         </head>
@@ -93,8 +102,8 @@ export function printPharmacyInvoiceReceipt(record) {
             <div class="hosp-title">THANGAM HOSPITAL</div>
             <div class="hosp-sub">123 Health City Road, Coimbatore - 641012 | Phone: +91 422 2345678</div>
             <div class="hosp-sub">GSTIN: 33AAAAA1111A1Z1 | Pharmacy DL: DL-COI-90823H</div>
-            <div class="badge ${isPaid ? 'badge-paid' : 'badge-fwd'}">
-              ${isPaid ? 'PAID AT PHARMACY COUNTER' : 'FORWARDED TO CENTRAL BILLING'}
+            <div class="badge ${badgeClass}">
+              ${badgeText}
             </div>
           </div>
 
@@ -134,10 +143,20 @@ export function printPharmacyInvoiceReceipt(record) {
               <span>GRAND TOTAL (incl. GST):</span>
               <span>₹${Number(record.totalVal || 0).toFixed(2)}</span>
             </div>
+            ${isUnpaid ? `
+            <div class="sum-row" style="color: #64748b; font-size: 10px;">
+              <span>Amount Received:</span>
+              <span>₹0.00</span>
+            </div>
+            <div class="sum-row" style="color: #dc2626; font-weight: 800; font-size: 12px; border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 2px;">
+              <span>TOTAL DUE (UNPAID):</span>
+              <span>₹${Number(record.totalVal || 0).toFixed(2)}</span>
+            </div>
+            ` : ''}
           </div>
 
           <div class="stamp">
-            ${isPaid ? 'PAID & DISPENSED' : 'FORWARDED TO BILLING'}
+            ${stampText}
           </div>
 
           <div class="footer">
@@ -217,6 +236,7 @@ export default function PharmacyPOSView({
   const [remarks, setRemarks] = useState("");
   const [nextOrderDays, setNextOrderDays] = useState(30);
   const [paymentMode, setPaymentMode] = useState("CASH");
+  const [billPaymentStatus, setBillPaymentStatus] = useState("UNPAID");
 
   // 4. Auxiliary Modals for Action Bar
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
@@ -557,7 +577,23 @@ export default function PharmacyPOSView({
 
     try {
       const finalAmt = tableCalculations.grandTotal;
-      const isPayAtDesk = paymentMode !== "CENTRAL BILLING";
+      const isCentralBilling = paymentMode === "CENTRAL BILLING" || billPaymentStatus === "CENTRAL BILLING";
+
+      // Determine effective payment status:
+      // - "Collect & Dispense" (Alt+C) OR manual "PAID" selection -> Paid
+      // - "CENTRAL BILLING" -> ForwardedToBilling
+      // - Default Save Bill / Print & Save -> Unpaid (Payment Due)
+      let effectivePaymentStatus = "Unpaid";
+      if (isCollectAndDispense || billPaymentStatus === "PAID") {
+        effectivePaymentStatus = "Paid";
+      } else if (isCentralBilling) {
+        effectivePaymentStatus = "ForwardedToBilling";
+      } else {
+        effectivePaymentStatus = "Unpaid";
+      }
+
+      const isPaid = effectivePaymentStatus === "Paid";
+      const isForwarded = effectivePaymentStatus === "ForwardedToBilling";
       const invoiceNo = invoiceNumber || `INV-${Date.now()}`;
       const pName = patientName || "Walk-in Customer";
       const pMobile = patientMobile || "";
@@ -581,12 +617,12 @@ export default function PharmacyPOSView({
       if (selectedWalkIn) {
         await updateWalkIn?.(selectedWalkIn.name, {
           pharmacy_status: "Completed",
-          appointment_status: isPayAtDesk ? "Completed" : "Billing",
-          bill_amount: (selectedWalkIn.bill_amount || 0) + (isPayAtDesk ? 0 : finalAmt),
+          appointment_status: isPaid ? "Completed" : "Billing",
+          bill_amount: (selectedWalkIn.bill_amount || 0) + (isPaid ? 0 : finalAmt),
           pharmacy_bill_amount: finalAmt,
-          pharmacy_payment_status: isPayAtDesk ? "Paid" : "ForwardedToBilling",
-          pharmacy_paid_amount: isPayAtDesk ? finalAmt : 0,
-          pharmacy_due_amount: isPayAtDesk ? 0 : finalAmt,
+          pharmacy_payment_status: isPaid ? "Paid" : isForwarded ? "ForwardedToBilling" : "Pending",
+          pharmacy_paid_amount: isPaid ? finalAmt : 0,
+          pharmacy_due_amount: isPaid ? 0 : finalAmt,
           dispensed_medicines: formattedDispenseItems
         });
 
@@ -594,22 +630,22 @@ export default function PharmacyPOSView({
         saveInvoiceToProfile?.(selectedWalkIn.mobile_number || pMobile, {
           name: `Pharmacy Bill ${invoiceNo} - ${formattedDispenseItems.map(i => `${i.medicine_name} (x${i.qty})`).join(", ")}`,
           bill_amount: finalAmt,
-          payment_method: isPayAtDesk ? paymentMode : "Pending at Central Billing",
+          payment_method: isPaid ? paymentMode : isForwarded ? "Pending at Central Billing" : "Payment Due (Unpaid)",
           walkinData: {
             name: selectedWalkIn.name,
             patient_name: pName,
             mobile_number: pMobile,
             doctor: doc,
             pharmacy_bill_amount: finalAmt,
-            pharmacy_payment_status: isPayAtDesk ? "Paid" : "ForwardedToBilling",
-            pharmacy_paid_amount: isPayAtDesk ? finalAmt : 0,
+            pharmacy_payment_status: isPaid ? "Paid" : isForwarded ? "ForwardedToBilling" : "Pending",
+            pharmacy_paid_amount: isPaid ? finalAmt : 0,
             dispensed_medicines: formattedDispenseItems
           }
         });
       }
 
-      // Record Finance Transaction
-      if (typeof window !== 'undefined' && isPayAtDesk && finalAmt > 0) {
+      // Record Finance Transaction ONLY if actually Paid
+      if (typeof window !== 'undefined' && isPaid && finalAmt > 0) {
         const storedPayments = localStorage.getItem("hospital_dept_payments");
         const deptPayments = storedPayments ? JSON.parse(storedPayments) : [];
         deptPayments.unshift({
@@ -641,9 +677,9 @@ export default function PharmacyPOSView({
 
       // Audit Log
       await createPharmacyAuditLog?.({
-        action: isCollectAndDispense ? "Collect & Dispense" : "POS Sale",
+        action: isCollectAndDispense ? "Collect & Dispense" : isPaid ? "POS Sale (Paid)" : "POS Bill (Unpaid)",
         patient: pName,
-        details: `Invoice: ${invoiceNo} | Total: ₹${finalAmt.toFixed(2)} | Method: ${paymentMode}${doc ? ` | Doctor: ${doc}` : ''}`,
+        details: `Invoice: ${invoiceNo} | Total: ₹${finalAmt.toFixed(2)} | Status: ${effectivePaymentStatus} | Method: ${paymentMode}${doc ? ` | Doctor: ${doc}` : ''}`,
         performed_by: pharmacistName
       }).catch(() => null);
 
@@ -669,9 +705,10 @@ export default function PharmacyPOSView({
         discountPct: billDiscountPct,
         discountAmount: tableCalculations.billDiscountAmount,
         netGst: tableCalculations.totalGst,
-        paymentMethod: isPayAtDesk ? paymentMode : "Pending at Central Billing",
-        paymentMode: isPayAtDesk ? "Paid at Pharmacy Counter" : "Forwarded to Central Billing",
-        isPaidAtPharmacy: isPayAtDesk,
+        paymentStatus: effectivePaymentStatus,
+        paymentMethod: isPaid ? paymentMode : isForwarded ? "Pending at Central Billing" : "Payment Due (Unpaid)",
+        paymentMode: isPaid ? "Paid at Pharmacy Counter" : isForwarded ? "Forwarded to Central Billing" : "Payment Due (Unpaid Bill)",
+        isPaidAtPharmacy: isPaid,
         pharmacistName: pharmacistName,
         date: new Date().toLocaleString("en-IN")
       };
@@ -679,7 +716,13 @@ export default function PharmacyPOSView({
       setLatestDispenseRecord?.(receiptData);
       setShowDispenseReceiptModal?.(true);
 
-      showToast?.(`Bill Saved Successfully! Invoice: ${invoiceNo} generated.`, "success");
+      if (isPaid) {
+        showToast?.(`Payment Collected & Bill Saved! Invoice: ${invoiceNo}`, "success");
+      } else if (isForwarded) {
+        showToast?.(`Bill Forwarded to Central Billing! Invoice: ${invoiceNo}`, "info");
+      } else {
+        showToast?.(`Bill Generated (Payment Due)! Invoice: ${invoiceNo}`, "success");
+      }
 
       // Reset Bill Form for next patient
       setBillingItems([]);
@@ -690,6 +733,7 @@ export default function PharmacyPOSView({
       setIsHospitalPrescription(false);
       setBillDiscountPct(0);
       setRemarks("");
+      setBillPaymentStatus("UNPAID");
       onClearWalkIn?.();
       
       // Auto-generate fresh next invoice number
@@ -873,7 +917,7 @@ export default function PharmacyPOSView({
   ]);
 
   return (
-    <div className="flex flex-col gap-2 w-full max-w-full font-sans text-slate-800 antialiased select-none">
+    <div className="flex flex-col gap-1.5 w-full max-w-full font-sans text-slate-800 antialiased select-none h-full justify-between overflow-hidden">
       
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           1. TOP HEADER (Compact Traditional POS Bar)
@@ -1070,7 +1114,7 @@ export default function PharmacyPOSView({
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           3. MEDICINE BILLING TABLE (High-Density Traditional Desktop POS Table)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[300px]">
+      <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[140px] max-h-[220px] lg:max-h-[250px] overflow-y-auto">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-left border-collapse text-[11px] select-text">
             <thead>
@@ -1560,11 +1604,16 @@ export default function PharmacyPOSView({
           </div>
 
           {/* Payment Mode */}
-          <div className="space-y-1 md:col-span-2">
+          <div className="space-y-1">
             <Label className="text-[10px] font-bold text-slate-600 uppercase">Payment Mode</Label>
             <select
               value={paymentMode}
-              onChange={(e) => setPaymentMode(e.target.value)}
+              onChange={(e) => {
+                setPaymentMode(e.target.value);
+                if (e.target.value === "CENTRAL BILLING") {
+                  setBillPaymentStatus("CENTRAL BILLING");
+                }
+              }}
               className="w-full h-8 px-2 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
             >
               <option value="CASH">CASH</option>
@@ -1574,17 +1623,37 @@ export default function PharmacyPOSView({
               <option value="CENTRAL BILLING">FORWARD TO CENTRAL BILLING</option>
             </select>
           </div>
+
+          {/* Bill Payment Status */}
+          <div className="space-y-1">
+            <Label className="text-[10px] font-bold text-slate-600 uppercase">Bill Status</Label>
+            <select
+              value={billPaymentStatus}
+              onChange={(e) => setBillPaymentStatus(e.target.value)}
+              className={`w-full h-8 px-2 text-xs font-bold rounded border transition-colors ${
+                billPaymentStatus === "PAID"
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 font-extrabold"
+                  : billPaymentStatus === "CENTRAL BILLING"
+                  ? "bg-amber-50 text-amber-800 border-amber-300 font-extrabold"
+                  : "bg-rose-50 text-rose-800 border-rose-300 font-extrabold"
+              }`}
+            >
+              <option value="UNPAID">UNPAID (Payment Due)</option>
+              <option value="PAID">PAID (Cash/UPI Received)</option>
+              <option value="CENTRAL BILLING">CENTRAL BILLING (Due at Desk)</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           6. BOTTOM BILLING ACTION BUTTONS (Large POS Buttons matching Reference)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
         <button
           type="button"
           onClick={() => handleMasterSaveBill({ isCollectAndDispense: true })}
-          className="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
           <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
           <span>Collect & Dispense</span>
@@ -1594,7 +1663,7 @@ export default function PharmacyPOSView({
         <button
           type="button"
           onClick={() => setShowServiceItemModal(true)}
-          className="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 text-indigo-400" />
           <span>Add Service Items</span>
@@ -1604,7 +1673,7 @@ export default function PharmacyPOSView({
         <button
           type="button"
           onClick={() => handleTabChange?.("dispensing")}
-          className="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
           <FileText className="w-3.5 h-3.5 text-amber-400" />
           <span>Prescription</span>
@@ -1614,7 +1683,7 @@ export default function PharmacyPOSView({
         <button
           type="button"
           onClick={() => handleMasterSaveBill({ autoPrint: true })}
-          className="px-3.5 py-2 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
+          className="px-3.5 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
           <Printer className="w-3.5 h-3.5 text-blue-400" />
           <span>Print & Save</span>
@@ -1625,46 +1694,12 @@ export default function PharmacyPOSView({
         <button
           type="button"
           onClick={() => handleMasterSaveBill()}
-          className="px-5 py-2 text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-98"
+          className="px-5 py-1.5 text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-98"
         >
           <CheckCircle className="w-4 h-4" />
           <span>Save Bill</span>
           <span className="bg-blue-800 text-white text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">Ctrl + Enter</span>
         </button>
-      </div>
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          7. PHARMACY MODULE NAVIGATION & FOOTER (Docked cleanly at bottom)
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="w-full mt-2 bg-slate-900 text-white rounded-lg border border-slate-800 p-1.5 shadow-sm">
-        {/* Module Navigation Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
-          {[
-            { id: "dashboard", label: "Pharmacy", shortcut: "Alt + 1" },
-            { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
-            { id: "dispensing", label: "Prescriptions Queue", shortcut: "Alt + 3" },
-            { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
-            { id: "logistics", label: "Purchase & Receiving", shortcut: "Alt + 5" }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange?.(tab.id)}
-              className={`px-3 py-2 rounded text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer w-full text-center ${
-                activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`text-[9px] font-mono px-1 rounded ${
-                activeTab === tab.id ? "bg-blue-800 text-white" : "bg-slate-950 text-slate-400"
-              }`}>
-                {tab.shortcut}
-              </span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
