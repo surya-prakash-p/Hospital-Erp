@@ -265,92 +265,36 @@ export default function PharmacyPOSView({
   const [settlePaymentMode, setSettlePaymentMode] = useState("Cash");
   const [savedBillsList, setSavedBillsList] = useState([]);
 
-  // Load Saved Bills from localStorage or seed
+  // Deduplicate and filter out any demo data or duplicate bills
+  const sanitizeBillsList = (bills) => {
+    if (!Array.isArray(bills)) return [];
+    const valid = bills.filter(b => 
+      b && 
+      b.invoiceNumber && 
+      !b.invoiceNumber.startsWith("INV-2026-0929-") && 
+      b.patientName !== "Rajesh Kumar" &&
+      b.patientName !== "Sunita Verma" &&
+      b.patientName !== "Vikram Malhotra" &&
+      !b.isDemo
+    );
+    const seen = new Map();
+    valid.forEach(b => {
+      seen.set(b.invoiceNumber, b);
+    });
+    return Array.from(seen.values());
+  };
+
+  // Load Saved Bills from localStorage (strictly authentic bills, no demo data, no duplicates)
   const loadSavedBills = () => {
     if (typeof window === "undefined") return;
     try {
       const stored = localStorage.getItem("hospital_pharmacy_bills");
-      if (stored) {
-        setSavedBillsList(JSON.parse(stored));
-      } else {
-        const initialBills = [
-          {
-            invoiceNumber: "INV-2026-0929-01",
-            patientName: "Rajesh Kumar",
-            patientMobile: "9876543210",
-            patientUHID: "UHID-1082",
-            doctorName: "Dr. Sarah Jenkins",
-            isWalkIn: false,
-            items: [
-              { medicine_name: "Amoxicillin 500mg", unit_price: 85, dispensed_qty: 2, line_total: 170, batch_number: "AMX-2026-01", expiry: "11/2027", category: "Antibiotic" },
-              { medicine_name: "Paracetamol 650mg", unit_price: 32, dispensed_qty: 1, line_total: 32, batch_number: "PCM-904", expiry: "08/2028", category: "Analgesic" }
-            ],
-            totalVal: 202.00,
-            subtotal: 202.00,
-            discountPct: 0,
-            discountAmount: 0,
-            netGst: 18.18,
-            paymentStatus: "Paid",
-            paymentMethod: "UPI",
-            paymentMode: "Paid at Pharmacy Counter",
-            isPaidAtPharmacy: true,
-            pharmacistName: pharmacistName || "Lead Pharmacist",
-            date: "30/09/2026, 09:15:20 AM",
-            createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
-          },
-          {
-            invoiceNumber: "INV-2026-0929-02",
-            patientName: "Sunita Verma",
-            patientMobile: "9845123456",
-            patientUHID: "UHID-1083",
-            doctorName: "Dr. Amit Patel",
-            isWalkIn: false,
-            items: [
-              { medicine_name: "Metformin 500mg", unit_price: 45, dispensed_qty: 3, line_total: 135, batch_number: "MET-102", expiry: "03/2027", category: "Antidiabetic" },
-              { medicine_name: "Atorvastatin 10mg", unit_price: 110, dispensed_qty: 1, line_total: 110, batch_number: "ATV-882", expiry: "12/2027", category: "Cardiovascular" }
-            ],
-            totalVal: 245.00,
-            subtotal: 245.00,
-            discountPct: 0,
-            discountAmount: 0,
-            netGst: 22.05,
-            paymentStatus: "Unpaid",
-            paymentMethod: "Payment Due (Unpaid)",
-            paymentMode: "Payment Due (Unpaid Bill)",
-            isPaidAtPharmacy: false,
-            pharmacistName: pharmacistName || "Lead Pharmacist",
-            date: "30/09/2026, 10:45:10 AM",
-            createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-          },
-          {
-            invoiceNumber: "INV-2026-0929-03",
-            patientName: "Vikram Malhotra",
-            patientMobile: "9711223344",
-            patientUHID: "UHID-1084",
-            doctorName: "Dr. Priya Nair",
-            isWalkIn: false,
-            items: [
-              { medicine_name: "Ceftriaxone 1g Inj", unit_price: 350, dispensed_qty: 2, line_total: 700, batch_number: "CEF-550", expiry: "05/2027", category: "Injectable" }
-            ],
-            totalVal: 700.00,
-            subtotal: 700.00,
-            discountPct: 0,
-            discountAmount: 0,
-            netGst: 75.00,
-            paymentStatus: "ForwardedToBilling",
-            paymentMethod: "Pending at Central Billing",
-            paymentMode: "Forwarded to Central Billing",
-            isPaidAtPharmacy: false,
-            pharmacistName: pharmacistName || "Lead Pharmacist",
-            date: "30/09/2026, 11:30:00 AM",
-            createdAt: new Date(Date.now() - 3600000 * 1).toISOString()
-          }
-        ];
-        localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(initialBills));
-        setSavedBillsList(initialBills);
-      }
+      const parsed = stored ? JSON.parse(stored) : [];
+      const cleanBills = sanitizeBillsList(parsed);
+      localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(cleanBills));
+      setSavedBillsList(cleanBills);
     } catch {
-      // ignore
+      setSavedBillsList([]);
     }
   };
 
@@ -434,7 +378,7 @@ export default function PharmacyPOSView({
     try {
       const stored = localStorage.getItem("hospital_pharmacy_bills");
       const curBills = stored ? JSON.parse(stored) : [];
-      const updatedBills = curBills.map(b => {
+      const updatedBills = sanitizeBillsList(curBills).map(b => {
         if (b.invoiceNumber === billToSettle.invoiceNumber) {
           return {
             ...b,
@@ -963,7 +907,7 @@ export default function PharmacyPOSView({
         try {
           const stored = localStorage.getItem("hospital_pharmacy_bills");
           const curBills = stored ? JSON.parse(stored) : [];
-          const updatedBills = [receiptData, ...curBills.filter(b => b.invoiceNumber !== receiptData.invoiceNumber)];
+          const updatedBills = sanitizeBillsList([receiptData, ...curBills]);
           localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(updatedBills));
           setSavedBillsList(updatedBills);
         } catch {
@@ -1186,32 +1130,14 @@ export default function PharmacyPOSView({
           1. TOP HEADER (Integrated POS Search & Action Bar)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100/90 px-3 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
-        {/* Left: Pharmacy Brand Title */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-7 h-7 rounded bg-indigo-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-            <Pill className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-slate-900 leading-none">Pharmacy</h1>
-              <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-1.5 py-0.2 rounded border border-indigo-200">
-                POS Billing Counter
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-              Dispense Medicines • Billing • Inventory
-            </p>
-          </div>
-        </div>
-
-        {/* Center: Integrated Medicine Search Input with Autocomplete Dropdown */}
-        <div ref={searchContainerRef} className="relative flex-1 min-w-[240px] max-w-sm lg:max-w-md mx-1">
-          <div className="relative flex items-center bg-white rounded-md border-2 border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-200/60 shadow-xs transition">
-            <Search className="w-3.5 h-3.5 text-amber-600 absolute left-2.5 pointer-events-none" />
+        {/* Enhanced Medicine Search Bar */}
+        <div ref={searchContainerRef} className="relative flex-1 min-w-[260px] max-w-3xl">
+          <div className="relative flex items-center bg-white rounded-lg border-2 border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-200/70 shadow-xs transition">
+            <Search className="w-4 h-4 text-amber-600 absolute left-3 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search medicines by name, barcode, batch... (Alt + S)"
+              placeholder="Search medicines by name, generic molecule, barcode or batch... (Press Alt + S)"
               value={posSearchQuery}
               onChange={(e) => {
                 setPosSearchQuery(e.target.value);
@@ -1220,7 +1146,7 @@ export default function PharmacyPOSView({
               onFocus={() => {
                 if (posSearchQuery.trim().length >= 1) setShowSearchDropdown(true);
               }}
-              className="w-full h-7 pl-8 pr-16 text-xs font-medium text-slate-900 bg-transparent border-none outline-none focus:ring-0 placeholder:text-slate-400"
+              className="w-full h-8.5 pl-9 pr-20 text-xs font-medium text-slate-900 bg-transparent border-none outline-none focus:ring-0 placeholder:text-slate-400 placeholder:italic"
             />
             {posSearchQuery && (
               <button
@@ -1229,13 +1155,13 @@ export default function PharmacyPOSView({
                   setPosSearchQuery("");
                   setShowSearchDropdown(false);
                 }}
-                className="absolute right-12 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                className="absolute right-14 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 title="Clear Search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
-            <span className="absolute right-2 text-[9px] bg-amber-50 text-amber-700 px-1 py-0.5 rounded border border-amber-200 font-mono font-bold pointer-events-none">
+            <span className="absolute right-2 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono font-bold border border-amber-300 pointer-events-none shadow-2xs">
               Alt + S
             </span>
           </div>
@@ -1249,49 +1175,59 @@ export default function PharmacyPOSView({
               (m.brand && m.brand.toLowerCase().includes(q)) ||
               (m.barcode && m.barcode.toLowerCase().includes(q)) ||
               (m.batch_number && m.batch_number.toLowerCase().includes(q))
-            )).slice(0, 10);
+            )).slice(0, 12);
 
             return (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-300 z-50 max-h-80 overflow-y-auto divide-y divide-slate-100">
+                <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500 font-semibold border-b">
+                  <span>Found {results.length} result{results.length === 1 ? '' : 's'} for &quot;{posSearchQuery}&quot;</span>
+                  <span className="text-[10px] font-mono text-slate-400">Click or press Enter to add</span>
+                </div>
                 {results.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-slate-500">
-                    No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press Alt + A to add new medicine.
+                  <div className="p-4 text-center text-xs text-slate-500">
+                    No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press <span className="font-bold text-slate-800">Alt + A</span> to add new medicine.
                   </div>
                 ) : (
                   results.map((med, idx) => (
                     <div
                       key={idx}
                       onClick={() => handleAddMedicineToBill(med)}
-                      className="p-2 px-3 hover:bg-amber-50/80 cursor-pointer flex items-center justify-between gap-3 transition text-xs"
+                      className="p-2.5 px-3 hover:bg-amber-50 cursor-pointer flex items-center justify-between gap-3 transition text-xs"
                     >
-                      <div>
+                      <div className="flex-1">
                         <div className="font-bold text-slate-900 flex items-center gap-2">
-                          <span>{med.medicine_name}</span>
+                          <span className="text-sm">{med.medicine_name}</span>
                           {med.strength && med.strength !== "-" && (
-                            <span className="text-[10px] text-slate-500 font-normal">({med.strength})</span>
+                            <span className="text-[11px] text-slate-500 font-normal">({med.strength})</span>
                           )}
-                          <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1 py-0.2 rounded border">
+                          <span className="text-[9px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
                             Batch: {med.batch_number || "BT-01"}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {med.generic_name ? `Generic: ${med.generic_name}` : med.category || "Regular"} • Exp: {med.expiry_date || "12/2027"} • Rack: {med.rack_location || "A-01"}
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
+                          <span>{med.generic_name ? `Generic: ${med.generic_name}` : (med.category || "Regular Medicine")}</span>
+                          <span>•</span>
+                          <span>Exp: {med.expiry_date || "12/2027"}</span>
+                          <span>•</span>
+                          <span>Rack: {med.rack_location || "A-01"}</span>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        <span className={`px-2.5 py-1 rounded text-[11px] font-bold ${
                           (med.stock || 0) > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
                         }`}>
                           {(med.stock || 0) > 0 ? `${med.stock} in stock` : "0 stock"}
                         </span>
                         <div>
-                          <div className="font-mono font-bold text-slate-900 text-xs">
+                          <div className="font-mono font-bold text-slate-900 text-sm">
                             ₹{Number(med.selling_price || med.mrp || 25).toFixed(2)}
                           </div>
-                          <div className="text-[9px] text-slate-400 line-through">
-                            MRP ₹{Number(med.mrp || 30).toFixed(2)}
-                          </div>
+                          {med.mrp && Number(med.mrp) > Number(med.selling_price || 0) && (
+                            <div className="text-[10px] text-slate-400 line-through">
+                              MRP ₹{Number(med.mrp).toFixed(2)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1443,25 +1379,18 @@ export default function PharmacyPOSView({
                         </div>
                       </td>
 
-                      {/* 3. Batch */}
-                      <td className="py-1 px-1 text-center font-mono text-[10px]">
-                        <input
-                          type="text"
-                          value={item.batch || ""}
-                          onChange={(e) => handleUpdateRowField(idx, "batch", e.target.value)}
-                          className="w-full text-center border-none bg-transparent focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded text-[10px] font-mono py-0.5"
-                        />
+                      {/* 3. Batch (Non-editable) */}
+                      <td className="py-1 px-1 text-center font-mono text-[10px] text-slate-700 font-semibold select-text">
+                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                          {item.batch || "BT-01"}
+                        </span>
                       </td>
 
-                      {/* 4. Expiry */}
-                      <td className="py-1 px-1 text-center font-mono text-[10px] text-slate-600">
-                        <input
-                          type="text"
-                          value={item.expiry || ""}
-                          onChange={(e) => handleUpdateRowField(idx, "expiry", e.target.value)}
-                          placeholder="MM/YY"
-                          className="w-full text-center border-none bg-transparent focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded text-[10px] font-mono py-0.5"
-                        />
+                      {/* 4. Expiry (Non-editable) */}
+                      <td className="py-1 px-1 text-center font-mono text-[10px] text-slate-600 select-text">
+                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                          {item.expiry || "N/A"}
+                        </span>
                       </td>
 
                       {/* 5. Margin % */}
@@ -2225,7 +2154,7 @@ export default function PharmacyPOSView({
           </DialogHeader>
 
           {(() => {
-            const allBills = savedBillsList;
+            const allBills = sanitizeBillsList(savedBillsList);
             const settledBills = allBills.filter(b => b.paymentStatus === "Paid" || (b.isPaidAtPharmacy && b.paymentStatus !== "Unpaid"));
             const unpaidBills = allBills.filter(b => b.paymentStatus === "Unpaid");
             const centralBills = allBills.filter(b => b.paymentStatus === "ForwardedToBilling");

@@ -1654,7 +1654,8 @@ export default function PharmacyPage() {
         try {
           const stored = localStorage.getItem("hospital_pharmacy_bills");
           const cur = stored ? JSON.parse(stored) : [];
-          localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([queueDispenseRecord, ...cur.filter(b => b.invoiceNumber !== queueDispenseRecord.invoiceNumber)]));
+          const cleanCur = cur.filter(b => b && b.invoiceNumber && b.invoiceNumber !== queueDispenseRecord.invoiceNumber && !b.invoiceNumber.startsWith("INV-2026-0929-") && b.patientName !== "Rajesh Kumar" && b.patientName !== "Sunita Verma" && b.patientName !== "Vikram Malhotra");
+          localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([queueDispenseRecord, ...cleanCur]));
         } catch {}
       }
       setShowDispenseReceiptModal(true);
@@ -7350,7 +7351,8 @@ export default function PharmacyPage() {
                       try {
                         const stored = localStorage.getItem("hospital_pharmacy_bills");
                         const cur = stored ? JSON.parse(stored) : [];
-                        localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([otcBillRecord, ...cur.filter(b => b.invoiceNumber !== otcBillRecord.invoiceNumber)]));
+                        const cleanCur = cur.filter(b => b && b.invoiceNumber && b.invoiceNumber !== otcBillRecord.invoiceNumber && !b.invoiceNumber.startsWith("INV-2026-0929-") && b.patientName !== "Rajesh Kumar" && b.patientName !== "Sunita Verma" && b.patientName !== "Vikram Malhotra");
+                        localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([otcBillRecord, ...cleanCur]));
                       } catch {}
                     }
                     setShowDispenseReceiptModal(true);
