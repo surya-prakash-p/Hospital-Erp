@@ -211,7 +211,24 @@ export default function PharmacyPOSView({
   // 1. POS Search & Autocomplete States
   const [posSearchQuery, setPosSearchQuery] = useState("");
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [highlightedSearchIndex, setHighlightedSearchIndex] = useState(0);
   const searchInputRef = useRef(null);
+
+  const searchResults = useMemo(() => {
+    if (!posSearchQuery.trim()) return [];
+    const q = posSearchQuery.trim().toLowerCase();
+    return medicines.filter(m => !m.disabled && (
+      (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
+      (m.generic_name && m.generic_name.toLowerCase().includes(q)) ||
+      (m.brand && m.brand.toLowerCase().includes(q)) ||
+      (m.barcode && m.barcode.toLowerCase().includes(q)) ||
+      (m.batch_number && m.batch_number.toLowerCase().includes(q))
+    )).slice(0, 12);
+  }, [posSearchQuery, medicines]);
+
+  useEffect(() => {
+    setHighlightedSearchIndex(0);
+  }, [posSearchQuery]);
   const patientInputRef = useRef(null);
   const doctorInputRef = useRef(null);
   const discountInputRef = useRef(null);
@@ -979,6 +996,89 @@ export default function PharmacyPOSView({
       const isAlt = e.altKey;
       const isCtrlOrMeta = e.ctrlKey || e.metaKey;
       const key = e.key;
+      // Backspace -> Close open modals (View Bills, Settle Bill, etc.) when not typing characters in an input
+      if (key === 'Backspace') {
+        const target = e.target;
+        const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        const hasText = isInput && target.value && target.value.length > 0;
+
+        if (!hasText) {
+          if (settlingBill) {
+            e.preventDefault();
+            setSettlingBill(null);
+            return;
+          }
+          if (showViewBillsModal) {
+            e.preventDefault();
+            setShowViewBillsModal(false);
+            return;
+          }
+          if (showSubstituteModal) {
+            e.preventDefault();
+            setShowSubstituteModal(false);
+            return;
+          }
+          if (showDiscountModal) {
+            e.preventDefault();
+            setShowDiscountModal(false);
+            return;
+          }
+          if (showServiceItemModal) {
+            e.preventDefault();
+            setShowServiceItemModal(false);
+            return;
+          }
+          if (showMoreDetailsModal) {
+            e.preventDefault();
+            setShowMoreDetailsModal(false);
+            return;
+          }
+        }
+      }
+
+      // Escape -> Close open modals or dropdowns
+      if (key === 'Escape') {
+        if (showSearchDropdown) {
+          e.preventDefault();
+          setShowSearchDropdown(false);
+          return;
+        }
+        if (showPatientDropdown) {
+          e.preventDefault();
+          setShowPatientDropdown(false);
+          return;
+        }
+        if (settlingBill) {
+          e.preventDefault();
+          setSettlingBill(null);
+          return;
+        }
+        if (showViewBillsModal) {
+          e.preventDefault();
+          setShowViewBillsModal(false);
+          return;
+        }
+        if (showSubstituteModal) {
+          e.preventDefault();
+          setShowSubstituteModal(false);
+          return;
+        }
+        if (showDiscountModal) {
+          e.preventDefault();
+          setShowDiscountModal(false);
+          return;
+        }
+        if (showServiceItemModal) {
+          e.preventDefault();
+          setShowServiceItemModal(false);
+          return;
+        }
+        if (showMoreDetailsModal) {
+          e.preventDefault();
+          setShowMoreDetailsModal(false);
+          return;
+        }
+      }
 
       // Ignore if user is inside another active modal
       if (showSubstituteModal || showDiscountModal || showServiceItemModal || showMoreDetailsModal || showViewBillsModal || settlingBill) {
@@ -1119,7 +1219,8 @@ export default function PharmacyPOSView({
     return () => window.removeEventListener("keydown", handlePOSKeyDown);
   }, [
     billingItems, selectedRowIndex, showSubstituteModal, showDiscountModal,
-    showServiceItemModal, showMoreDetailsModal, posSearchQuery, tableCalculations,
+    showServiceItemModal, showMoreDetailsModal, showViewBillsModal, settlingBill,
+    showSearchDropdown, showPatientDropdown, posSearchQuery, tableCalculations,
     isHospitalPrescription, doctorName
   ]);
 
@@ -1146,6 +1247,42 @@ export default function PharmacyPOSView({
               onFocus={() => {
                 if (posSearchQuery.trim().length >= 1) setShowSearchDropdown(true);
               }}
+              onKeyDown={(e) => {
+                if (showSearchDropdown && searchResults.length > 0) {
+                  // Space or Enter -> Select the highlighted medicine immediately
+                  if (e.key === " " || e.code === "Space") {
+                    e.preventDefault();
+                    const selectedMed = searchResults[highlightedSearchIndex] || searchResults[0];
+                    if (selectedMed) {
+                      handleAddMedicineToBill(selectedMed);
+                    }
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const selectedMed = searchResults[highlightedSearchIndex] || searchResults[0];
+                    if (selectedMed) {
+                      handleAddMedicineToBill(selectedMed);
+                    }
+                    return;
+                  }
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedSearchIndex(prev => (prev + 1) % searchResults.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedSearchIndex(prev => (prev - 1 + searchResults.length) % searchResults.length);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setShowSearchDropdown(false);
+                    return;
+                  }
+                }
+              }}
               className="w-full h-8.5 pl-9 pr-20 text-xs font-medium text-slate-900 bg-transparent border-none outline-none focus:ring-0 placeholder:text-slate-400 placeholder:italic"
             />
             {posSearchQuery && (
@@ -1167,32 +1304,35 @@ export default function PharmacyPOSView({
           </div>
 
           {/* Autocomplete Search Dropdown */}
-          {showSearchDropdown && posSearchQuery.trim().length >= 1 && (() => {
-            const q = posSearchQuery.trim().toLowerCase();
-            const results = medicines.filter(m => !m.disabled && (
-              (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
-              (m.generic_name && m.generic_name.toLowerCase().includes(q)) ||
-              (m.brand && m.brand.toLowerCase().includes(q)) ||
-              (m.barcode && m.barcode.toLowerCase().includes(q)) ||
-              (m.batch_number && m.batch_number.toLowerCase().includes(q))
-            )).slice(0, 12);
-
-            return (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-300 z-50 max-h-80 overflow-y-auto divide-y divide-slate-100">
-                <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500 font-semibold border-b">
-                  <span>Found {results.length} result{results.length === 1 ? '' : 's'} for &quot;{posSearchQuery}&quot;</span>
-                  <span className="text-[10px] font-mono text-slate-400">Click or press Enter to add</span>
+          {showSearchDropdown && posSearchQuery.trim().length >= 1 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-300 z-50 max-h-80 overflow-y-auto divide-y divide-slate-100">
+              <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-slate-600 font-semibold border-b">
+                <span>Found {searchResults.length} result{searchResults.length === 1 ? '' : 's'} for &quot;{posSearchQuery}&quot;</span>
+                <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                  <span className="bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                    Space / Enter
+                  </span>
+                  <span className="text-slate-500">to Select</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="bg-slate-200 text-slate-700 font-bold px-1 py-0.5 rounded">↑↓</span>
+                  <span className="text-slate-500">to Navigate</span>
                 </div>
-                {results.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-500">
-                    No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press <span className="font-bold text-slate-800">Alt + A</span> to add new medicine.
-                  </div>
-                ) : (
-                  results.map((med, idx) => (
+              </div>
+              {searchResults.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-500">
+                  No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press <span className="font-bold text-slate-800">Alt + A</span> to add new medicine.
+                </div>
+              ) : (
+                searchResults.map((med, idx) => {
+                  const isSelected = idx === highlightedSearchIndex;
+                  return (
                     <div
-                      key={idx}
+                      key={med.name || med.id || idx}
                       onClick={() => handleAddMedicineToBill(med)}
-                      className="p-2.5 px-3 hover:bg-amber-50 cursor-pointer flex items-center justify-between gap-3 transition text-xs"
+                      onMouseEnter={() => setHighlightedSearchIndex(idx)}
+                      className={`p-2.5 px-3 cursor-pointer flex items-center justify-between gap-3 transition text-xs ${
+                        isSelected ? "bg-amber-100/90 ring-1 ring-inset ring-amber-400 font-semibold" : "hover:bg-amber-50"
+                      }`}
                     >
                       <div className="flex-1">
                         <div className="font-bold text-slate-900 flex items-center gap-2">
@@ -1203,6 +1343,11 @@ export default function PharmacyPOSView({
                           <span className="text-[9px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
                             Batch: {med.batch_number || "BT-01"}
                           </span>
+                          {isSelected && (
+                            <span className="text-[9px] font-mono bg-amber-600 text-white px-1.5 py-0.2 rounded font-bold uppercase tracking-wider animate-pulse">
+                              Space to Select
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
                           <span>{med.generic_name ? `Generic: ${med.generic_name}` : (med.category || "Regular Medicine")}</span>
@@ -1231,11 +1376,11 @@ export default function PharmacyPOSView({
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            );
-          })()}
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right side quick POS buttons */}
@@ -2148,6 +2293,20 @@ export default function PharmacyPOSView({
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Refresh
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowViewBillsModal(false)}
+                  className="h-8 text-xs font-semibold gap-1.5 text-slate-700 hover:text-rose-700 hover:bg-rose-50 border-slate-300 cursor-pointer"
+                  title="Close Register (Backspace / Esc)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Close</span>
+                  <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.2 rounded font-mono border border-slate-200">
+                    Backspace
+                  </span>
                 </Button>
               </div>
             </div>

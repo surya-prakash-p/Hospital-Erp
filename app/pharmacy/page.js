@@ -3650,6 +3650,101 @@ export default function PharmacyPage() {
         }
       }
 
+      // Backspace -> Close active modal or exit view (e.g., Alt + L Low Stock / Inventory) back to POS Billing when not typing characters
+      if (key === 'Backspace') {
+        const hasText = isInput && target.value && target.value.length > 0;
+        if (!hasText) {
+          if (showShortcutsModal) {
+            e.preventDefault();
+            setShowShortcutsModal(false);
+            return;
+          }
+          if (showDownloadReportsModal) {
+            e.preventDefault();
+            setShowDownloadReportsModal(false);
+            return;
+          }
+          if (showSubmitDispenseModal) {
+            e.preventDefault();
+            setShowSubmitDispenseModal(false);
+            return;
+          }
+          if (showWorkdeskDeleteModal) {
+            e.preventDefault();
+            setShowWorkdeskDeleteModal(false);
+            return;
+          }
+          if (showWorkdeskEditModal) {
+            e.preventDefault();
+            setShowWorkdeskEditModal(false);
+            return;
+          }
+          if (showWorkdeskPartialModal) {
+            e.preventDefault();
+            setShowWorkdeskPartialModal(false);
+            return;
+          }
+          if (showDispenseWorkdeskModal) {
+            e.preventDefault();
+            setShowDispenseWorkdeskModal(false);
+            return;
+          }
+          if (showOTCSaleModal) {
+            e.preventDefault();
+            setShowOTCSaleModal(false);
+            return;
+          }
+          if (isAddModalOpen) {
+            e.preventDefault();
+            setIsAddModalOpen(false);
+            return;
+          }
+          if (isPOModalOpen) {
+            e.preventDefault();
+            setIsPOModalOpen(false);
+            return;
+          }
+          if (showBulkPOModal) {
+            e.preventDefault();
+            setShowBulkPOModal(false);
+            return;
+          }
+          if (showAdjustModal) {
+            e.preventDefault();
+            setShowAdjustModal(false);
+            return;
+          }
+          if (showEditMedModal) {
+            e.preventDefault();
+            setShowEditMedModal(false);
+            return;
+          }
+          if (showSalesReturnModal) {
+            e.preventDefault();
+            setShowSalesReturnModal(false);
+            return;
+          }
+          if (selectedMedicine) {
+            e.preventDefault();
+            setSelectedMedicine(null);
+            return;
+          }
+          if (showDispenseReceiptModal) {
+            e.preventDefault();
+            setShowDispenseReceiptModal(false);
+            return;
+          }
+
+          // If on a sub-view (like Inventory opened via Alt + L, Dispensing, Registers, Logistics), return to POS Billing Dashboard
+          if (activeTab !== 'dashboard') {
+            e.preventDefault();
+            handleTabChange('dashboard');
+            setStatusFilter('All');
+            return;
+          }
+        }
+      }
+
       // 3. Ctrl + Enter -> Submit Dispensation or Confirm
       if (isCtrlOrMeta && key === 'Enter') {
         if (showSubmitDispenseModal) {
@@ -3948,6 +4043,7 @@ export default function PharmacyPage() {
     showEditMedModal, 
     showSalesReturnModal, 
     selectedMedicine,
+    showDispenseReceiptModal,
     userRole
   ]);
 
@@ -4589,6 +4685,21 @@ export default function PharmacyPage() {
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Item</span>
                 <span className="text-[9px] bg-indigo-800 text-indigo-100 px-1 rounded font-mono">Alt + A</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleTabChange('dashboard');
+                  setStatusFilter('All');
+                }}
+                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 rounded border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition"
+                title="Close Inventory view and return to POS Billing (Backspace)"
+              >
+                <X className="w-3.5 h-3.5 text-slate-500" />
+                <span>Close</span>
+                <span className="text-[9px] bg-slate-100 text-slate-600 px-1 rounded font-mono border border-slate-200">
+                  Backspace
+                </span>
               </button>
             </div>
           </div>
