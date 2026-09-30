@@ -1233,8 +1233,8 @@ export default function PharmacyPOSView({
       <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100/90 px-3 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
         {/* Enhanced Medicine Search Bar */}
         <div ref={searchContainerRef} className="relative flex-1 min-w-[260px] max-w-3xl">
-          <div className="relative flex items-center bg-white rounded-lg border-2 border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-200/70 shadow-xs transition">
-            <Search className="w-4 h-4 text-amber-600 absolute left-3 pointer-events-none" />
+          <div className="relative flex items-center bg-white rounded-lg border border-slate-300 focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-100 shadow-xs transition">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
@@ -1298,7 +1298,7 @@ export default function PharmacyPOSView({
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
-            <span className="absolute right-2 text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono font-bold border border-amber-300 pointer-events-none shadow-2xs">
+            <span className="absolute right-2 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-300 pointer-events-none shadow-2xs">
               Alt + S
             </span>
           </div>
@@ -1309,7 +1309,7 @@ export default function PharmacyPOSView({
               <div className="px-3 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-slate-600 font-semibold border-b">
                 <span>Found {searchResults.length} result{searchResults.length === 1 ? '' : 's'} for &quot;{posSearchQuery}&quot;</span>
                 <div className="flex items-center gap-1.5 text-[10px] font-mono">
-                  <span className="bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-1.5 py-0.5 rounded shadow-2xs">
                     Space / Enter
                   </span>
                   <span className="text-slate-500">to Select</span>
@@ -1331,7 +1331,7 @@ export default function PharmacyPOSView({
                       onClick={() => handleAddMedicineToBill(med)}
                       onMouseEnter={() => setHighlightedSearchIndex(idx)}
                       className={`p-2.5 px-3 cursor-pointer flex items-center justify-between gap-3 transition text-xs ${
-                        isSelected ? "bg-amber-100/90 ring-1 ring-inset ring-amber-400 font-semibold" : "hover:bg-amber-50"
+                        isSelected ? "bg-indigo-50/80 ring-1 ring-inset ring-indigo-400 font-semibold" : "hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex-1">
@@ -1344,7 +1344,7 @@ export default function PharmacyPOSView({
                             Batch: {med.batch_number || "BT-01"}
                           </span>
                           {isSelected && (
-                            <span className="text-[9px] font-mono bg-amber-600 text-white px-1.5 py-0.2 rounded font-bold uppercase tracking-wider animate-pulse">
+                            <span className="text-[9px] font-mono bg-indigo-600 text-white px-1.5 py-0.2 rounded font-bold uppercase tracking-wider">
                               Space to Select
                             </span>
                           )}
@@ -1404,11 +1404,11 @@ export default function PharmacyPOSView({
               handleTabChange?.("inventory");
               showToast?.("Switched to Inventory Low Stock View", "info");
             }}
-            className="px-2 py-1 text-[11px] font-semibold bg-white text-amber-700 border border-slate-300 rounded hover:bg-amber-50 shadow-2xs flex items-center gap-1 cursor-pointer"
+            className="px-2 py-1 text-[11px] font-semibold bg-white text-indigo-700 border border-slate-300 rounded hover:bg-indigo-50 shadow-2xs flex items-center gap-1 cursor-pointer"
           >
-            <AlertCircle className="w-3 h-3 text-amber-600" />
+            <AlertCircle className="w-3 h-3 text-indigo-600" />
             <span>Low Stock</span>
-            <span className="text-[9px] bg-amber-50 text-amber-600 px-1 rounded border border-amber-200 font-mono">Alt + L</span>
+            <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1 rounded border border-indigo-200 font-mono">Alt + L</span>
           </button>
 
           <button
@@ -1502,8 +1502,8 @@ export default function PharmacyPOSView({
                     <tr
                       key={item.id || idx}
                       onClick={() => setSelectedRowIndex(idx)}
-                      className={`hover:bg-amber-50/60 divide-x divide-slate-200 transition-colors h-8 ${
-                        isSelected ? "bg-amber-50/90 font-semibold" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                      className={`hover:bg-slate-50 divide-x divide-slate-200 transition-colors h-8 ${
+                        isSelected ? "bg-indigo-50/80 font-semibold" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                       }`}
                     >
                       {/* 1. Row Index */}
@@ -1519,7 +1519,7 @@ export default function PharmacyPOSView({
                             <span className="text-[10px] text-slate-500 font-normal">({item.strength})</span>
                           )}
                           {item.source === "Outside Purchase" && (
-                            <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 rounded">Outside</span>
+                            <span className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1 rounded border border-slate-200">Outside</span>
                           )}
                         </div>
                       </td>
@@ -1661,7 +1661,7 @@ export default function PharmacyPOSView({
             onClick={onAddNewMedicine}
             className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="bg-slate-700 text-amber-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + A</span>
+            <span className="bg-slate-700 text-indigo-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + A</span>
             <span>+ Add Medicine</span>
           </button>
 
@@ -1700,7 +1700,7 @@ export default function PharmacyPOSView({
             onClick={onOpenSalesReturn}
             className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="bg-slate-700 text-amber-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + R</span>
+            <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + R</span>
             <span>Return</span>
           </button>
 
@@ -2381,17 +2381,17 @@ export default function PharmacyPOSView({
                     <span className="text-[10px] text-rose-700">Outstanding payment</span>
                   </div>
 
-                  <div className="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200">
+                  <div className="p-2.5 rounded-lg bg-sky-50/70 border border-sky-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold text-amber-800">Central Billing</span>
-                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-mono">
+                      <span className="text-[10px] uppercase font-bold text-sky-800">Central Billing</span>
+                      <span className="text-[10px] font-bold bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-mono">
                         {centralBills.length}
                       </span>
                     </div>
-                    <div className="text-lg font-bold text-amber-900 font-mono mt-0.5">
+                    <div className="text-lg font-bold text-sky-900 font-mono mt-0.5">
                       ₹{centralTotal.toFixed(2)}
                     </div>
-                    <span className="text-[10px] text-amber-700">Due at cashier desk</span>
+                    <span className="text-[10px] text-sky-700">Due at cashier desk</span>
                   </div>
                 </div>
 
@@ -2520,8 +2520,8 @@ export default function PharmacyPOSView({
                                     SETTLED (PAID)
                                   </span>
                                 ) : isForwarded ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                    <Clock className="w-3 h-3 text-amber-600" />
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                    <Clock className="w-3 h-3 text-sky-600" />
                                     CENTRAL BILLING
                                   </span>
                                 ) : (
