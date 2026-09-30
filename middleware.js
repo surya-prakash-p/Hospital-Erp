@@ -45,7 +45,11 @@ export async function middleware(request) {
   let userRoles = [];
   let userPermissions = [];
   try {
-    const parsed = JSON.parse(sessionCookie.value);
+    const rawVal = sessionCookie.value || '';
+    const decoded = rawVal.startsWith('%') || rawVal.includes('%22') || rawVal.includes('%7B') 
+      ? decodeURIComponent(rawVal) 
+      : rawVal;
+    const parsed = JSON.parse(decoded);
     userRole = parsed.role || parsed.roles?.[0] || 'Staff Member';
     userRoles = Array.isArray(parsed.roles) && parsed.roles.length > 0 
       ? parsed.roles 

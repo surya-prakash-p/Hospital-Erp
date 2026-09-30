@@ -28,20 +28,7 @@ const mainNavigation = [
   { name: "Reception Desk", href: "/reception", icon: ClipboardList, role: "Receptionist", permission: "Patient Registration" },
   { name: "Patient Registry", href: "/patient-registry", icon: Users, role: "Receptionist", permission: "Patient Registration" },
   { name: "Consultation", href: "/consultation", icon: Stethoscope, role: "Doctor", permission: "Doctor Consultations" },
-  { 
-    name: "Pharmacy", 
-    href: "/pharmacy", 
-    icon: Pill, 
-    role: "Pharmacist", 
-    permission: "Pharmacy Dispensing",
-    children: [
-      { name: "Pharmacy", href: "/pharmacy?tab=dashboard", tab: "dashboard", icon: Pill },
-      { name: "Inventory", href: "/pharmacy?tab=inventory", tab: "inventory", icon: Package },
-      { name: "Prescriptions Queue", href: "/pharmacy?tab=dispensing", tab: "dispensing", icon: ClipboardList },
-      { name: "Compliance Records", href: "/pharmacy?tab=registers", tab: "registers", icon: FileCheck2 },
-      { name: "Purchase & Receiving", href: "/pharmacy?tab=logistics", tab: "logistics", icon: Truck },
-    ]
-  },
+  { name: "Pharmacy", href: "/pharmacy", icon: Pill, role: "Pharmacist", permission: "Pharmacy Dispensing" },
   { name: "Billing & Pay", href: "/billing", icon: Receipt, role: "Billing Clerk", permission: "Billing & Invoicing" },
   { name: "Finance Ledger", href: "/finance", icon: Wallet, role: "Billing Clerk", permission: "Billing & Invoicing" },
   { name: "AI Copilot", href: "/ai-assistant", icon: Bot, role: "Doctor", permission: "Doctor Consultations" },
@@ -49,19 +36,8 @@ const mainNavigation = [
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const { user, hasRole, hasPermission } = useAuth()
   const [collapsed, setCollapsed] = React.useState(false)
-  const [pharmacyOpen, setPharmacyOpen] = React.useState(true)
-
-  const isPharmacyRoute = pathname === "/pharmacy" || pathname.startsWith("/pharmacy/")
-  const currentPharmacyTab = isPharmacyRoute ? (searchParams.get("tab") || "dashboard") : null
-
-  React.useEffect(() => {
-    if (isPharmacyRoute) {
-      setPharmacyOpen(true)
-    }
-  }, [isPharmacyRoute])
 
   // Don't render sidebar on login page or when user is not logged in
   if (pathname === '/login' || !user) {
@@ -132,77 +108,7 @@ export function AppSidebar() {
             <ul className="space-y-1 px-2">
               {allowedNav.map((item) => {
                 const Icon = item.icon
-                const hasChildren = Boolean(item.children && item.children.length > 0)
-                const isParentActive = pathname === item.href || (hasChildren && pathname.startsWith(item.href))
-
-                if (hasChildren) {
-                  return (
-                    <li key={item.name} className="space-y-0.5">
-                      {/* Parent expandable button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (collapsed) {
-                            setCollapsed(false)
-                            setPharmacyOpen(true)
-                          } else {
-                            setPharmacyOpen(!pharmacyOpen)
-                          }
-                        }}
-                        className={`w-full flex items-center gap-3 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                          collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2 justify-between"
-                        } ${
-                          isParentActive && !pharmacyOpen
-                            ? "bg-indigo-600 text-white shadow-xs"
-                            : isParentActive
-                            ? "bg-slate-100 text-slate-900 font-semibold"
-                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        }`}
-                        title={collapsed ? item.name : undefined}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className={`w-4 h-4 flex-shrink-0 ${isParentActive && !pharmacyOpen ? "text-white" : isParentActive ? "text-indigo-600" : ""}`} />
-                          {!collapsed && <span className="text-[11px] font-semibold">{item.name}</span>}
-                        </div>
-                        {!collapsed && (
-                          <div className="text-slate-400 hover:text-slate-600">
-                            {pharmacyOpen ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                            )}
-                          </div>
-                        )}
-                      </button>
-
-                      {/* Expandable Child Sub-Menu */}
-                      {!collapsed && pharmacyOpen && item.children && (
-                        <ul className="ml-4 pl-2 space-y-0.5 border-l border-slate-200/80 my-1 py-0.5">
-                          {item.children.map((child) => {
-                            const ChildIcon = child.icon
-                            const isChildActive = isPharmacyRoute && currentPharmacyTab === child.tab
-
-                            return (
-                              <li key={child.name}>
-                                <Link
-                                  href={child.href}
-                                  className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs transition-all ${
-                                    isChildActive
-                                      ? "bg-indigo-600 text-white font-semibold shadow-2xs"
-                                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-                                  }`}
-                                >
-                                  <ChildIcon className={`w-3.5 h-3.5 shrink-0 ${isChildActive ? "text-white" : "text-slate-400"}`} />
-                                  <span className="text-[11px] truncate">{child.name}</span>
-                                </Link>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-                    </li>
-                  )
-                }
+                const isParentActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
 
                 return (
                   <li key={item.name}>

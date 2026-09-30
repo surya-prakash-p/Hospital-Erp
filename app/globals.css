@@ -129,3 +129,34 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   PRINT MEDIA STYLES - Clean Single Receipt Printing
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide app navigation, sidebars, headers, dialog backdrops, action buttons */
+  aside,
+  header,
+  nav,
+  .no-print,
+  [data-no-print="true"],
+  button,
+  .backdrop-blur-xs,
+  .backdrop-blur-sm,
+  .backdrop-blur-md {
+    display: none !important;
+  }
+}
+
+
