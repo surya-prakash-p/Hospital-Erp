@@ -1634,7 +1634,7 @@ export default function PharmacyPage() {
         };
       });
 
-      setLatestDispenseRecord({
+      const queueDispenseRecord = {
         invoiceNumber: response.invoiceNumber,
         patientName: pName,
         patientMobile: pMobile,
@@ -1642,12 +1642,21 @@ export default function PharmacyPage() {
         items: enrichedReceiptItems,
         dispenseItems: dispenseItems,
         totalVal: billAmt,
+        paymentStatus: isPayAtPharmacy ? "Paid" : "ForwardedToBilling",
         paymentMethod: isPayAtPharmacy ? (otcPaymentMethod || "Cash") : "Pending at Central Billing",
         paymentMode: isPayAtPharmacy ? "Paid at Pharmacy Desk" : "Forwarded to Central Billing Desk",
         isPaidAtPharmacy: isPayAtPharmacy,
         pharmacistName: pharmacistName,
         date: new Date().toLocaleString("en-IN")
-      });
+      };
+      setLatestDispenseRecord(queueDispenseRecord);
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("hospital_pharmacy_bills");
+          const cur = stored ? JSON.parse(stored) : [];
+          localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([queueDispenseRecord, ...cur.filter(b => b.invoiceNumber !== queueDispenseRecord.invoiceNumber)]));
+        } catch {}
+      }
       setShowDispenseReceiptModal(true);
       setShowDispenseWorkdeskModal(false);
 
@@ -7321,7 +7330,7 @@ export default function PharmacyPage() {
                     showToast(`Direct Sale completed. Invoice ${response.invoiceNumber} generated!`, "success");
                     
                     // Show on-screen receipt preview modal (NO auto download)
-                    setLatestDispenseRecord({
+                    const otcBillRecord = {
                       invoiceNumber: response.invoiceNumber,
                       patientName: otcCustomerName || "Walk-in Customer",
                       patientMobile: otcCustomerMobile || "N/A",
@@ -7329,12 +7338,21 @@ export default function PharmacyPage() {
                       items: receiptItems,
                       dispenseItems: otcBasket,
                       totalVal: totalVal,
+                      paymentStatus: "Paid",
                       paymentMethod: otcPaymentMethod,
                       paymentMode: "Direct OTC Sale (Paid at Counter)",
                       isPaidAtPharmacy: true,
                       pharmacistName: pharmacistName,
                       date: new Date().toLocaleString("en-IN")
-                    });
+                    };
+                    setLatestDispenseRecord(otcBillRecord);
+                    if (typeof window !== "undefined") {
+                      try {
+                        const stored = localStorage.getItem("hospital_pharmacy_bills");
+                        const cur = stored ? JSON.parse(stored) : [];
+                        localStorage.setItem("hospital_pharmacy_bills", JSON.stringify([otcBillRecord, ...cur.filter(b => b.invoiceNumber !== otcBillRecord.invoiceNumber)]));
+                      } catch {}
+                    }
                     setShowDispenseReceiptModal(true);
 
                     setShowOTCSaleModal(false);

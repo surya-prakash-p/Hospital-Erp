@@ -6,7 +6,7 @@ import {
   RotateCcw, Printer, CheckCircle, Calendar, Pill, DollarSign,
   AlertCircle, ChevronDown, ArrowRight, User, Stethoscope,
   Clock, ShieldAlert, PackageCheck, FileText, X,
-  Percent, RefreshCw
+  Percent, RefreshCw, Receipt, Download, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -253,6 +253,248 @@ export default function PharmacyPOSView({
 
   const [showMoreDetailsModal, setShowMoreDetailsModal] = useState(false);
   const [detailItemIndex, setDetailItemIndex] = useState(null);
+
+  // Search Container Ref for Click Outside
+  const searchContainerRef = useRef(null);
+
+  // View Bills & Settle Modal States
+  const [showViewBillsModal, setShowViewBillsModal] = useState(false);
+  const [billsFilterStatus, setBillsFilterStatus] = useState("ALL"); // "ALL" | "PAID" | "UNPAID" | "CENTRAL BILLING"
+  const [billsSearchQuery, setBillsSearchQuery] = useState("");
+  const [settlingBill, setSettlingBill] = useState(null);
+  const [settlePaymentMode, setSettlePaymentMode] = useState("Cash");
+  const [savedBillsList, setSavedBillsList] = useState([]);
+
+  // Load Saved Bills from localStorage or seed
+  const loadSavedBills = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = localStorage.getItem("hospital_pharmacy_bills");
+      if (stored) {
+        setSavedBillsList(JSON.parse(stored));
+      } else {
+        const initialBills = [
+          {
+            invoiceNumber: "INV-2026-0929-01",
+            patientName: "Rajesh Kumar",
+            patientMobile: "9876543210",
+            patientUHID: "UHID-1082",
+            doctorName: "Dr. Sarah Jenkins",
+            isWalkIn: false,
+            items: [
+              { medicine_name: "Amoxicillin 500mg", unit_price: 85, dispensed_qty: 2, line_total: 170, batch_number: "AMX-2026-01", expiry: "11/2027", category: "Antibiotic" },
+              { medicine_name: "Paracetamol 650mg", unit_price: 32, dispensed_qty: 1, line_total: 32, batch_number: "PCM-904", expiry: "08/2028", category: "Analgesic" }
+            ],
+            totalVal: 202.00,
+            subtotal: 202.00,
+            discountPct: 0,
+            discountAmount: 0,
+            netGst: 18.18,
+            paymentStatus: "Paid",
+            paymentMethod: "UPI",
+            paymentMode: "Paid at Pharmacy Counter",
+            isPaidAtPharmacy: true,
+            pharmacistName: pharmacistName || "Lead Pharmacist",
+            date: "30/09/2026, 09:15:20 AM",
+            createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
+          },
+          {
+            invoiceNumber: "INV-2026-0929-02",
+            patientName: "Sunita Verma",
+            patientMobile: "9845123456",
+            patientUHID: "UHID-1083",
+            doctorName: "Dr. Amit Patel",
+            isWalkIn: false,
+            items: [
+              { medicine_name: "Metformin 500mg", unit_price: 45, dispensed_qty: 3, line_total: 135, batch_number: "MET-102", expiry: "03/2027", category: "Antidiabetic" },
+              { medicine_name: "Atorvastatin 10mg", unit_price: 110, dispensed_qty: 1, line_total: 110, batch_number: "ATV-882", expiry: "12/2027", category: "Cardiovascular" }
+            ],
+            totalVal: 245.00,
+            subtotal: 245.00,
+            discountPct: 0,
+            discountAmount: 0,
+            netGst: 22.05,
+            paymentStatus: "Unpaid",
+            paymentMethod: "Payment Due (Unpaid)",
+            paymentMode: "Payment Due (Unpaid Bill)",
+            isPaidAtPharmacy: false,
+            pharmacistName: pharmacistName || "Lead Pharmacist",
+            date: "30/09/2026, 10:45:10 AM",
+            createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+          },
+          {
+            invoiceNumber: "INV-2026-0929-03",
+            patientName: "Vikram Malhotra",
+            patientMobile: "9711223344",
+            patientUHID: "UHID-1084",
+            doctorName: "Dr. Priya Nair",
+            isWalkIn: false,
+            items: [
+              { medicine_name: "Ceftriaxone 1g Inj", unit_price: 350, dispensed_qty: 2, line_total: 700, batch_number: "CEF-550", expiry: "05/2027", category: "Injectable" }
+            ],
+            totalVal: 700.00,
+            subtotal: 700.00,
+            discountPct: 0,
+            discountAmount: 0,
+            netGst: 75.00,
+            paymentStatus: "ForwardedToBilling",
+            paymentMethod: "Pending at Central Billing",
+            paymentMode: "Forwarded to Central Billing",
+            isPaidAtPharmacy: false,
+            pharmacistName: pharmacistName || "Lead Pharmacist",
+            date: "30/09/2026, 11:30:00 AM",
+            createdAt: new Date(Date.now() - 3600000 * 1).toISOString()
+          }
+        ];
+        localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(initialBills));
+        setSavedBillsList(initialBills);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Load saved bills on mount
+  useEffect(() => {
+    loadSavedBills();
+  }, []);
+
+  // Export Bills to CSV
+  const handleExportBillsToCSV = () => {
+    if (savedBillsList.length === 0) {
+      showToast?.("No bills to export", "info");
+      return;
+    }
+    const headers = [
+      "Invoice Number",
+      "Date",
+      "Patient Name",
+      "Patient Mobile",
+      "Patient UHID",
+      "Doctor",
+      "Items Count",
+      "Items Summary",
+      "Subtotal (INR)",
+      "Discount (INR)",
+      "Net GST (INR)",
+      "Grand Total (INR)",
+      "Payment Status",
+      "Payment Mode",
+      "Pharmacist"
+    ];
+
+    const rows = savedBillsList.map(bill => {
+      const itemsSummary = (bill.items || []).map(i => `${i.medicine_name} (x${i.dispensed_qty || i.qty || 1})`).join("; ");
+      return [
+        `"${(bill.invoiceNumber || "").replace(/"/g, '""')}"`,
+        `"${(bill.date || "").replace(/"/g, '""')}"`,
+        `"${(bill.patientName || "").replace(/"/g, '""')}"`,
+        `"${(bill.patientMobile || "").replace(/"/g, '""')}"`,
+        `"${(bill.patientUHID || "").replace(/"/g, '""')}"`,
+        `"${(bill.doctorName || "").replace(/"/g, '""')}"`,
+        (bill.items || []).length,
+        `"${itemsSummary.replace(/"/g, '""')}"`,
+        Number(bill.subtotal || bill.totalVal || 0).toFixed(2),
+        Number(bill.discountAmount || 0).toFixed(2),
+        Number(bill.netGst || 0).toFixed(2),
+        Number(bill.totalVal || 0).toFixed(2),
+        `"${(bill.paymentStatus || (bill.isPaidAtPharmacy ? "Paid" : "ForwardedToBilling")).replace(/"/g, '""')}"`,
+        `"${(bill.paymentMode || bill.paymentMethod || "").replace(/"/g, '""')}"`,
+        `"${(bill.pharmacistName || pharmacistName || "").replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `pharmacy_invoices_register_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast?.("Bills exported successfully to CSV", "success");
+  };
+
+  // Settle Bill Handler
+  const handleConfirmSettleBill = async (billToSettle, mode = "Cash") => {
+    if (!billToSettle) return;
+    try {
+      const stored = localStorage.getItem("hospital_pharmacy_bills");
+      const curBills = stored ? JSON.parse(stored) : [];
+      const updatedBills = curBills.map(b => {
+        if (b.invoiceNumber === billToSettle.invoiceNumber) {
+          return {
+            ...b,
+            paymentStatus: "Paid",
+            isPaidAtPharmacy: true,
+            paymentMode: "Paid at Pharmacy Counter",
+            paymentMethod: mode,
+            settledAt: new Date().toLocaleString("en-IN"),
+            settledBy: pharmacistName
+          };
+        }
+        return b;
+      });
+      localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(updatedBills));
+      setSavedBillsList(updatedBills);
+
+      // Record in dept payments
+      const storedPayments = localStorage.getItem("hospital_dept_payments");
+      const deptPayments = storedPayments ? JSON.parse(storedPayments) : [];
+      deptPayments.unshift({
+        id: `dp-pharm-settle-${Date.now()}`,
+        walkInId: billToSettle.invoiceNumber,
+        patientName: billToSettle.patientName,
+        mobile: billToSettle.patientMobile,
+        department: "Pharmacy",
+        description: `Settled Bill ${billToSettle.invoiceNumber} (${(billToSettle.items || []).map(i => i.medicine_name).join(", ")})`,
+        amount: Number(billToSettle.totalVal || 0),
+        method: mode,
+        date: new Date().toISOString().split("T")[0],
+        status: "Paid"
+      });
+      localStorage.setItem("hospital_dept_payments", JSON.stringify(deptPayments));
+
+      // Record in finance ledger
+      const rxTx = {
+        id: `tx-settle-${billToSettle.invoiceNumber}-${Date.now()}`,
+        title: `Settled Pharmacy Bill — ${billToSettle.patientName}`,
+        type: "Income",
+        category: "Pharmacy Income",
+        amount: Number(billToSettle.totalVal || 0),
+        method: mode,
+        date: new Date().toISOString().split("T")[0],
+        notes: `Bill Settled: ${billToSettle.invoiceNumber} | Collected via ${mode}`
+      };
+      recordFinanceTransaction?.(rxTx).catch(() => null);
+
+      // Record in audit log
+      createPharmacyAuditLog?.({
+        action: "Bill Settled",
+        patient: billToSettle.patientName,
+        details: `Invoice ${billToSettle.invoiceNumber} marked Settled/Paid via ${mode} (₹${Number(billToSettle.totalVal || 0).toFixed(2)})`,
+        performed_by: pharmacistName
+      }).catch(() => null);
+
+      showToast?.(`Bill ${billToSettle.invoiceNumber} successfully settled via ${mode}!`, "success");
+      setSettlingBill(null);
+    } catch {
+      showToast?.("Failed to settle bill", "error");
+    }
+  };
 
   // Initialize Invoice No and Date
   useEffect(() => {
@@ -716,6 +958,19 @@ export default function PharmacyPOSView({
       setLatestDispenseRecord?.(receiptData);
       setShowDispenseReceiptModal?.(true);
 
+      // Save to persistent hospital_pharmacy_bills register
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("hospital_pharmacy_bills");
+          const curBills = stored ? JSON.parse(stored) : [];
+          const updatedBills = [receiptData, ...curBills.filter(b => b.invoiceNumber !== receiptData.invoiceNumber)];
+          localStorage.setItem("hospital_pharmacy_bills", JSON.stringify(updatedBills));
+          setSavedBillsList(updatedBills);
+        } catch {
+          // ignore
+        }
+      }
+
       if (isPaid) {
         showToast?.(`Payment Collected & Bill Saved! Invoice: ${invoiceNo}`, "success");
       } else if (isForwarded) {
@@ -782,7 +1037,15 @@ export default function PharmacyPOSView({
       const key = e.key;
 
       // Ignore if user is inside another active modal
-      if (showSubstituteModal || showDiscountModal || showServiceItemModal || showMoreDetailsModal) {
+      if (showSubstituteModal || showDiscountModal || showServiceItemModal || showMoreDetailsModal || showViewBillsModal || settlingBill) {
+        return;
+      }
+
+      // Alt + B -> View Bills / Invoices History
+      if (isAlt && key.toLowerCase() === 'b') {
+        e.preventDefault();
+        loadSavedBills();
+        setShowViewBillsModal(true);
         return;
       }
 
@@ -920,10 +1183,11 @@ export default function PharmacyPOSView({
     <div className="flex flex-col gap-1.5 w-full max-w-full font-sans text-slate-800 antialiased select-none h-full justify-between overflow-hidden">
       
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          1. TOP HEADER (Compact Traditional POS Bar)
+          1. TOP HEADER (Integrated POS Search & Action Bar)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
-        <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100/90 px-3 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
+        {/* Left: Pharmacy Brand Title */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="w-7 h-7 rounded bg-indigo-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
             <Pill className="w-4 h-4" />
           </div>
@@ -940,19 +1204,117 @@ export default function PharmacyPOSView({
           </div>
         </div>
 
+        {/* Center: Integrated Medicine Search Input with Autocomplete Dropdown */}
+        <div ref={searchContainerRef} className="relative flex-1 min-w-[240px] max-w-sm lg:max-w-md mx-1">
+          <div className="relative flex items-center bg-white rounded-md border-2 border-amber-400 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-200/60 shadow-xs transition">
+            <Search className="w-3.5 h-3.5 text-amber-600 absolute left-2.5 pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search medicines by name, barcode, batch... (Alt + S)"
+              value={posSearchQuery}
+              onChange={(e) => {
+                setPosSearchQuery(e.target.value);
+                setShowSearchDropdown(true);
+              }}
+              onFocus={() => {
+                if (posSearchQuery.trim().length >= 1) setShowSearchDropdown(true);
+              }}
+              className="w-full h-7 pl-8 pr-16 text-xs font-medium text-slate-900 bg-transparent border-none outline-none focus:ring-0 placeholder:text-slate-400"
+            />
+            {posSearchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPosSearchQuery("");
+                  setShowSearchDropdown(false);
+                }}
+                className="absolute right-12 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                title="Clear Search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <span className="absolute right-2 text-[9px] bg-amber-50 text-amber-700 px-1 py-0.5 rounded border border-amber-200 font-mono font-bold pointer-events-none">
+              Alt + S
+            </span>
+          </div>
+
+          {/* Autocomplete Search Dropdown */}
+          {showSearchDropdown && posSearchQuery.trim().length >= 1 && (() => {
+            const q = posSearchQuery.trim().toLowerCase();
+            const results = medicines.filter(m => !m.disabled && (
+              (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
+              (m.generic_name && m.generic_name.toLowerCase().includes(q)) ||
+              (m.brand && m.brand.toLowerCase().includes(q)) ||
+              (m.barcode && m.barcode.toLowerCase().includes(q)) ||
+              (m.batch_number && m.batch_number.toLowerCase().includes(q))
+            )).slice(0, 10);
+
+            return (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                {results.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-slate-500">
+                    No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press Alt + A to add new medicine.
+                  </div>
+                ) : (
+                  results.map((med, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleAddMedicineToBill(med)}
+                      className="p-2 px-3 hover:bg-amber-50/80 cursor-pointer flex items-center justify-between gap-3 transition text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          <span>{med.medicine_name}</span>
+                          {med.strength && med.strength !== "-" && (
+                            <span className="text-[10px] text-slate-500 font-normal">({med.strength})</span>
+                          )}
+                          <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1 py-0.2 rounded border">
+                            Batch: {med.batch_number || "BT-01"}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {med.generic_name ? `Generic: ${med.generic_name}` : med.category || "Regular"} • Exp: {med.expiry_date || "12/2027"} • Rack: {med.rack_location || "A-01"}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 flex items-center gap-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          (med.stock || 0) > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                        }`}>
+                          {(med.stock || 0) > 0 ? `${med.stock} in stock` : "0 stock"}
+                        </span>
+                        <div>
+                          <div className="font-mono font-bold text-slate-900 text-xs">
+                            ₹{Number(med.selling_price || med.mrp || 25).toFixed(2)}
+                          </div>
+                          <div className="text-[9px] text-slate-400 line-through">
+                            MRP ₹{Number(med.mrp || 30).toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })()}
+        </div>
+
         {/* Right side quick POS buttons */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap shrink-0">
           <button
             type="button"
             onClick={() => {
-              searchInputRef.current?.focus();
-              searchInputRef.current?.select();
+              loadSavedBills();
+              setShowViewBillsModal(true);
             }}
-            className="px-2 py-1 text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 rounded hover:bg-slate-50 shadow-2xs flex items-center gap-1 cursor-pointer"
+            className="px-2 py-1 text-[11px] font-semibold bg-white text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-50 shadow-2xs flex items-center gap-1 cursor-pointer"
           >
-            <Search className="w-3 h-3 text-slate-500" />
-            <span>Search</span>
-            <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded border border-slate-200 font-mono">Alt + S</span>
+            <Receipt className="w-3 h-3 text-indigo-600" />
+            <span>View Bills</span>
+            <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1 rounded border border-indigo-200 font-mono">Alt + B</span>
           </button>
 
           <button
@@ -1001,7 +1363,10 @@ export default function PharmacyPOSView({
                 <ChevronDown className="w-3 h-3 opacity-80" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
+            <DropdownMenuContent align="end" className="w-52 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
+              <DropdownMenuItem onClick={() => { loadSavedBills(); setShowViewBillsModal(true); }} className="flex items-center gap-2 cursor-pointer">
+                <Receipt className="w-3.5 h-3.5 text-indigo-600" /> View Bills / Invoices (Alt + B)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onOpenOTCSale} className="flex items-center gap-2 cursor-pointer">
                 <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" /> Quick OTC (Alt + N)
               </DropdownMenuItem>
@@ -1010,104 +1375,6 @@ export default function PharmacyPOSView({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </div>
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          2. MEDICINE SEARCH AREA (Yellow/Gold Highlight Bar matching Reference)
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="relative w-full bg-white p-1 rounded-lg border-2 border-amber-400 shadow-xs flex items-center gap-2">
-        {/* Large Search Input */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search medicines by name, barcode or batch... (Press Alt + S)"
-            value={posSearchQuery}
-            onChange={(e) => {
-              setPosSearchQuery(e.target.value);
-              setShowSearchDropdown(true);
-            }}
-            onFocus={() => {
-              if (posSearchQuery.trim().length >= 1) setShowSearchDropdown(true);
-            }}
-            className="w-full h-9 pl-8 pr-3 text-xs font-medium text-slate-900 bg-transparent border-none outline-none focus:ring-0 placeholder:text-slate-400"
-          />
-
-          {/* Autocomplete Search Dropdown */}
-          {showSearchDropdown && posSearchQuery.trim().length >= 1 && (() => {
-            const q = posSearchQuery.trim().toLowerCase();
-            const results = medicines.filter(m => !m.disabled && (
-              (m.medicine_name && m.medicine_name.toLowerCase().includes(q)) ||
-              (m.generic_name && m.generic_name.toLowerCase().includes(q)) ||
-              (m.brand && m.brand.toLowerCase().includes(q)) ||
-              (m.barcode && m.barcode.toLowerCase().includes(q)) ||
-              (m.batch_number && m.batch_number.toLowerCase().includes(q))
-            )).slice(0, 10);
-
-            return (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
-                {results.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-slate-500">
-                    No medicine catalog matches found for &quot;{posSearchQuery}&quot;. Press Alt + A to add new medicine.
-                  </div>
-                ) : (
-                  results.map((med, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => handleAddMedicineToBill(med)}
-                      className="p-2 px-3 hover:bg-amber-50/80 cursor-pointer flex items-center justify-between gap-3 transition text-xs"
-                    >
-                      <div>
-                        <div className="font-bold text-slate-900 flex items-center gap-2">
-                          <span>{med.medicine_name}</span>
-                          {med.strength && med.strength !== "-" && (
-                            <span className="text-[10px] text-slate-500 font-normal">({med.strength})</span>
-                          )}
-                          <span className="text-[9px] font-mono bg-slate-100 text-slate-600 px-1 py-0.2 rounded border">
-                            Batch: {med.batch_number || "BT-01"}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {med.generic_name ? `Generic: ${med.generic_name}` : med.category || "Regular"} • Exp: {med.expiry_date || "12/2027"} • Rack: {med.rack_location || "A-01"}
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0 flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          (med.stock || 0) > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}>
-                          {(med.stock || 0) > 0 ? `${med.stock} in stock` : "0 stock"}
-                        </span>
-                        <div>
-                          <div className="font-mono font-bold text-slate-900 text-xs">
-                            ₹{Number(med.selling_price || med.mrp || 25).toFixed(2)}
-                          </div>
-                          <div className="text-[9px] text-slate-400 line-through">
-                            MRP ₹{Number(med.mrp || 30).toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            );
-          })()}
-
-          {posSearchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setPosSearchQuery("");
-                setShowSearchDropdown(false);
-              }}
-              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -1909,6 +2176,395 @@ export default function PharmacyPOSView({
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. View Bills & Invoices History Modal */}
+      <Dialog open={showViewBillsModal} onOpenChange={setShowViewBillsModal}>
+        <DialogContent className="max-w-5xl w-full max-h-[88vh] flex flex-col p-5 bg-white rounded-xl border border-slate-300 shadow-2xl overflow-hidden">
+          <DialogHeader className="shrink-0 pb-3 border-b border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
+                    Pharmacy Bills &amp; Invoice Register
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Track settled, unpaid, and central billing invoices • Settle outstanding bills • Reprint receipts
+                  </DialogDescription>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportBillsToCSV}
+                  className="h-8 text-xs font-semibold gap-1 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export CSV
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={loadSavedBills}
+                  className="h-8 text-xs font-semibold gap-1 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  title="Refresh Bills"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {(() => {
+            const allBills = savedBillsList;
+            const settledBills = allBills.filter(b => b.paymentStatus === "Paid" || (b.isPaidAtPharmacy && b.paymentStatus !== "Unpaid"));
+            const unpaidBills = allBills.filter(b => b.paymentStatus === "Unpaid");
+            const centralBills = allBills.filter(b => b.paymentStatus === "ForwardedToBilling");
+
+            const settledTotal = settledBills.reduce((acc, b) => acc + Number(b.totalVal || 0), 0);
+            const unpaidTotal = unpaidBills.reduce((acc, b) => acc + Number(b.totalVal || 0), 0);
+            const centralTotal = centralBills.reduce((acc, b) => acc + Number(b.totalVal || 0), 0);
+
+            // Filter by selected tab
+            let listToDisplay = allBills;
+            if (billsFilterStatus === "PAID") {
+              listToDisplay = settledBills;
+            } else if (billsFilterStatus === "UNPAID") {
+              listToDisplay = unpaidBills;
+            } else if (billsFilterStatus === "CENTRAL BILLING") {
+              listToDisplay = centralBills;
+            }
+
+            // Search filter
+            if (billsSearchQuery.trim()) {
+              const q = billsSearchQuery.trim().toLowerCase();
+              listToDisplay = listToDisplay.filter(b =>
+                (b.invoiceNumber && b.invoiceNumber.toLowerCase().includes(q)) ||
+                (b.patientName && b.patientName.toLowerCase().includes(q)) ||
+                (b.patientMobile && b.patientMobile.toLowerCase().includes(q)) ||
+                (b.patientUHID && b.patientUHID.toLowerCase().includes(q)) ||
+                (b.doctorName && b.doctorName.toLowerCase().includes(q)) ||
+                (b.items && b.items.some(i => i.medicine_name && i.medicine_name.toLowerCase().includes(q)))
+              );
+            }
+
+            return (
+              <div className="flex-1 min-h-0 flex flex-col gap-3 pt-3 overflow-hidden">
+                {/* 1. Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 shrink-0">
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Total Invoices</span>
+                    <div className="text-lg font-bold text-slate-900 font-mono mt-0.5">{allBills.length}</div>
+                    <span className="text-[10px] text-slate-400">All registered bills</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-emerald-800">Settled (Paid)</span>
+                      <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono">
+                        {settledBills.length}
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-emerald-900 font-mono mt-0.5">
+                      ₹{settledTotal.toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-emerald-700">Collected at counter</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-rose-50/70 border border-rose-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-rose-800">Unpaid (Payment Due)</span>
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded font-mono">
+                        {unpaidBills.length}
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-rose-900 font-mono mt-0.5">
+                      ₹{unpaidTotal.toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-rose-700">Outstanding payment</span>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold text-amber-800">Central Billing</span>
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-mono">
+                        {centralBills.length}
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-amber-900 font-mono mt-0.5">
+                      ₹{centralTotal.toFixed(2)}
+                    </div>
+                    <span className="text-[10px] text-amber-700">Due at cashier desk</span>
+                  </div>
+                </div>
+
+                {/* 2. Filter Tabs & Search Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 shrink-0 bg-slate-100/80 p-1.5 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-1">
+                    {[
+                      { id: "ALL", label: `All Bills (${allBills.length})` },
+                      { id: "PAID", label: `Settled (${settledBills.length})` },
+                      { id: "UNPAID", label: `Unpaid (${unpaidBills.length})` },
+                      { id: "CENTRAL BILLING", label: `Central Billing (${centralBills.length})` }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setBillsFilterStatus(tab.id)}
+                        className={`px-2.5 py-1 rounded text-xs font-bold transition cursor-pointer ${
+                          billsFilterStatus === tab.id
+                            ? "bg-slate-900 text-white shadow-2xs"
+                            : "bg-white text-slate-700 hover:bg-slate-200 border border-slate-300"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative w-64">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search bills, patients, doctor..."
+                      value={billsSearchQuery}
+                      onChange={(e) => setBillsSearchQuery(e.target.value)}
+                      className="w-full h-8 pl-8 pr-7 text-xs bg-white rounded-md border border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-400 placeholder:text-slate-400"
+                    />
+                    {billsSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setBillsSearchQuery("")}
+                        className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Bills Table */}
+                <div className="flex-1 min-h-0 border border-slate-200 rounded-lg overflow-y-auto bg-white shadow-2xs">
+                  {listToDisplay.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-10 text-center text-slate-400">
+                      <Receipt className="w-8 h-8 text-slate-300 mb-2 stroke-1" />
+                      <p className="text-xs font-semibold text-slate-600">No pharmacy bills found</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {billsSearchQuery ? "Try refining your search keyword." : "Save a bill from the counter to view it here."}
+                      </p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider z-10">
+                        <tr>
+                          <th className="py-2 px-3">Date / Time</th>
+                          <th className="py-2 px-3">Invoice No</th>
+                          <th className="py-2 px-3">Patient Info</th>
+                          <th className="py-2 px-3">Doctor</th>
+                          <th className="py-2 px-3">Items Summary</th>
+                          <th className="py-2 px-3 text-right">Total (₹)</th>
+                          <th className="py-2 px-3 text-center">Status</th>
+                          <th className="py-2 px-3 text-center">Mode</th>
+                          <th className="py-2 px-3 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {listToDisplay.map((bill, bIdx) => {
+                          const isPaid = bill.paymentStatus === "Paid" || (bill.isPaidAtPharmacy && bill.paymentStatus !== "Unpaid");
+                          const isForwarded = bill.paymentStatus === "ForwardedToBilling";
+                          const isUnpaid = !isPaid && !isForwarded;
+                          const itemsCount = (bill.items || []).length;
+                          const itemsPreview = (bill.items || [])
+                            .slice(0, 2)
+                            .map(i => `${i.medicine_name} (×${i.dispensed_qty || i.qty || 1})`)
+                            .join(", ");
+                          const hasMoreItems = itemsCount > 2;
+
+                          return (
+                            <tr key={bill.invoiceNumber || bIdx} className="hover:bg-slate-50/80 transition">
+                              <td className="py-2 px-3 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                                {bill.date || "Today"}
+                              </td>
+                              <td className="py-2 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                {bill.invoiceNumber}
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="font-semibold text-slate-900 flex items-center gap-1">
+                                  <User className="w-3 h-3 text-slate-400" />
+                                  <span>{bill.patientName || "Walk-in Customer"}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-mono">
+                                  {bill.patientMobile ? `Mob: ${bill.patientMobile}` : bill.patientUHID ? `ID: ${bill.patientUHID}` : "Counter Sale"}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-slate-600 text-[11px]">
+                                {bill.doctorName && !bill.doctorName.toLowerCase().includes("walk-in") && !bill.doctorName.toLowerCase().includes("otc") ? (
+                                  <span className="flex items-center gap-1 text-slate-800">
+                                    <Stethoscope className="w-3 h-3 text-blue-500" />
+                                    {bill.doctorName}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic">OTC / Walk-in</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-[11px] text-slate-600 max-w-[220px]">
+                                <span className="line-clamp-1">
+                                  {itemsPreview || "Medicines"}
+                                  {hasMoreItems && <span className="text-[10px] text-slate-400 font-bold ml-1">+{itemsCount - 2} more</span>}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                                ₹{Number(bill.totalVal || 0).toFixed(2)}
+                              </td>
+                              <td className="py-2 px-3 text-center whitespace-nowrap">
+                                {isPaid ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                    SETTLED (PAID)
+                                  </span>
+                                ) : isForwarded ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    CENTRAL BILLING
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <AlertCircle className="w-3 h-3 text-rose-600" />
+                                    UNPAID (DUE)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-center text-[10px] font-semibold text-slate-600 whitespace-nowrap">
+                                {bill.paymentMethod || bill.paymentMode || "Cash"}
+                              </td>
+                              <td className="py-2 px-3 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => printPharmacyInvoiceReceipt(bill)}
+                                    className="h-6 px-2 text-[10px] font-semibold flex items-center gap-1 text-slate-700 hover:bg-slate-100 border-slate-300 cursor-pointer"
+                                    title="Print / View Receipt"
+                                  >
+                                    <Printer className="w-3 h-3 text-slate-500" />
+                                    Receipt
+                                  </Button>
+
+                                  {!isPaid && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setSettlingBill(bill);
+                                        setSettlePaymentMode("Cash");
+                                      }}
+                                      className="h-6 px-2 text-[10px] font-bold flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                                      title="Collect Payment & Settle Bill"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      Settle
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* 6. Settle Bill Confirmation Modal */}
+      <Dialog open={Boolean(settlingBill)} onOpenChange={(open) => { if (!open) setSettlingBill(null); }}>
+        <DialogContent className="max-w-md bg-white p-5 rounded-xl border border-slate-300 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              Settle Pharmacy Bill
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Collect payment and mark this bill as settled and paid.
+            </DialogDescription>
+          </DialogHeader>
+
+          {settlingBill && (
+            <div className="space-y-3.5 pt-2 text-xs">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Invoice Number:</span>
+                  <span className="font-mono font-bold text-slate-900">{settlingBill.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Patient Name:</span>
+                  <span className="font-semibold text-slate-900">{settlingBill.patientName || "Walk-in"}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Current Status:</span>
+                  <span className="font-bold text-rose-600 font-mono">
+                    {settlingBill.paymentStatus === "ForwardedToBilling" ? "Central Billing" : "Payment Due (Unpaid)"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                  <span className="text-xs font-bold text-slate-700">Total Due Amount:</span>
+                  <span className="text-base font-bold text-emerald-700 font-mono">
+                    ₹{Number(settlingBill.totalVal || 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700">Select Collection Payment Method</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Cash", "UPI", "Credit/Debit Card", "Net Banking"].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSettlePaymentMode(mode)}
+                      className={`p-2 rounded-lg border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                        settlePaymentMode === mode
+                          ? "bg-emerald-600 text-white border-emerald-700 shadow-xs"
+                          : "bg-white text-slate-700 hover:bg-slate-50 border-slate-300"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSettlingBill(null)}
+                  className="flex-1 h-9 text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleConfirmSettleBill(settlingBill, settlePaymentMode)}
+                  className="flex-1 h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                >
+                  Confirm &amp; Settle (₹{Number(settlingBill.totalVal || 0).toFixed(2)})
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
