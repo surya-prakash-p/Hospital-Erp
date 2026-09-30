@@ -4048,7 +4048,7 @@ export default function PharmacyPage() {
   ]);
 
   return (
-    <div className="flex flex-col justify-between w-full h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] overflow-hidden font-sans text-slate-800 antialiased select-none -my-3 -mx-2 md:-mx-4 px-2 md:px-4">
+    <div className="flex flex-col justify-between w-full h-screen max-h-screen overflow-hidden font-sans text-slate-800 antialiased select-none p-2 sm:p-2.5">
       
       {/* Toast Alert System */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">

@@ -279,21 +279,25 @@ export function AppSidebar() {
         className="hidden md:flex fixed top-0 left-0 bottom-0 z-30 flex-col border-r border-slate-200 bg-white shadow-2xs overflow-hidden select-none"
       >
         {/* Top Header with Brand and Toggle Button */}
-        <div className="h-14 border-b border-slate-200 px-3 flex items-center justify-between shrink-0 bg-slate-50/40">
-          {/* Logo & Branding */}
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 min-w-0 overflow-hidden outline-none group"
-            title="Thangam Hospital ERP"
-          >
-            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 shadow-2xs group-hover:border-indigo-300 transition-colors">
-              <img
-                src="/thangam_logo.png"
-                alt="Thangam Hospital Logo"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            {!collapsed && (
+        <div
+          className={`h-14 border-b border-slate-200 flex items-center shrink-0 bg-slate-50/40 transition-colors ${
+            collapsed ? "justify-center px-2" : "justify-between px-3"
+          }`}
+        >
+          {/* Logo & Branding - completely hidden when collapsed */}
+          {!collapsed && (
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 min-w-0 overflow-hidden outline-none group"
+              title="Thangam Hospital ERP"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 shadow-2xs group-hover:border-indigo-300 transition-colors">
+                <img
+                  src="/thangam_logo.png"
+                  alt="Thangam Hospital Logo"
+                  className="w-full h-full object-contain"
+                />
+              </div>
               <div className="whitespace-nowrap overflow-hidden">
                 <h1 className="text-xs font-black leading-tight text-slate-900 tracking-wider font-sans">
                   THANGAM
@@ -302,20 +306,22 @@ export function AppSidebar() {
                   Hospital ERP
                 </p>
               </div>
-            )}
-          </Link>
+            </Link>
+          )}
 
-          {/* Top Sidebar Toggle Button (Icon-Only, No "Collapse" / "Expand" text) */}
+          {/* Top Sidebar Toggle Button (Icon-Only, centered when collapsed) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={toggleCollapsed}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer outline-none shrink-0"
+                className={`rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer outline-none shrink-0 ${
+                  collapsed ? "w-10 h-10 flex items-center justify-center" : "p-1.5"
+                }`}
                 aria-label={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
               >
                 {collapsed ? (
-                  <PanelLeftOpen className="w-4 h-4" />
+                  <PanelLeft className="w-5 h-5 text-slate-600" />
                 ) : (
                   <PanelLeftClose className="w-4 h-4" />
                 )}

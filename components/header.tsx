@@ -56,8 +56,8 @@ export function Header() {
     return () => clearInterval(interval);
   }, []);
 
-  // Don't render header on login page or when user is not logged in
-  if (pathname === "/login" || !user) {
+  // Don't render header on login page, pharmacy module, or when user is not logged in
+  if (pathname === "/login" || pathname?.startsWith("/pharmacy") || !user) {
     return null;
   }
 
