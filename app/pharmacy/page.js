@@ -3939,7 +3939,7 @@ export default function PharmacyPage() {
       // 19. ARROW KEYS NAVIGATION: ArrowUp / ArrowDown
       if (showSubmitDispenseModal) {
         e.preventDefault();
-        const options = ["Pay at Pharmacy Desk", "Forward to Central Billing Desk", "Outside Purchase"];
+        const options = ["Pay at Pharmacy Desk", "Outside Purchase"];
         const currentIdx = options.indexOf(selectedSubmitAction);
         const nextIdx = key === 'ArrowDown' 
           ? (currentIdx + 1) % options.length 
@@ -9147,6 +9147,7 @@ export default function PharmacyPage() {
                         >
                           <option value="Cash">Cash</option>
                           <option value="UPI">UPI / QR Code</option>
+                          <option value="Cash + UPI">Cash + UPI (Split Payment)</option>
                           <option value="Card">Credit / Debit Card</option>
                           <option value="Insurance">Insurance / TPA</option>
                           <option value="Credit">Hospital Credit</option>
@@ -9157,37 +9158,7 @@ export default function PharmacyPage() {
                 </div>
               </label>
 
-              {/* Option 2: Forward to Central Billing Desk */}
-              <label 
-                onClick={() => setSelectedSubmitAction("Forward to Central Billing Desk")}
-                className={`flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition ${
-                  selectedSubmitAction === "Forward to Central Billing Desk" 
-                    ? "bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-500/20" 
-                    : "bg-white border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="submit_dispense_action"
-                  checked={selectedSubmitAction === "Forward to Central Billing Desk"}
-                  onChange={() => setSelectedSubmitAction("Forward to Central Billing Desk")}
-                  className="mt-1 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <div className="font-bold text-slate-900 text-xs flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span>Forward to Central Billing Desk</span>
-                      <span className="bg-indigo-100 text-indigo-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Central Pay</span>
-                    </div>
-                    <kbd className="text-[10px] font-sans font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">Alt + F</kbd>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Post medicine charges to patient&apos;s central hospital account for unified payment collection at the billing counter.
-                  </p>
-                </div>
-              </label>
-
-              {/* Option 3: Outside Purchase */}
+              {/* Option 2: Outside Purchase */}
               <label 
                 onClick={() => setSelectedSubmitAction("Outside Purchase")}
                 className={`flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition ${

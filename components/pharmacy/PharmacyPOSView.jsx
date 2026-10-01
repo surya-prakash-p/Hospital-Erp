@@ -143,6 +143,16 @@ export function printPharmacyInvoiceReceipt(record) {
               <span>GRAND TOTAL (incl. GST):</span>
               <span>₹${Number(record.totalVal || 0).toFixed(2)}</span>
             </div>
+            ${record.paymentMethod === "CASH + UPI" || record.isSplitPayment ? `
+            <div class="sum-row" style="color: #475569; font-size: 10px; margin-top: 4px; padding-top: 2px; border-top: 1px dotted #cbd5e1;">
+              <span>• Cash Received:</span>
+              <span style="font-weight: 700;">₹${Number(record.splitCash || 0).toFixed(2)}</span>
+            </div>
+            <div class="sum-row" style="color: #475569; font-size: 10px;">
+              <span>• UPI Received:</span>
+              <span style="font-weight: 700;">₹${Number(record.splitUpi || 0).toFixed(2)}</span>
+            </div>
+            ` : ''}
             ${isUnpaid ? `
             <div class="sum-row" style="color: #64748b; font-size: 10px;">
               <span>Amount Received:</span>
@@ -253,7 +263,9 @@ export default function PharmacyPOSView({
   const [remarks, setRemarks] = useState("");
   const [nextOrderDays, setNextOrderDays] = useState(30);
   const [paymentMode, setPaymentMode] = useState("CASH");
-  const [billPaymentStatus, setBillPaymentStatus] = useState("UNPAID");
+  const [billPaymentStatus, setBillPaymentStatus] = useState("PAID");
+  const [splitCashAmount, setSplitCashAmount] = useState("");
+  const [splitUpiAmount, setSplitUpiAmount] = useState("");
 
   // 4. Auxiliary Modals for Action Bar
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
@@ -780,27 +792,30 @@ export default function PharmacyPOSView({
 
     try {
       const finalAmt = tableCalculations.grandTotal;
-      const isCentralBilling = paymentMode === "CENTRAL BILLING" || billPaymentStatus === "CENTRAL BILLING";
 
       // Determine effective payment status:
       // - "Collect & Dispense" (Alt+C) OR manual "PAID" selection -> Paid
-      // - "CENTRAL BILLING" -> ForwardedToBilling
-      // - Default Save Bill / Print & Save -> Unpaid (Payment Due)
+      // - Default Save Bill / Print & Save -> Unpaid (Payment Due) if not PAID
       let effectivePaymentStatus = "Unpaid";
       if (isCollectAndDispense || billPaymentStatus === "PAID") {
         effectivePaymentStatus = "Paid";
-      } else if (isCentralBilling) {
-        effectivePaymentStatus = "ForwardedToBilling";
       } else {
         effectivePaymentStatus = "Unpaid";
       }
 
       const isPaid = effectivePaymentStatus === "Paid";
-      const isForwarded = effectivePaymentStatus === "ForwardedToBilling";
       const invoiceNo = invoiceNumber || `INV-${Date.now()}`;
       const pName = patientName || "Walk-in Customer";
       const pMobile = patientMobile || "";
       const doc = (isHospitalPrescription && doctorName && doctorName.trim()) ? doctorName.trim() : "";
+
+      // Handle split payment amounts
+      const isSplit = paymentMode === "SPLIT";
+      const cashVal = isSplit ? (parseFloat(splitCashAmount) || 0) : (paymentMode === "CASH" ? finalAmt : 0);
+      const upiVal = isSplit ? (parseFloat(splitUpiAmount) || 0) : (paymentMode === "UPI / QR" ? finalAmt : 0);
+      const paymentMethodLabel = isSplit 
+        ? `CASH + UPI (Cash: ₹${cashVal.toFixed(2)}, UPI: ₹${upiVal.toFixed(2)})` 
+        : paymentMode;
 
       // Convert items to hospital service format
       const formattedDispenseItems = billingItems.map(item => ({
@@ -823,7 +838,7 @@ export default function PharmacyPOSView({
           appointment_status: isPaid ? "Completed" : "Billing",
           bill_amount: (selectedWalkIn.bill_amount || 0) + (isPaid ? 0 : finalAmt),
           pharmacy_bill_amount: finalAmt,
-          pharmacy_payment_status: isPaid ? "Paid" : isForwarded ? "ForwardedToBilling" : "Pending",
+          pharmacy_payment_status: isPaid ? "Paid" : "Pending",
           pharmacy_paid_amount: isPaid ? finalAmt : 0,
           pharmacy_due_amount: isPaid ? 0 : finalAmt,
           dispensed_medicines: formattedDispenseItems
@@ -833,14 +848,14 @@ export default function PharmacyPOSView({
         saveInvoiceToProfile?.(selectedWalkIn.mobile_number || pMobile, {
           name: `Pharmacy Bill ${invoiceNo} - ${formattedDispenseItems.map(i => `${i.medicine_name} (x${i.qty})`).join(", ")}`,
           bill_amount: finalAmt,
-          payment_method: isPaid ? paymentMode : isForwarded ? "Pending at Central Billing" : "Payment Due (Unpaid)",
+          payment_method: isPaid ? paymentMethodLabel : "Payment Due (Unpaid)",
           walkinData: {
             name: selectedWalkIn.name,
             patient_name: pName,
             mobile_number: pMobile,
             doctor: doc,
             pharmacy_bill_amount: finalAmt,
-            pharmacy_payment_status: isPaid ? "Paid" : isForwarded ? "ForwardedToBilling" : "Pending",
+            pharmacy_payment_status: isPaid ? "Paid" : "Pending",
             pharmacy_paid_amount: isPaid ? finalAmt : 0,
             dispensed_medicines: formattedDispenseItems
           }
@@ -859,7 +874,7 @@ export default function PharmacyPOSView({
           department: "Pharmacy",
           description: `Pharmacy POS Bill (${formattedDispenseItems.map(i => i.medicine_name).join(", ")})`,
           amount: finalAmt,
-          method: paymentMode,
+          method: paymentMethodLabel,
           date: new Date().toISOString().split("T")[0],
           status: "Paid"
         });
@@ -871,9 +886,9 @@ export default function PharmacyPOSView({
           type: "Income",
           category: "Pharmacy Income",
           amount: finalAmt,
-          method: paymentMode,
+          method: paymentMethodLabel,
           date: new Date().toISOString().split("T")[0],
-          notes: `Invoice: ${invoiceNo} | Payment: ${paymentMode}${doc ? ` | Doctor: ${doc}` : ''} | Items: ${formattedDispenseItems.map(i => `${i.medicine_name} ×${i.qty}`).join(", ")}`
+          notes: `Invoice: ${invoiceNo} | Payment: ${paymentMethodLabel}${doc ? ` | Doctor: ${doc}` : ''} | Items: ${formattedDispenseItems.map(i => `${i.medicine_name} ×${i.qty}`).join(", ")}`
         };
         recordFinanceTransaction?.(rxTx).catch(() => null);
       }
@@ -882,7 +897,7 @@ export default function PharmacyPOSView({
       await createPharmacyAuditLog?.({
         action: isCollectAndDispense ? "Collect & Dispense" : isPaid ? "POS Sale (Paid)" : "POS Bill (Unpaid)",
         patient: pName,
-        details: `Invoice: ${invoiceNo} | Total: ₹${finalAmt.toFixed(2)} | Status: ${effectivePaymentStatus} | Method: ${paymentMode}${doc ? ` | Doctor: ${doc}` : ''}`,
+        details: `Invoice: ${invoiceNo} | Total: ₹${finalAmt.toFixed(2)} | Status: ${effectivePaymentStatus} | Method: ${paymentMethodLabel}${doc ? ` | Doctor: ${doc}` : ''}`,
         performed_by: pharmacistName
       }).catch(() => null);
 
@@ -909,8 +924,11 @@ export default function PharmacyPOSView({
         discountAmount: tableCalculations.billDiscountAmount,
         netGst: tableCalculations.totalGst,
         paymentStatus: effectivePaymentStatus,
-        paymentMethod: isPaid ? paymentMode : isForwarded ? "Pending at Central Billing" : "Payment Due (Unpaid)",
-        paymentMode: isPaid ? "Paid at Pharmacy Counter" : isForwarded ? "Forwarded to Central Billing" : "Payment Due (Unpaid Bill)",
+        paymentMethod: isPaid ? (isSplit ? "CASH + UPI" : paymentMode) : "Payment Due (Unpaid)",
+        paymentMode: isPaid ? (isSplit ? "Cash + UPI Split Payment" : "Paid at Pharmacy Counter") : "Payment Due (Unpaid Bill)",
+        isSplitPayment: isSplit,
+        splitCash: cashVal,
+        splitUpi: upiVal,
         isPaidAtPharmacy: isPaid,
         pharmacistName: pharmacistName,
         date: new Date().toLocaleString("en-IN")
@@ -934,8 +952,6 @@ export default function PharmacyPOSView({
 
       if (isPaid) {
         showToast?.(`Payment Collected & Bill Saved! Invoice: ${invoiceNo}`, "success");
-      } else if (isForwarded) {
-        showToast?.(`Bill Forwarded to Central Billing! Invoice: ${invoiceNo}`, "info");
       } else {
         showToast?.(`Bill Generated (Payment Due)! Invoice: ${invoiceNo}`, "success");
       }
@@ -949,7 +965,10 @@ export default function PharmacyPOSView({
       setIsHospitalPrescription(false);
       setBillDiscountPct(0);
       setRemarks("");
-      setBillPaymentStatus("UNPAID");
+      setBillPaymentStatus("PAID");
+      setPaymentMode("CASH");
+      setSplitCashAmount("");
+      setSplitUpiAmount("");
       onClearWalkIn?.();
       
       // Auto-generate fresh next invoice number
@@ -1950,18 +1969,21 @@ export default function PharmacyPOSView({
             <select
               value={paymentMode}
               onChange={(e) => {
-                setPaymentMode(e.target.value);
-                if (e.target.value === "CENTRAL BILLING") {
-                  setBillPaymentStatus("CENTRAL BILLING");
+                const newMode = e.target.value;
+                setPaymentMode(newMode);
+                if (newMode === "SPLIT") {
+                  const half = Math.round(tableCalculations.grandTotal / 2);
+                  setSplitCashAmount(String(half));
+                  setSplitUpiAmount(String(tableCalculations.grandTotal - half));
                 }
               }}
               className="w-full h-8 px-2 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
             >
               <option value="CASH">CASH</option>
               <option value="UPI / QR">UPI / QR (Instant)</option>
+              <option value="SPLIT">CASH + UPI (Split Payment)</option>
               <option value="CARD">CREDIT / DEBIT CARD</option>
               <option value="CREDIT">HOSPITAL CREDIT / IPD</option>
-              <option value="CENTRAL BILLING">FORWARD TO CENTRAL BILLING</option>
             </select>
           </div>
 
@@ -1974,17 +1996,62 @@ export default function PharmacyPOSView({
               className={`w-full h-8 px-2 text-xs font-bold rounded border transition-colors ${
                 billPaymentStatus === "PAID"
                   ? "bg-emerald-50 text-emerald-800 border-emerald-300 font-extrabold"
-                  : billPaymentStatus === "CENTRAL BILLING"
-                  ? "bg-amber-50 text-amber-800 border-amber-300 font-extrabold"
                   : "bg-rose-50 text-rose-800 border-rose-300 font-extrabold"
               }`}
             >
-              <option value="UNPAID">UNPAID (Payment Due)</option>
               <option value="PAID">PAID (Cash/UPI Received)</option>
-              <option value="CENTRAL BILLING">CENTRAL BILLING (Due at Desk)</option>
+              <option value="UNPAID">UNPAID (Payment Due)</option>
             </select>
           </div>
         </div>
+
+        {/* Dynamic Split Payment Breakdown if SPLIT is selected */}
+        {paymentMode === "SPLIT" && (
+          <div className="mt-2 p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-lg flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-extrabold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Split Breakdown (Total: ₹{tableCalculations.grandTotal.toFixed(2)}):</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] font-bold text-slate-700">Cash ₹</label>
+              <input
+                type="number"
+                min="0"
+                max={tableCalculations.grandTotal}
+                value={splitCashAmount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSplitCashAmount(val);
+                  const num = parseFloat(val) || 0;
+                  const rem = Math.max(0, tableCalculations.grandTotal - num);
+                  setSplitUpiAmount(String(rem));
+                }}
+                className="w-24 h-7 px-2 text-xs font-bold font-mono bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                placeholder="0"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-[10px] font-bold text-slate-700">UPI ₹</label>
+              <input
+                type="number"
+                min="0"
+                max={tableCalculations.grandTotal}
+                value={splitUpiAmount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSplitUpiAmount(val);
+                  const num = parseFloat(val) || 0;
+                  const rem = Math.max(0, tableCalculations.grandTotal - num);
+                  setSplitCashAmount(String(rem));
+                }}
+                className="w-24 h-7 px-2 text-xs font-bold font-mono bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                placeholder="0"
+              />
+            </div>
+            <span className="text-[10px] text-indigo-700 font-semibold ml-auto">
+              Sum: ₹{((parseFloat(splitCashAmount) || 0) + (parseFloat(splitUpiAmount) || 0)).toFixed(2)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
