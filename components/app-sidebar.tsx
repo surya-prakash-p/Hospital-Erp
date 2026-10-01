@@ -318,7 +318,7 @@ export function AppSidebar() {
                 className={`rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer outline-none shrink-0 ${
                   collapsed ? "w-10 h-10 flex items-center justify-center" : "p-1.5"
                 }`}
-                aria-label={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+                aria-label={collapsed ? "Expand sidebar (Ctrl+\\)" : "Collapse sidebar (Ctrl+\\)"}
               >
                 {collapsed ? (
                   <PanelLeft className="w-5 h-5 text-slate-600" />
@@ -328,7 +328,7 @@ export function AppSidebar() {
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={12} className="text-xs font-semibold">
-              {collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+              {collapsed ? "Expand sidebar (Ctrl+\\)" : "Collapse sidebar (Ctrl+\\)"}
             </TooltipContent>
           </Tooltip>
         </div>

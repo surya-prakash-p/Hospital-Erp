@@ -45,10 +45,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setMobileOpen((prev) => !prev);
   };
 
-  // Keyboard shortcut Ctrl+B or Cmd+B to toggle sidebar
+  // Keyboard shortcut Ctrl+\ or Cmd+\ to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "\\" || e.code === "Backslash")) {
         const target = e.target as HTMLElement;
         const isInput =
           target &&

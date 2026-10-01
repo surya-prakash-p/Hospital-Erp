@@ -3759,21 +3759,11 @@ export default function PharmacyPage() {
         }
       }
 
-      // 4. Focus Medicine Search (Alt + S OR '/' when not inside input)
-      if ((isAlt && (key.toLowerCase() === 's' || key === 's')) || (key === '/' && !isInput)) {
+      // 4. Focus Search inside Dispense Workdesk modal ('/' when not inside input)
+      if (key === '/' && !isInput && showDispenseWorkdeskModal) {
         e.preventDefault();
-        if (showDispenseWorkdeskModal) {
-          workdeskSearchInputRef.current?.focus();
-          workdeskSearchInputRef.current?.select();
-        } else {
-          if (activeTab !== 'inventory') {
-            handleTabChange('inventory');
-          }
-          setTimeout(() => {
-            inventorySearchInputRef.current?.focus();
-            inventorySearchInputRef.current?.select();
-          }, 50);
-        }
+        workdeskSearchInputRef.current?.focus();
+        workdeskSearchInputRef.current?.select();
         return;
       }
 
@@ -4705,7 +4695,7 @@ export default function PharmacyPage() {
                 <input
                   ref={inventorySearchInputRef}
                   type="text"
-                  placeholder="Search medicine... (Alt + S)"
+                  placeholder="Search medicine..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-8 pl-8 pr-2.5 text-xs font-medium text-slate-900 bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 placeholder:text-slate-400"
@@ -8761,7 +8751,7 @@ export default function PharmacyPage() {
                     </Label>
                     <Input
                       ref={workdeskSearchInputRef}
-                      placeholder="Type medicine name, generic name, or barcode... (Alt + S)"
+                      placeholder="Type medicine name, generic name, or barcode..."
                       value={customAddMedName}
                       onChange={(e) => {
                         setCustomAddMedName(e.target.value);

@@ -249,6 +249,28 @@ export default function PharmacyPOSView({
   const [billingItems, setBillingItems] = useState([]);
   const [selectedRowIndex, setSelectedRowIndex] = useState(-1);
 
+  // Default focus to pharmacy search input when mounted
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Return focus to pharmacy search bar if user clicks on empty page / no active input or button touched
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      const target = e.target;
+      if (!target) return;
+      const interactiveEl = target.closest("input, select, textarea, button, [role='button'], a, [contenteditable='true'], .dialog-content");
+      if (!interactiveEl) {
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, []);
+
   // 3. Patient & Doctor Details State (Walk-In has no doctor; Hospital Prescription has doctor)
   const [patientName, setPatientName] = useState("Walk-in Customer");
   const [patientMobile, setPatientMobile] = useState("");
@@ -1212,8 +1234,8 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Ctrl + Enter or Ctrl + S -> Save Bill Primary Action
-      if (isCtrlOrMeta && (key === 'Enter' || key.toLowerCase() === 's')) {
+      // Ctrl + Enter -> Save Bill Primary Action
+      if (isCtrlOrMeta && key === 'Enter') {
         e.preventDefault();
         handleMasterSaveBill();
         return;
