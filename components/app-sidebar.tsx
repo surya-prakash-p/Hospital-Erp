@@ -199,15 +199,15 @@ export function AppSidebar() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-60 rounded-xl p-1.5 shadow-xl border border-slate-200 bg-white z-[100]"
+        className="w-56 rounded-xl p-1 shadow-xl border border-slate-200 bg-white z-[100]"
         align={!isMobileView && collapsed ? "start" : "end"}
         side={!isMobileView && collapsed ? "right" : "top"}
         sideOffset={8}
       >
-        <DropdownMenuLabel className="px-3 py-2 text-xs font-semibold text-slate-900 border-b border-slate-100 mb-1">
-          <div className="font-bold text-slate-900 text-sm leading-tight truncate">{displayName}</div>
-          <div className="text-[11px] font-normal text-slate-500 mt-0.5 truncate">{user?.email || "user@thangamhospital.com"}</div>
-          <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+        <DropdownMenuLabel className="px-2.5 py-1.5 border-b border-slate-100 mb-0.5 font-normal">
+          <div className="font-semibold text-slate-900 text-[14px] leading-tight truncate">{displayName}</div>
+          <div className="text-[12px] font-normal text-slate-500 mt-0.5 truncate">{user?.email || "user@thangamhospital.com"}</div>
+          <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 leading-tight">
             {displayRole}
           </span>
         </DropdownMenuLabel>
@@ -218,7 +218,7 @@ export function AppSidebar() {
               if (isMobileView) setMobileOpen(false);
               router.push("/admin-dashboard");
             }}
-            className="flex items-center gap-2.5 px-3 py-2 text-xs text-indigo-950 font-semibold hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-indigo-950 font-medium hover:bg-indigo-50 hover:text-indigo-700 rounded-lg cursor-pointer transition-colors"
           >
             <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>Admin Dashboard</span>
@@ -231,7 +231,7 @@ export function AppSidebar() {
               if (isMobileView) setMobileOpen(false);
               router.push("/audit-logs");
             }}
-            className="flex items-center gap-2.5 px-3 py-2 text-xs text-slate-800 font-semibold hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-slate-800 font-medium hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
           >
             <Activity className="w-4 h-4 text-slate-600 shrink-0" />
             <span>Audit &amp; Access Logs</span>
@@ -243,20 +243,20 @@ export function AppSidebar() {
             if (isMobileView) setMobileOpen(false);
             setIsProfileModalOpen(true);
           }}
-          className="flex items-center gap-2.5 px-3 py-2 text-xs text-slate-800 font-semibold hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+          className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-slate-800 font-medium hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
         >
           <UserIcon className="w-4 h-4 text-slate-600 shrink-0" />
           <span>Account &amp; Profile Details</span>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className="my-1 border-slate-100" />
+        <DropdownMenuSeparator className="my-0.5 border-slate-100" />
 
         <DropdownMenuItem
           onClick={() => {
             if (isMobileView) setMobileOpen(false);
             logout();
           }}
-          className="flex items-center gap-2.5 px-3 py-2 text-xs text-rose-600 font-bold hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer transition-colors"
+          className="flex items-center gap-2.5 px-2.5 py-2 text-[13px] text-rose-600 font-semibold hover:bg-rose-50 hover:text-rose-700 rounded-lg cursor-pointer transition-colors"
         >
           <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
           <span>Logout</span>

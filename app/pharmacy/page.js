@@ -8,7 +8,7 @@ import {
   PlusCircle, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Calendar,
   ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw,
-  Keyboard, Package, ShieldCheck
+  Package, ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -3560,13 +3560,6 @@ export default function PharmacyPage() {
       const isCtrlOrMeta = e.ctrlKey || e.metaKey;
       const key = e.key;
 
-      // 1. Shift + / or '?' -> Open Keyboard Shortcuts Cheat Sheet
-      if ((key === '?' || (e.shiftKey && key === '/')) && !isInput) {
-        e.preventDefault();
-        setShowShortcutsModal(prev => !prev);
-        return;
-      }
-
       // 2. Escape -> Close active modal / clear search where appropriate
       if (key === 'Escape') {
         if (showShortcutsModal) {
@@ -4651,7 +4644,7 @@ export default function PharmacyPage() {
           />
         </TabsContent>
 
-        <TabsContent value="inventory" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
+        <TabsContent value="inventory" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -4843,20 +4836,20 @@ export default function PharmacyPage() {
           )}
 
           {/* High-Density Traditional Desktop Inventory ERP Table */}
-          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[360px]">
-            <div className="overflow-x-auto flex-1 pb-16">
-              <table className="w-full text-left border-collapse text-[11px] select-text">
-                <thead>
+          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
-                    <th className="py-2 px-2.5 min-w-[200px]">Medicine</th>
-                    <th className="py-2 px-2 w-28 text-center">Schedule</th>
-                    <th className="py-2 px-2 w-28 text-center font-mono">Batch No.</th>
-                    <th className="py-2 px-2 w-24 text-center">Pack Size</th>
-                    <th className="py-2 px-2 w-24 text-center font-bold">Total Units</th>
-                    <th className="py-2 px-2 w-24 text-center">Expiry</th>
-                    <th className="py-2 px-2 w-20 text-center">Rack</th>
-                    <th className="py-2 px-2 w-28 text-center">Stock Status</th>
-                    <th className="py-2 px-2 w-20 text-center">Actions</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Medicine</th>
+                    <th className="py-2.5 px-2 text-center">Schedule</th>
+                    <th className="py-2.5 px-2 text-center font-mono">Batch No.</th>
+                    <th className="py-2.5 px-2 text-center">Pack Size</th>
+                    <th className="py-2.5 px-2 text-center font-bold">Total Units</th>
+                    <th className="py-2.5 px-2 text-center">Expiry</th>
+                    <th className="py-2.5 px-2 text-center">Rack</th>
+                    <th className="py-2.5 px-2 text-center">Stock Status</th>
+                    <th className="py-2.5 px-2 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white font-medium">
@@ -4921,15 +4914,15 @@ export default function PharmacyPage() {
                       return (
                         <tr 
                           key={med.medicine_name} 
-                          className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors h-9 ${
+                          className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors ${
                             med.disabled ? "bg-slate-50/50 opacity-60" : ""
                           } ${index === selectedInvRowIndex ? "bg-indigo-50/90 ring-1 ring-indigo-500/60 ring-inset" : ""}`}
                         >
-                          <td className="py-1 px-2.5">
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-bold text-slate-900 leading-tight">{med.medicine_name}</div>
                             <div className="text-[10px] text-slate-500 mt-0.5">{med.generic_name} • {med.brand || "Generics"}</div>
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2 text-center align-middle">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                               med.category === "Schedule H" || med.category === "Schedule H1" || med.category === "Schedule X"
                                 ? "bg-rose-50 text-rose-700 border-rose-200"
@@ -4942,7 +4935,7 @@ export default function PharmacyPage() {
                               {med.category || "Regular"}
                             </span>
                           </td>
-                          <td className="py-1 px-2 text-center font-mono text-[10px]">
+                          <td className="py-2.5 px-2 text-center font-mono text-[10px] align-middle">
                             {primaryBatch ? (
                               <div className="flex items-center justify-center gap-1">
                                 <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
@@ -4962,24 +4955,24 @@ export default function PharmacyPage() {
                               <span className="text-slate-400 italic">No Batch</span>
                             )}
                           </td>
-                          <td className="py-1 px-2 text-center font-mono text-slate-600 text-[10px]">
+                          <td className="py-2.5 px-2 text-center font-mono text-slate-600 text-[10px] align-middle">
                             {primaryBatch ? `${primaryBatch.pack_size || med.pack_size || "10'S"} tabs/pack` : `${med.pack_size || "10'S"}`}
                           </td>
-                          <td className="py-1 px-2 text-center font-mono font-black text-slate-900 text-xs">
+                          <td className="py-2.5 px-2 text-center font-mono font-black text-slate-900 text-xs align-middle">
                             {med.stock ?? (primaryBatch?.current_stock || 0)}
                           </td>
-                          <td className="py-1 px-2 text-center font-mono text-[10px] text-slate-600">
+                          <td className="py-2.5 px-2 text-center font-mono text-[10px] text-slate-600 align-middle">
                             {(primaryBatch && primaryBatch.exp_date) ? primaryBatch.exp_date : (med.expiry_date || med.exp_date || "12-2028")}
                           </td>
-                          <td className="py-1 px-2 text-center text-slate-600 font-mono text-[10px]">
+                          <td className="py-2.5 px-2 text-center text-slate-600 font-mono text-[10px] align-middle">
                             {primaryBatch ? (primaryBatch.rack_location || med.rack_location || "A-1") : (med.rack_location || "A-1")}
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2 text-center align-middle">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
                               {badgeLabel}
                             </span>
                           </td>
-                          <td className="py-1 px-2 text-center relative">
+                          <td className="py-2.5 px-2 text-center relative align-middle">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -5130,7 +5123,7 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: PRESCRIPTIONS DISPENSING QUEUE
             ======================================================== */}
-        <TabsContent value="dispensing" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
+        <TabsContent value="dispensing" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -5235,21 +5228,21 @@ export default function PharmacyPage() {
           </div>
 
           {/* Prescriptions ERP Table */}
-          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[360px]">
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse text-[11px] select-text">
-                <thead>
+          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
-                    <th className="py-2 px-2 text-center w-10">#</th>
-                    <th className="py-2 px-2.5 min-w-[200px]">Patient Details</th>
-                    <th className="py-2 px-2 w-28 text-center">UHID</th>
-                    <th className="py-2 px-2.5 min-w-[140px]">Doctor</th>
-                    <th className="py-2 px-2 w-24 text-center">Items</th>
-                    <th className="py-2 px-2 w-28 text-center">Status</th>
+                    <th className="py-2.5 px-2 text-center w-10">#</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Patient Details</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center">UHID</th>
+                    <th className="py-2.5 px-3 min-w-[140px]">Doctor</th>
+                    <th className="py-2.5 px-2.5 w-24 text-center">Items</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center">Status</th>
                     {queueFilterTab !== "Completed" && (
                       <>
-                        <th className="py-2 px-2 w-20 text-center">Action</th>
-                        <th className="py-2 px-2 w-24 text-center">Dispense</th>
+                        <th className="py-2.5 px-2.5 w-20 text-center">Action</th>
+                        <th className="py-2.5 px-2.5 w-24 text-center">Dispense</th>
                       </>
                     )}
                   </tr>
@@ -5272,14 +5265,14 @@ export default function PharmacyPage() {
                       return (
                         <tr 
                           key={`${item.name}-${idx}`}
-                          className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors h-9 ${
+                          className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors ${
                             isSelected ? "bg-indigo-50/60" : ""
                           } ${idx === selectedQueueRowIndex ? "bg-indigo-50/90 ring-1 ring-indigo-500/60 ring-inset" : ""}`}
                         >
-                          <td className="py-1 px-2 text-center font-mono text-slate-400 font-semibold text-[10px]">
+                          <td className="py-2.5 px-2 text-center font-mono text-slate-400 font-semibold text-[10px] align-middle">
                             {idx + 1}
                           </td>
-                          <td className="py-1 px-2.5">
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-bold text-slate-900 leading-tight">{item.patient_name}</div>
                             <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                               <span>{item.gender || "Patient"}</span>
@@ -5287,21 +5280,21 @@ export default function PharmacyPage() {
                               <span>• Mob: {item.mobile_number || item.phone || "N/A"}</span>
                             </div>
                           </td>
-                          <td className="py-1 px-2 text-center font-mono text-[10px]">
+                          <td className="py-2.5 px-2.5 text-center font-mono text-[10px] align-middle">
                             <span className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
                               {uhid}
                             </span>
                           </td>
-                          <td className="py-1 px-2.5 text-slate-700 font-medium">
+                          <td className="py-2.5 px-3 text-slate-700 font-medium align-middle">
                             {item.doctor || "General Physician"}
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2.5 text-center align-middle">
                             <span className="font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1">
                               <Pill className="w-3 h-3 text-indigo-600" />
                               {distinctItemsCount} {distinctItemsCount === 1 ? "item" : "items"}
                             </span>
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2.5 text-center align-middle">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
                               isCompleted
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -5312,7 +5305,7 @@ export default function PharmacyPage() {
                           </td>
                           {queueFilterTab !== "Completed" && (
                             <>
-                              <td className="py-1 px-2 text-center">
+                              <td className="py-2.5 px-2.5 text-center align-middle">
                                 <button
                                   type="button"
                                   onClick={() => handleSelectQueueItem(item)}
@@ -5322,7 +5315,7 @@ export default function PharmacyPage() {
                                   <span>View</span>
                                 </button>
                               </td>
-                              <td className="py-1 px-2 text-center">
+                              <td className="py-2.5 px-2.5 text-center align-middle">
                                 <button
                                   type="button"
                                   onClick={() => handleDirectQuickDispense(item)}
@@ -5347,7 +5340,7 @@ export default function PharmacyPage() {
         {/* ========================================================
             TAB: DRUG REGISTERS
             ======================================================== */}
-        <TabsContent value="registers" className="flex-1 min-h-0 flex flex-col overflow-y-auto space-y-2 focus-visible:outline-none pr-1">
+        <TabsContent value="registers" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
           {/* Top Header Bar */}
           <div className="flex items-center justify-between bg-slate-100/90 px-3.5 py-1.5 rounded-lg border border-slate-300/80 shadow-2xs">
             <div className="flex items-center gap-2.5">
@@ -5402,20 +5395,20 @@ export default function PharmacyPage() {
           </div>
 
           {/* Compliance Records ERP Table */}
-          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[360px]">
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse text-[11px] select-text">
-                <thead>
+          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
-                    <th className="py-2 px-2.5 w-36">Date &amp; Time</th>
-                    <th className="py-2 px-2.5 min-w-[180px]">Patient Details</th>
-                    <th className="py-2 px-2.5 w-36">Prescribed By</th>
-                    <th className="py-2 px-2.5 min-w-[160px]">Medicine Name</th>
-                    <th className="py-2 px-2 w-24 text-center">Batch</th>
-                    <th className="py-2 px-2 w-16 text-center">Qty</th>
-                    <th className="py-2 px-2.5 w-32 font-mono">Invoice ID</th>
-                    <th className="py-2 px-2.5 w-28">Pharmacist</th>
-                    <th className="py-2 px-2 w-28 text-center">Actions</th>
+                    <th className="py-2.5 px-3 w-36">Date &amp; Time</th>
+                    <th className="py-2.5 px-3 min-w-[180px]">Patient Details</th>
+                    <th className="py-2.5 px-3 w-36">Prescribed By</th>
+                    <th className="py-2.5 px-3 min-w-[160px]">Medicine Name</th>
+                    <th className="py-2.5 px-2.5 w-24 text-center">Batch</th>
+                    <th className="py-2.5 px-2.5 w-16 text-center">Qty</th>
+                    <th className="py-2.5 px-3 w-32 font-mono">Invoice ID</th>
+                    <th className="py-2.5 px-3 w-28">Pharmacist</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white font-medium">
@@ -5433,25 +5426,25 @@ export default function PharmacyPage() {
                       });
                       const isReturn = Number(log.quantity) < 0 || log.doctor === "Sales Return" || (log.invoice_number && log.invoice_number.includes("RET-"));
                       return (
-                        <tr key={index} className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors h-9 ${isReturn ? "bg-rose-50/30" : ""}`}>
-                          <td className="py-1 px-2.5 font-mono text-slate-600 text-[10px]">{date}</td>
-                          <td className="py-1 px-2.5">
+                        <tr key={index} className={`hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors ${isReturn ? "bg-rose-50/30" : ""}`}>
+                          <td className="py-2.5 px-3 font-mono text-slate-600 text-[10px] align-middle">{date}</td>
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-bold text-slate-900 leading-tight">{log.patient_name}</div>
                             <div className="text-[10px] text-slate-500 font-mono mt-0.5">Mob: {log.patient_id}</div>
                           </td>
-                          <td className="py-1 px-2.5 text-slate-700 font-medium">{log.doctor}</td>
-                          <td className="py-1 px-2.5 font-bold text-slate-800">{log.medicine}</td>
-                          <td className="py-1 px-2 text-center font-mono text-slate-500 text-[10px]">{log.batch_number}</td>
-                          <td className="py-1 px-2 text-center font-mono font-bold">
+                          <td className="py-2.5 px-3 text-slate-700 font-medium align-middle">{log.doctor}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-800 align-middle">{log.medicine}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono text-slate-500 text-[10px] align-middle">{log.batch_number}</td>
+                          <td className="py-2.5 px-2.5 text-center font-mono font-bold align-middle">
                             {isReturn ? (
                               <span className="text-rose-600 font-bold">{log.quantity}</span>
                             ) : (
                               <span className="text-slate-800 font-bold">{log.quantity}</span>
                             )}
                           </td>
-                          <td className="py-1 px-2.5 font-mono text-indigo-700 font-semibold text-[10px]">{log.invoice_number}</td>
-                          <td className="py-1 px-2.5 text-slate-600 font-medium">{(log.pharmacist || log.user || "Admin").split(",")[0]}</td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-3 font-mono text-indigo-700 font-semibold text-[10px] align-middle">{log.invoice_number}</td>
+                          <td className="py-2.5 px-3 text-slate-600 font-medium align-middle">{(log.pharmacist || log.user || "Admin").split(",")[0]}</td>
+                          <td className="py-2.5 px-2.5 text-center align-middle">
                             {isReturn ? (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                                 Return Refund
@@ -5594,17 +5587,17 @@ export default function PharmacyPage() {
           </div>
 
           {/* Suggestions ERP Table */}
-          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[220px]">
-            <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse text-[11px] select-text">
-                <thead>
+          <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[260px]">
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
-                    <th className="py-2 px-2.5 min-w-[200px]">Medicine</th>
-                    <th className="py-2 px-2 w-28 text-center">Current Stock</th>
-                    <th className="py-2 px-2 w-28 text-center font-mono">Reorder Level</th>
-                    <th className="py-2 px-2 w-32 text-center">Suggested Qty</th>
-                    <th className="py-2 px-2.5 min-w-[160px]">Preferred Supplier</th>
-                    <th className="py-2 px-2.5 w-28 text-right">Est. Cost</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Medicine</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center">Current Stock</th>
+                    <th className="py-2.5 px-2.5 w-28 text-center font-mono">Reorder Level</th>
+                    <th className="py-2.5 px-2.5 w-32 text-center">Suggested Qty</th>
+                    <th className="py-2.5 px-3 min-w-[160px]">Preferred Supplier</th>
+                    <th className="py-2.5 px-3 w-28 text-right">Est. Cost</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white font-medium">
@@ -5626,18 +5619,18 @@ export default function PharmacyPage() {
                       else if (rec.current_stock <= rec.reorder_level) { stockBadgeColor = "bg-amber-50 text-amber-700 border-amber-200"; }
 
                       return (
-                        <tr key={rec.medicine} className="hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors h-9">
-                          <td className="py-1 px-2.5">
+                        <tr key={rec.medicine} className="hover:bg-amber-50/50 divide-x divide-slate-200 transition-colors">
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-bold text-slate-900 leading-tight">{rec.medicine}</div>
                             <div className="text-[10px] text-slate-500 mt-0.5">{rec.generic}</div>
                           </td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2.5 text-center align-middle">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${stockBadgeColor}`}>
                               {rec.current_stock}
                             </span>
                           </td>
-                          <td className="py-1 px-2 text-center font-mono text-slate-600 text-[10px]">{rec.reorder_level}</td>
-                          <td className="py-1 px-2 text-center">
+                          <td className="py-2.5 px-2.5 text-center font-mono text-slate-600 text-[10px] align-middle">{rec.reorder_level}</td>
+                          <td className="py-2.5 px-2.5 text-center align-middle">
                             <input
                               type="number"
                               min="0"
@@ -5649,8 +5642,8 @@ export default function PharmacyPage() {
                               }}
                             />
                           </td>
-                          <td className="py-1 px-2.5 font-medium text-slate-700">{rec.supplier}</td>
-                          <td className="py-1 px-2.5 text-right font-mono font-bold text-slate-900">
+                          <td className="py-2.5 px-3 font-medium text-slate-700 align-middle">{rec.supplier}</td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 align-middle">
                             ₹{(rec.suggested * rec.price).toLocaleString("en-IN")}
                           </td>
                         </tr>
@@ -9389,18 +9382,6 @@ export default function PharmacyPage() {
         </div>
       )}
 
-      {/* Floating Keyboard Shortcuts Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setShowShortcutsModal(true)}
-        className="fixed bottom-6 right-6 z-40 bg-slate-900 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl border border-slate-700/60 flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 group"
-        title="Keyboard Shortcuts (Press ?)"
-      >
-        <Keyboard className="w-4 h-4 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
-        <span className="text-xs font-semibold pr-1 hidden sm:inline-block">Shortcuts</span>
-        <kbd className="hidden sm:inline-block bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded border border-slate-700 font-mono">?</kbd>
-      </button>
-
       {/* Download & Export Pharmacy Reports Modal (Alt + D) */}
       {showDownloadReportsModal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -9630,169 +9611,6 @@ export default function PharmacyPage() {
                   <Download className="w-3.5 h-3.5" /> Download / Export Report
                 </Button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Keyboard Shortcuts Cheat Sheet Modal */}
-      {showShortcutsModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="p-4 px-6 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                  <Keyboard className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 font-serif">Pharmacy Keyboard Shortcuts</h3>
-                  <p className="text-[11px] text-slate-500">Fast keyboard-driven ergonomics &amp; operational hotkeys</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowShortcutsModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-              {/* Group 1: Workspace Navigation */}
-              <div>
-                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" /> Workspace Navigation
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 sm:col-span-2">
-                    <span className="text-slate-700 font-medium">Direct Tab Jump (Dashboard, Inventory, Queue, Compliance, Logistics)</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + 1-5</kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Group 2: Quick Search & Filters */}
-              <div>
-                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Search className="w-3.5 h-3.5" /> Search, Filters &amp; Reports
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Focus Medicine Search</span>
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + S</kbd>
-                      <span className="text-slate-400 text-[10px]">or</span>
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">/</kbd>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Download &amp; Export Reports Modal</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + D</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Filter Low Stock Medicines</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + L</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Filter Expiring Soon Medicines</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + E</kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Group 3: Dispensation Workdesk */}
-              <div>
-                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Pill className="w-3.5 h-3.5" /> Dispensation Workdesk
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Select Next Patient / Open Rx</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + Q</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Submit / Settle Dispensation</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Ctrl + Enter</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Collect &amp; Dispense (Pay Counter)</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + C</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Forward to Central Billing</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + F</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 sm:col-span-2">
-                    <span className="text-slate-700 font-medium">Outside Purchase (Zero Bill)</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + O</kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Group 4: Sales, Catalog & Operations */}
-              <div>
-                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <ShoppingBag className="w-3.5 h-3.5" /> Sales &amp; Operations
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Add Medicine Record</span>
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + +</kbd>
-                      <span className="text-slate-400 text-[10px]">or</span>
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + A</kbd>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Return Sold Medicine (Sales Return)</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + R</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Quick OTC Direct Sale</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + N</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Generate Bulk Purchase Orders</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Alt + P</kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Group 5: General Controls */}
-              <div>
-                <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5" /> General Controls
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Close Active Modal / Clear Search</span>
-                    <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Esc</kbd>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-700 font-medium">Open Shortcuts Cheat Sheet</span>
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">Shift + /</kbd>
-                      <span className="text-slate-400 text-[10px]">or</span>
-                      <kbd className="px-2 py-1 bg-white rounded-md border border-slate-200 text-[11px] font-mono font-bold text-slate-800 shadow-2xs">?</kbd>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-              <span className="text-[11px] text-slate-500">Shortcuts are available throughout the Pharmacy workspace.</span>
-              <Button
-                type="button"
-                onClick={() => setShowShortcutsModal(false)}
-                className="h-8.5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 cursor-pointer"
-              >
-                Got it
-              </Button>
             </div>
           </div>
         </div>

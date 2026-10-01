@@ -1462,10 +1462,10 @@ export default function PharmacyPOSView({
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           3. MEDICINE BILLING TABLE (High-Density Traditional Desktop POS Table)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[140px] max-h-[220px] lg:max-h-[250px] overflow-y-auto">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-left border-collapse text-[11px] select-text">
-            <thead>
+      <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[140px]">
+        <div className="overflow-auto flex-1 min-h-0">
+          <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+            <thead className="sticky top-0 z-10">
               <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                 <th className="py-2 px-1.5 text-center w-8">#</th>
                 <th className="py-2 px-2.5 min-w-[220px]">Product</th>
@@ -1487,9 +1487,9 @@ export default function PharmacyPOSView({
               {tableCalculations.itemsWithTotals.length === 0 ? (
                 // Blank grid rows matching reference POS empty layout
                 [...Array(6)].map((_, emptyIdx) => (
-                  <tr key={`empty-${emptyIdx}`} className="h-8 border-b border-slate-100 text-slate-300 divide-x divide-slate-100">
-                    <td className="text-center font-mono text-[10px]">{emptyIdx === 0 ? "1" : ""}</td>
-                    <td className="px-3 text-slate-400 font-normal">
+                  <tr key={`empty-${emptyIdx}`} className="border-b border-slate-100 text-slate-300 divide-x divide-slate-100">
+                    <td className="text-center font-mono text-[10px] py-2 align-middle">{emptyIdx === 0 ? "1" : ""}</td>
+                    <td className="px-3 text-slate-400 font-normal py-2 align-middle">
                       {emptyIdx === 0 ? "Search product above or press Alt + S to begin billing..." : ""}
                     </td>
                     <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
@@ -1502,17 +1502,17 @@ export default function PharmacyPOSView({
                     <tr
                       key={item.id || idx}
                       onClick={() => setSelectedRowIndex(idx)}
-                      className={`hover:bg-slate-50 divide-x divide-slate-200 transition-colors h-8 ${
+                      className={`hover:bg-slate-50 divide-x divide-slate-200 transition-colors ${
                         isSelected ? "bg-indigo-50/80 font-semibold" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                       }`}
                     >
                       {/* 1. Row Index */}
-                      <td className="py-1 px-1 text-center font-mono text-slate-500 font-semibold text-[10px]">
+                      <td className="py-1.5 px-1 text-center font-mono text-slate-500 font-semibold text-[10px] align-middle">
                         {idx + 1}
                       </td>
 
                       {/* 2. Product Name */}
-                      <td className="py-1 px-2.5">
+                      <td className="py-1.5 px-2.5 align-middle">
                         <div className="font-bold text-slate-900 leading-tight flex items-center gap-1.5 flex-wrap">
                           <span>{item.medicine_name}</span>
                           {item.strength && item.strength !== "-" && !item.medicine_name.includes(item.strength) && (

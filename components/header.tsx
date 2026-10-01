@@ -64,7 +64,7 @@ export function Header() {
   // Find matching metadata for current path
   const currentMeta = routeMetadata[pathname] || {
     title: "Thangam Hospital ERP",
-    subtitle: "Coimbatore Medical Campus",
+    subtitle: "Hospital Operations & Real-Time Performance",
     icon: Activity,
   };
   const Icon = currentMeta.icon;
@@ -93,9 +93,6 @@ export function Header() {
               <h1 className="text-xs sm:text-sm font-bold text-slate-900 leading-none truncate">
                 {currentMeta.title}
               </h1>
-              <span className="hidden lg:inline-flex items-center text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200/80 px-1.5 py-0.2 rounded-md">
-                Coimbatore Campus
-              </span>
             </div>
             <p className="hidden sm:block text-[10px] text-slate-500 font-medium leading-tight truncate mt-0.5">
               {currentMeta.subtitle}
