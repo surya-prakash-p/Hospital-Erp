@@ -4492,10 +4492,10 @@ export default function PharmacyPage() {
                   >
                     <option value="" disabled>-- Choose Medicine to Add Batch --</option>
                     {medicines
-                      .filter(m => !m.disabled && (
+                      .filter(m => m && !m.disabled && (
                         (addBatchMed && (m.name === addBatchMed.name || m.medicine_name === addBatchMed.medicine_name)) ||
                         !batchMedSearchFilter ||
-                        m.medicine_name.toLowerCase().includes(batchMedSearchFilter.toLowerCase()) ||
+                        (m.medicine_name && m.medicine_name.toLowerCase().includes(batchMedSearchFilter.toLowerCase())) ||
                         (m.generic_name && m.generic_name.toLowerCase().includes(batchMedSearchFilter.toLowerCase()))
                       ))
                       .map((m, idx) => (
@@ -4625,7 +4625,7 @@ export default function PharmacyPage() {
                       <Label htmlFor="add-batch-pur" className="text-xs font-semibold">Purchase Pr. (₹)</Label>
                       <Input 
                         id="add-batch-pur" type="number" placeholder="₹"
-                        value={newBatchData.purchase_price || addBatchMed.purchase_price || ""} 
+                        value={newBatchData.purchase_price ?? addBatchMed?.purchase_price ?? ""} 
                         onChange={(e) => setNewBatchData(p => ({ ...p, purchase_price: e.target.value }))}
                       />
                     </div>
