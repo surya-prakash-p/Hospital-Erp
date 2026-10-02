@@ -1244,7 +1244,8 @@ export default function PharmacyPOSView({
       // Ctrl + B -> Add Batch
       if (isCtrlOrMeta && key.toLowerCase() === 'b') {
         e.preventDefault();
-        onOpenAddBatch?.();
+        const currentItem = selectedRowIndex >= 0 ? billingItems[selectedRowIndex] : null;
+        onOpenAddBatch?.(currentItem);
         return;
       }
 
@@ -1747,7 +1748,10 @@ export default function PharmacyPOSView({
 
           <button
             type="button"
-            onClick={onOpenAddBatch}
+            onClick={() => {
+              const currentItem = selectedRowIndex >= 0 ? billingItems[selectedRowIndex] : null;
+              onOpenAddBatch?.(currentItem);
+            }}
             className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             <span className="bg-slate-700 text-indigo-300 text-[9px] px-1 py-0.2 rounded font-mono">Ctrl + B</span>
