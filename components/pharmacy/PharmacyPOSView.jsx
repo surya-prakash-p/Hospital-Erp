@@ -1505,7 +1505,7 @@ export default function PharmacyPOSView({
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[140px]">
         <div className="overflow-auto flex-1 min-h-0">
-          <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+          <table className="w-full text-left border-collapse text-[11px] select-text">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                 <th className="py-2 px-1.5 text-center w-8">#</th>

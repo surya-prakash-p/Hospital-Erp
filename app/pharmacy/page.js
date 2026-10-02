@@ -4828,7 +4828,7 @@ export default function PharmacyPage() {
           {/* High-Density Traditional Desktop Inventory ERP Table */}
           <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="overflow-auto flex-1 min-h-0">
-              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+              <table className="w-full text-left border-collapse text-[11px] select-text">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                     <th className="py-2.5 px-3 min-w-[200px]">Medicine</th>
@@ -5220,7 +5220,7 @@ export default function PharmacyPage() {
           {/* Prescriptions ERP Table */}
           <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="overflow-auto flex-1 min-h-0">
-              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+              <table className="w-full text-left border-collapse text-[11px] select-text">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                     <th className="py-2.5 px-2 text-center w-10">#</th>
@@ -5387,7 +5387,7 @@ export default function PharmacyPage() {
           {/* Compliance Records ERP Table */}
           <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="overflow-auto flex-1 min-h-0">
-              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+              <table className="w-full text-left border-collapse text-[11px] select-text">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                     <th className="py-2.5 px-3 w-36">Date &amp; Time</th>
@@ -5579,7 +5579,7 @@ export default function PharmacyPage() {
           {/* Suggestions ERP Table */}
           <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col min-h-[260px]">
             <div className="overflow-auto flex-1 min-h-0">
-              <table className="w-full h-full min-h-full text-left border-collapse text-[11px] select-text">
+              <table className="w-full text-left border-collapse text-[11px] select-text">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gradient-to-b from-slate-100 to-slate-200 border-b border-slate-300 text-slate-700 font-bold uppercase text-[10px] tracking-wider divide-x divide-slate-300">
                     <th className="py-2.5 px-3 min-w-[200px]">Medicine</th>
