@@ -4427,25 +4427,46 @@ export default function PharmacyPage() {
           {/* Add New Batch to Existing Medicine Dialog */}
           <Dialog open={showAddBatchModal} onOpenChange={(open) => {
             setShowAddBatchModal(open);
-            if (!open) setBatchMedSearchFilter("");
+            if (!open) {
+              setBatchMedSearchFilter("");
+              setAddBatchMed(null);
+            }
           }}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[88vh] overflow-y-auto p-4 sm:p-5">
               <DialogHeader>
                 <DialogTitle className="font-serif text-base">Add New Batch to Inventory</DialogTitle>
-                <DialogDescription className="text-xs">
+                <DialogDescription className="text-xs text-slate-500">
                   {addBatchMed ? `Registering additional batch for ${addBatchMed.medicine_name}` : "Select a medicine from catalog to add a new batch"}
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleAddBatchToExistingMedicine} className="space-y-4 pt-2">
+              <form onSubmit={handleAddBatchToExistingMedicine} className="space-y-3 pt-1">
                 {/* 1. Interactive Medicine Selector */}
-                <div className="space-y-1.5 bg-slate-50/80 p-3 rounded-lg border border-slate-200">
+                <div className="space-y-1 bg-slate-50/90 p-2.5 rounded-lg border border-slate-200">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="add-batch-med-select" className="text-xs font-bold text-slate-700">
                       Medicine *
                     </Label>
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {medicines.filter(m => !m.disabled).length} medicines available
-                    </span>
+                    {addBatchMed ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddBatchMed(null);
+                          setNewBatchData(p => ({
+                            ...p,
+                            purchase_price: "",
+                            mrp: "",
+                            rack_location: "Rack A-01"
+                          }));
+                        }}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-bold underline cursor-pointer"
+                      >
+                        Deselect Medicine
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {medicines.filter(m => !m.disabled).length} medicines available
+                      </span>
+                    )}
                   </div>
 
                   {medicines.filter(m => !m.disabled).length > 5 && (
@@ -4453,7 +4474,7 @@ export default function PharmacyPage() {
                       <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="text"
-                        placeholder="Search medicine by name or generic molecule..."
+                        placeholder="Filter medicines by name or generic..."
                         value={batchMedSearchFilter}
                         onChange={(e) => setBatchMedSearchFilter(e.target.value)}
                         className="w-full h-7 pl-8 pr-6 text-xs bg-white border border-slate-200 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -4474,8 +4495,19 @@ export default function PharmacyPage() {
                     id="add-batch-med-select"
                     value={addBatchMed?.name || addBatchMed?.medicine_name || ""}
                     onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setAddBatchMed(null);
+                        setNewBatchData(p => ({
+                          ...p,
+                          purchase_price: "",
+                          mrp: "",
+                          rack_location: "Rack A-01"
+                        }));
+                        return;
+                      }
                       const selected = medicines.find(
-                        m => (m.name === e.target.value || m.medicine_name === e.target.value)
+                        m => (m.name === val || m.medicine_name === val)
                       );
                       if (selected) {
                         setAddBatchMed(selected);
@@ -4487,10 +4519,10 @@ export default function PharmacyPage() {
                         }));
                       }
                     }}
-                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 shadow-2xs cursor-pointer"
+                    className="flex h-8.5 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 shadow-2xs cursor-pointer"
                     required
                   >
-                    <option value="" disabled>-- Choose Medicine to Add Batch --</option>
+                    <option value="">-- Choose Medicine to Add Batch --</option>
                     {medicines
                       .filter(m => m && !m.disabled && (
                         (addBatchMed && (m.name === addBatchMed.name || m.medicine_name === addBatchMed.medicine_name)) ||
@@ -4500,27 +4532,19 @@ export default function PharmacyPage() {
                       ))
                       .map((m, idx) => (
                         <option key={m.name || m.medicine_name || idx} value={m.name || m.medicine_name}>
-                          {m.medicine_name} {m.strength && m.strength !== '-' ? `(${m.strength})` : ''} — Current Stock: {m.stock || 0} ({m.generic_name || m.category || 'Medicine'})
+                          {m.medicine_name} {m.strength && m.strength !== '-' ? `(${m.strength})` : ''} — Stock: {m.stock || 0} ({m.generic_name || m.category || 'Medicine'})
                         </option>
                       ))}
                   </select>
 
-                  {/* Selected Medicine Details Display */}
+                  {/* Compact Selected Medicine Badge */}
                   {addBatchMed && (
-                    <div className="bg-white border border-slate-200 p-2 rounded text-xs font-medium text-slate-800 flex justify-between items-center mt-1.5">
-                      <div>
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                          <span>{addBatchMed.medicine_name}</span>
-                          {addBatchMed.strength && addBatchMed.strength !== '-' && (
-                            <span className="text-[10px] text-slate-500 font-normal">({addBatchMed.strength})</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-500 block">
-                          {addBatchMed.generic_name || "Generic"} • {addBatchMed.category || "Regular Medicine"}
-                        </span>
-                      </div>
-                      <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono text-[10px] font-bold">
-                        Current: {addBatchMed.stock || 0} units
+                    <div className="flex items-center justify-between text-[10.5px] bg-white border border-indigo-200 px-2 py-1 rounded text-slate-700">
+                      <span className="truncate">
+                        <strong className="text-slate-900">{addBatchMed.medicine_name}</strong> • {addBatchMed.generic_name || "Generic"}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono font-bold shrink-0">
+                        Stock: {addBatchMed.stock || 0} units
                       </span>
                     </div>
                   )}
@@ -4647,9 +4671,27 @@ export default function PharmacyPage() {
                     </div>
                   </div>
 
-                  <Button type="submit" disabled={!addBatchMed} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 text-xs">
-                    Save New Batch
-                  </Button>
+                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowAddBatchModal(false);
+                        setAddBatchMed(null);
+                        setBatchMedSearchFilter("");
+                      }}
+                      className="h-8.5 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-100 border-slate-300 cursor-pointer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!addBatchMed}
+                      className="h-8.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                    >
+                      Save New Batch
+                    </Button>
+                  </div>
                 </form>
             </DialogContent>
           </Dialog>
@@ -4700,20 +4742,17 @@ export default function PharmacyPage() {
                     (m.name && targetMed.name && m.name === targetMed.name)
                   );
                 }
-                if (!medToSet) {
-                  medToSet = selectedMedicine || medicines[0];
-                }
                 setAddBatchMed(medToSet);
                 setNewBatchData({
                   batch_number: "",
                   supplier: "ABC Pharma",
                   mfg_date: "",
                   exp_date: "",
-                  pack_size: (medToSet.batches?.[0]?.pack_size) || medToSet.pack_size || 30,
+                  pack_size: (medToSet?.batches?.[0]?.pack_size) || medToSet?.pack_size || 30,
                   no_of_packs: 10,
-                  purchase_price: medToSet.purchase_price || "",
-                  mrp: medToSet.selling_price || medToSet.mrp || "",
-                  rack_location: medToSet.rack_location || "Rack A-01",
+                  purchase_price: medToSet?.purchase_price || "",
+                  mrp: medToSet?.selling_price || medToSet?.mrp || "",
+                  rack_location: medToSet?.rack_location || "Rack A-01",
                   invoice_number: "",
                   invoice_date: ""
                 });
