@@ -1142,13 +1142,6 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Alt + A -> Add Medicine modal / focus
-      if (isAlt && (key.toLowerCase() === 'a' || key === '+')) {
-        e.preventDefault();
-        onAddNewMedicine?.();
-        return;
-      }
-
       // Alt + N -> Quick OTC / Add Service
       if (isAlt && key.toLowerCase() === 'n') {
         e.preventDefault();
@@ -1163,8 +1156,8 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Alt + P -> Patient Focus
-      if (isAlt && key.toLowerCase() === 'p') {
+      // Alt + P -> Patient Focus (isolated from Shift)
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'p') {
         e.preventDefault();
         patientInputRef.current?.focus();
         patientInputRef.current?.select();
@@ -1206,24 +1199,10 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Alt + Z -> Calculate Discount Dialog
-      if (isAlt && key.toLowerCase() === 'z') {
-        e.preventDefault();
-        setShowDiscountModal(true);
-        return;
-      }
-
       // Alt + C -> Collect & Dispense
       if (isAlt && key.toLowerCase() === 'c') {
         e.preventDefault();
         handleMasterSaveBill({ isCollectAndDispense: true });
-        return;
-      }
-
-      // Alt + E -> Prescriptions Queue
-      if (isAlt && key.toLowerCase() === 'e') {
-        e.preventDefault();
-        handleTabChange?.("dispensing");
         return;
       }
 
@@ -1238,14 +1217,6 @@ export default function PharmacyPOSView({
       if (isCtrlOrMeta && key === 'Enter') {
         e.preventDefault();
         handleMasterSaveBill();
-        return;
-      }
-
-      // Ctrl + B -> Add Batch
-      if (isCtrlOrMeta && key.toLowerCase() === 'b') {
-        e.preventDefault();
-        const currentItem = selectedRowIndex >= 0 ? billingItems[selectedRowIndex] : null;
-        onOpenAddBatch?.(currentItem);
         return;
       }
 
@@ -1440,42 +1411,6 @@ export default function PharmacyPOSView({
             <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1 rounded border border-indigo-200 font-mono">Alt + B</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              handleTabChange?.("inventory");
-              showToast?.("Switched to Inventory Low Stock View", "info");
-            }}
-            className="px-2 py-1 text-[11px] font-semibold bg-white text-indigo-700 border border-slate-300 rounded hover:bg-indigo-50 shadow-2xs flex items-center gap-1 cursor-pointer"
-          >
-            <AlertCircle className="w-3 h-3 text-indigo-600" />
-            <span>Low Stock</span>
-            <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1 rounded border border-indigo-200 font-mono">Alt + L</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              handleTabChange?.("inventory");
-              showToast?.("Switched to Inventory Expiry View", "info");
-            }}
-            className="px-2 py-1 text-[11px] font-semibold bg-white text-rose-700 border border-slate-300 rounded hover:bg-rose-50 shadow-2xs flex items-center gap-1 cursor-pointer"
-          >
-            <Calendar className="w-3 h-3 text-rose-600" />
-            <span>Expiry</span>
-            <span className="text-[9px] bg-rose-50 text-rose-600 px-1 rounded border border-rose-200 font-mono">Alt + E</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenExport}
-            className="px-2 py-1 text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 rounded hover:bg-slate-50 shadow-2xs flex items-center gap-1 cursor-pointer"
-          >
-            <FileText className="w-3 h-3 text-slate-500" />
-            <span>Export</span>
-            <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded border border-slate-200 font-mono">Alt + D</span>
-          </button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -1663,17 +1598,6 @@ export default function PharmacyPOSView({
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
-                            title="More Details (Alt + M)"
-                            onClick={() => {
-                              setDetailItemIndex(idx);
-                              setShowMoreDetailsModal(true);
-                            }}
-                            className="text-slate-400 hover:text-indigo-600 p-0.5 rounded hover:bg-slate-100"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
                             title="Delete Row (Del)"
                             onClick={() => handleDeleteRow(idx)}
                             className="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-slate-100"
@@ -1700,15 +1624,6 @@ export default function PharmacyPOSView({
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            onClick={onAddNewMedicine}
-            className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="bg-slate-700 text-indigo-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + A</span>
-            <span>+ Add Medicine</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => {
               if (selectedRowIndex >= 0) handleDeleteRow(selectedRowIndex);
               else showToast?.("Select a row in the table first to delete", "info");
@@ -1730,48 +1645,11 @@ export default function PharmacyPOSView({
 
           <button
             type="button"
-            onClick={() => setShowDiscountModal(true)}
-            className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="bg-slate-700 text-emerald-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + Z</span>
-            <span>Calculate Discount</span>
-          </button>
-
-          <button
-            type="button"
             onClick={onOpenSalesReturn}
             className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + R</span>
             <span>Return</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const currentItem = selectedRowIndex >= 0 ? billingItems[selectedRowIndex] : null;
-              onOpenAddBatch?.(currentItem);
-            }}
-            className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="bg-slate-700 text-indigo-300 text-[9px] px-1 py-0.2 rounded font-mono">Ctrl + B</span>
-            <span>Add Batch</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedRowIndex >= 0) {
-                setDetailItemIndex(selectedRowIndex);
-                setShowMoreDetailsModal(true);
-              } else {
-                showToast?.("Select a medicine row to view more details", "info");
-              }
-            }}
-            className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="bg-slate-700 text-slate-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + M</span>
-            <span>More Details</span>
           </button>
         </div>
 
@@ -2102,16 +1980,6 @@ export default function PharmacyPOSView({
           <Plus className="w-3.5 h-3.5 text-indigo-400" />
           <span>Add Service Items</span>
           <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + N</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleTabChange?.("dispensing")}
-          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
-        >
-          <FileText className="w-3.5 h-3.5 text-amber-400" />
-          <span>Prescription</span>
-          <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + E</span>
         </button>
 
         <button

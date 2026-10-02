@@ -3903,13 +3903,22 @@ export default function PharmacyPage() {
         return;
       }
 
-      // 17. Alt + P -> Generate Purchase Order
-      if (isAlt && key.toLowerCase() === 'p') {
+      // 17. Alt + Shift + P -> Generate Purchase Order (PO)
+      if (isAlt && e.shiftKey && key.toLowerCase() === 'p') {
         e.preventDefault();
         if (activeTab !== 'logistics') {
           handleTabChange('logistics');
         }
         handleBulkGeneratePOs();
+        return;
+      }
+
+      // Alt + P -> Patient Focus (switch to POS dashboard if on another tab)
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'p') {
+        if (activeTab !== 'dashboard') {
+          e.preventDefault();
+          handleTabChange('dashboard');
+        }
         return;
       }
 
@@ -4799,7 +4808,7 @@ export default function PharmacyPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
                 onClick={() => {
@@ -4812,8 +4821,61 @@ export default function PharmacyPage() {
                 className="px-2.5 py-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Item</span>
+                <span>Add Medicine</span>
                 <span className="text-[9px] bg-indigo-800 text-indigo-100 px-1 rounded font-mono">Alt + A</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextStatus = statusFilter === "Low Stock" ? "All" : "Low Stock";
+                  setStatusFilter(nextStatus);
+                  showToast(nextStatus === "Low Stock" ? "Filtered Inventory: Low Stock Items" : "Cleared Low Stock filter", "info");
+                }}
+                className={`px-2.5 py-1 text-xs font-bold rounded shadow-2xs flex items-center gap-1.5 cursor-pointer transition ${
+                  statusFilter === "Low Stock"
+                    ? "bg-amber-600 text-white shadow-inner"
+                    : "bg-white hover:bg-amber-50 text-amber-800 border border-amber-300"
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                <span>Low Stock</span>
+                <span className={`text-[9px] px-1 rounded font-mono ${
+                  statusFilter === "Low Stock" ? "bg-amber-800 text-amber-100" : "bg-amber-100 text-amber-800 border border-amber-200"
+                }`}>
+                  Alt + L
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextStatus = statusFilter === "Expiring / Expired" ? "All" : "Expiring / Expired";
+                  setStatusFilter(nextStatus);
+                  showToast(nextStatus === "Expiring / Expired" ? "Filtered Inventory: Expiring / Expired Items" : "Cleared Expiry filter", "info");
+                }}
+                className={`px-2.5 py-1 text-xs font-bold rounded shadow-2xs flex items-center gap-1.5 cursor-pointer transition ${
+                  statusFilter === "Expiring / Expired"
+                    ? "bg-rose-600 text-white shadow-inner"
+                    : "bg-white hover:bg-rose-50 text-rose-800 border border-rose-300"
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-rose-500" />
+                <span>Expiry</span>
+                <span className={`text-[9px] px-1 rounded font-mono ${
+                  statusFilter === "Expiring / Expired" ? "bg-rose-800 text-rose-100" : "bg-rose-100 text-rose-800 border border-rose-200"
+                }`}>
+                  Alt + E
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDownloadReportsModal(true)}
+                className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-300 shadow-2xs flex items-center gap-1.5 cursor-pointer transition"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Export</span>
+                <span className="text-[9px] bg-slate-100 text-slate-600 px-1 rounded font-mono border border-slate-200">
+                  Alt + D
+                </span>
               </button>
               <button
                 type="button"
@@ -5648,7 +5710,10 @@ export default function PharmacyPage() {
                   >
                     <ShoppingCart className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                     <div>
-                      <div className="font-bold text-slate-900">Review &amp; Edit Purchase Orders</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-bold text-slate-900">Review &amp; Edit Purchase Orders</div>
+                        <span className="text-[9px] font-mono bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded border border-indigo-200">Alt + Shift + P</span>
+                      </div>
                       <div className="text-[10px] text-slate-500">Auto-generate orders from system suggestions</div>
                     </div>
                   </DropdownMenuItem>
