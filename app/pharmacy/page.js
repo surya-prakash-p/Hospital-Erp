@@ -7996,9 +7996,9 @@ export default function PharmacyPage() {
         </div>
       )}
 
-      {/* ── Desktop Purchase Inward & Stock Entry Modal (Supplier Bill with Rate Diff) ── */}
+      {/* ── Desktop Purchase Inward & Stock Entry Modal (Supplier Bill) ── */}
       <Dialog open={isPurchaseInwardOpen} onOpenChange={setIsPurchaseInwardOpen}>
-        <DialogContent className="max-w-7xl w-[98vw] max-h-[96vh] flex flex-col bg-slate-100 p-3.5 sm:p-4 rounded-xl border border-slate-300 shadow-2xl overflow-hidden focus:outline-none text-xs">
+        <DialogContent className="max-w-[98vw] w-[1360px] max-h-[96vh] flex flex-col bg-slate-100 p-3 sm:p-3.5 rounded-xl border border-slate-300 shadow-2xl overflow-hidden focus:outline-none text-xs">
           {/* Header Bar */}
           <DialogHeader className="shrink-0 pb-1.5 border-b border-slate-300 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
@@ -8008,13 +8008,13 @@ export default function PharmacyPage() {
                   Purchase Inward &amp; Stock Entry (Supplier Bill)
                 </DialogTitle>
                 <DialogDescription className="text-[11px] text-slate-500">
-                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Last Rate vs New Rate).
+                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Old Rate vs New Rate).
                 </DialogDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                Rate Variance Active
+              <span className="text-[10px] font-mono font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
+                Purchase Inward Active
               </span>
             </div>
           </DialogHeader>
@@ -8337,7 +8337,7 @@ export default function PharmacyPage() {
               </button>
             </div>
 
-            {/* 3. Inward Bill Items Table (Matching Photo High-Density Classic Blue Table) */}
+            {/* 3. Inward Bill Items Table (High-Density Classic Blue Table with Old Rate and New Rate) */}
             <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[160px]">
               <div className="overflow-auto flex-1 min-h-0 max-h-[260px]">
                 <table className="w-full text-left border-collapse text-xs select-text">
@@ -8350,9 +8350,8 @@ export default function PharmacyPage() {
                       <th className="py-2 px-2 text-center w-24">Expiry Date</th>
                       <th className="py-2 px-2 text-center w-20">Pack</th>
                       <th className="py-2 px-2 text-center w-16">Qty</th>
-                      <th className="py-2 px-2 text-right w-24">Last Rate (₹)</th>
+                      <th className="py-2 px-2 text-right w-24">Old Rate (₹)</th>
                       <th className="py-2 px-2 text-right w-24">New Rate (₹)</th>
-                      <th className="py-2 px-2 text-center w-28">Rate Diff (₹)</th>
                       <th className="py-2 px-2 text-right w-20">MRP (₹)</th>
                       <th className="py-2 px-2.5 text-right w-28">Line Total (₹)</th>
                       <th className="py-2 px-2 text-center w-16">Action</th>
@@ -8361,7 +8360,7 @@ export default function PharmacyPage() {
                   <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-800">
                     {inwardItems.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="text-center py-8 text-slate-400 font-medium">
+                        <td colSpan={12} className="text-center py-8 text-slate-400 font-medium">
                           No medicines in inward bill. Use the entry bar above to add medicines.
                         </td>
                       </tr>
@@ -8371,7 +8370,6 @@ export default function PharmacyPage() {
                         const pPrice = parseFloat(item.purchase_price) || 0;
                         const lastPrice = Number(item.last_purchase_price) || 0;
                         const isFirst = lastPrice === 0;
-                        const diff = pPrice - lastPrice;
                         const qty = parseInt(item.quantity, 10) || 0;
                         const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
                         const mrpVal = Number(item.mrp || 0).toFixed(2);
@@ -8423,7 +8421,7 @@ export default function PharmacyPage() {
                               {item.quantity}
                             </td>
 
-                            {/* 8. Last Rate (Read-Only) */}
+                            {/* 8. Old Rate (Read-Only) */}
                             <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isSelected ? "text-white" : "text-slate-600"}`}>
                               {isFirst ? (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-normal italic ${
@@ -8453,52 +8451,17 @@ export default function PharmacyPage() {
                               />
                             </td>
 
-                            {/* 10. Rate Diff (₹) */}
-                            <td className="py-1.5 px-2 text-center font-mono">
-                              {isFirst ? (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-normal italic ${
-                                  isSelected ? "bg-sky-700 text-sky-100" : "bg-slate-100 text-slate-500"
-                                }`}>
-                                  No Prev. Rate
-                                </span>
-                              ) : diff > 0 ? (
-                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                                  isSelected 
-                                    ? "bg-rose-900 text-rose-100 border border-rose-400" 
-                                    : "bg-rose-50 text-rose-700 border border-rose-200"
-                                }`}>
-                                  ▲ +₹{diff.toFixed(2)}
-                                </span>
-                              ) : diff < 0 ? (
-                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded ${
-                                  isSelected 
-                                    ? "bg-emerald-900 text-emerald-100 border border-emerald-400" 
-                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                }`}>
-                                  ▼ -₹{Math.abs(diff).toFixed(2)}
-                                </span>
-                              ) : (
-                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded ${
-                                  isSelected 
-                                    ? "bg-sky-700 text-sky-100" 
-                                    : "bg-slate-100 text-slate-600"
-                                }`}>
-                                  ₹0.00
-                                </span>
-                              )}
-                            </td>
-
-                            {/* 11. MRP */}
+                            {/* 10. MRP */}
                             <td className={`py-1.5 px-2 text-right font-mono ${isSelected ? "text-white" : "text-slate-700"}`}>
                               ₹{mrpVal}
                             </td>
 
-                            {/* 12. Line Total (New Rate × Qty) */}
+                            {/* 11. Line Total (New Rate × Qty) */}
                             <td className={`py-1.5 px-2.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
                               ₹{Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
 
-                            {/* 13. Action */}
+                            {/* 12. Action */}
                             <td className="py-1.5 px-2 text-center">
                               <button
                                 type="button"
@@ -8523,64 +8486,6 @@ export default function PharmacyPage() {
                 </table>
               </div>
             </div>
-
-            {/* Rate Difference Summary Strip */}
-            {(() => {
-              let increased = 0;
-              let decreased = 0;
-              let noChange = 0;
-              let newItems = 0;
-              let totalDiff = 0;
-              let diffCount = 0;
-
-              inwardItems.forEach(it => {
-                const p = parseFloat(it.purchase_price) || 0;
-                const lastP = Number(it.last_purchase_price) || 0;
-                if (lastP === 0) {
-                  newItems++;
-                } else {
-                  const d = p - lastP;
-                  totalDiff += d;
-                  diffCount++;
-                  if (d > 0) increased++;
-                  else if (d < 0) decreased++;
-                  else noChange++;
-                }
-              });
-
-              const avgDiff = diffCount > 0 ? (totalDiff / diffCount) : 0;
-
-              return (
-                <div className="bg-white rounded-lg border border-slate-300 p-2 px-3 flex items-center justify-between text-xs text-slate-700 shrink-0 shadow-2xs">
-                  <div className="flex items-center gap-3.5 flex-wrap">
-                    <span className="font-bold text-slate-900 flex items-center gap-1">
-                      <TrendingUp className="w-3.5 h-3.5 text-blue-600" /> Rate Difference Summary:
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
-                      Price Increased: <strong className="text-rose-700 font-bold">{increased} Items</strong>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                      Price Decreased: <strong className="text-emerald-700 font-bold">{decreased} Items</strong>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                      No Change: <strong className="text-slate-700 font-bold">{noChange} Items</strong>
-                    </span>
-                    {newItems > 0 && (
-                      <span className="text-slate-500 text-[11px] italic">({newItems} New Item{newItems > 1 ? 's' : ''})</span>
-                    )}
-                  </div>
-                  <div className="font-mono text-xs">
-                    <span className="text-slate-500">Average Rate Difference: </span>
-                    <strong className={`font-bold ${avgDiff > 0 ? "text-rose-600" : avgDiff < 0 ? "text-emerald-600" : "text-slate-800"}`}>
-                      {avgDiff > 0 ? `+₹${avgDiff.toFixed(2)}` : avgDiff < 0 ? `-₹${Math.abs(avgDiff).toFixed(2)}` : `₹0.00`}
-                    </strong>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* 4. Bottom 3 Summary Cards (Item Summary, Additional Details, Grand Total) */}
             {(() => {
@@ -8696,13 +8601,13 @@ export default function PharmacyPage() {
                       </span>
                     </div>
 
-                    {/* Highlighted Grand Total Banner */}
-                    <div className="bg-[#fef08a] border border-amber-300 rounded p-1.5 px-3 flex items-center justify-between shadow-xs mt-1">
-                      <span className="text-xs font-black text-blue-900 uppercase tracking-wide">
+                    {/* Highlighted Grand Total Banner (Professional Slate & Emerald) */}
+                    <div className="bg-slate-900 border border-slate-800 rounded p-2 px-3.5 flex items-center justify-between shadow-md mt-1">
+                      <span className="text-xs font-black text-white uppercase tracking-wider">
                         Grand Total (₹)
                       </span>
-                      <span className="text-base font-black font-mono text-blue-900">
-                        {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="text-base font-black font-mono text-emerald-400">
+                        ₹{grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
