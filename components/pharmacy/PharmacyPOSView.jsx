@@ -1180,14 +1180,6 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Alt + N -> Quick OTC Sale
-      if (isAlt && key.toLowerCase() === 'n') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        onOpenOTCSale?.();
-        return;
-      }
-
       // Alt + O -> Outside Purchase
       if (isAlt && key.toLowerCase() === 'o') {
         e.preventDefault();
@@ -1270,14 +1262,6 @@ export default function PharmacyPOSView({
         } else {
           showToast?.("No waiting patients in prescription queue.", "info");
         }
-        return;
-      }
-
-      // Alt + C -> Collect & Dispense
-      if (isAlt && key.toLowerCase() === 'c') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        handleMasterSaveBill({ isCollectAndDispense: true });
         return;
       }
 
@@ -1541,12 +1525,6 @@ export default function PharmacyPOSView({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAddSupplier} className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
                 <PlusCircle className="w-3.5 h-3.5 text-emerald-600" /> Add Supplier (Alt + Shift + S)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { loadSavedBills(); setShowViewBillsModal(true); }} className="flex items-center gap-2 cursor-pointer">
-                <Receipt className="w-3.5 h-3.5 text-indigo-600" /> View Bills / Invoices (Alt + B)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenOTCSale} className="flex items-center gap-2 cursor-pointer">
-                <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" /> Quick OTC (Alt + N)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onOpenSalesReturn} className="flex items-center gap-2 cursor-pointer">
                 <RotateCcw className="w-3.5 h-3.5 text-rose-600" /> Sales Return (Alt + R)
@@ -2081,26 +2059,6 @@ export default function PharmacyPOSView({
           6. BOTTOM BILLING ACTION BUTTONS (Large POS Buttons matching Reference)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={() => handleMasterSaveBill({ isCollectAndDispense: true })}
-          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
-        >
-          <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Collect & Dispense</span>
-          <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + C</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onOpenOTCSale?.()}
-          className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
-        >
-          <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Quick OTC Sale</span>
-          <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + N</span>
-        </button>
-
         <button
           type="button"
           onClick={() => handleMasterSaveBill({ autoPrint: true })}

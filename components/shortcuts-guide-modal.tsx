@@ -95,16 +95,6 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
         description: "Opens medicine return/refund workflow.",
       },
       {
-        keys: [{ kbd: "Alt" }, "+", { kbd: "C" }],
-        action: "Collect & Dispense",
-        description: "Sets payment action to Counter Pay and completes the bill.",
-      },
-      {
-        keys: [{ kbd: "Alt" }, "+", { kbd: "N" }],
-        action: "Quick OTC Sale",
-        description: "Starts a non-prescription walk-in/OTC sale.",
-      },
-      {
         keys: [{ kbd: "Alt" }, "+", { kbd: "O" }],
         action: "Outside Purchase",
         description: "Adds a medicine purchased from an external pharmacy.",

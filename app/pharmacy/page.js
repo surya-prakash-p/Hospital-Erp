@@ -3926,16 +3926,6 @@ export default function PharmacyPage() {
         return;
       }
 
-      // 12. Alt + C -> Collect & Dispense
-      if (isAlt && key.toLowerCase() === 'c') {
-        e.preventDefault();
-        if (showDispenseWorkdeskModal || showSubmitDispenseModal) {
-          setSelectedSubmitAction("Pay at Pharmacy Desk");
-          if (!showSubmitDispenseModal) setShowSubmitDispenseModal(true);
-        }
-        return;
-      }
-
       // 13. Alt + F -> Forward to Billing
       if (isAlt && key.toLowerCase() === 'f') {
         e.preventDefault();
@@ -3953,21 +3943,6 @@ export default function PharmacyPage() {
           setSelectedSubmitAction("Outside Purchase");
           if (!showSubmitDispenseModal) setShowSubmitDispenseModal(true);
         }
-        return;
-      }
-
-      // 15. Alt + N -> Quick OTC Sale
-      if (isAlt && key.toLowerCase() === 'n') {
-        e.preventDefault();
-        setOtcBasket([]);
-        setOtcCustomerName("");
-        setOtcCustomerMobile("");
-        setOtcCustomerAge("");
-        setOtcCustomerGender("Male");
-        setOtcCustomerType("Walk-in");
-        setOtcSelectedPatient(null);
-        setOtcSearchQuery("");
-        setShowOTCSaleModal(true);
         return;
       }
 
@@ -5476,27 +5451,6 @@ export default function PharmacyPage() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      if (userRole === "Store Manager") {
-                        showToast("Access Denied: Store Managers cannot initiate medicine sales.", "error");
-                      } else {
-                        setOtcBasket([]);
-                        setOtcCustomerName("");
-                        setOtcCustomerMobile("");
-                        setOtcCustomerAge("");
-                        setOtcCustomerGender("Male");
-                        setOtcCustomerType("Walk-in");
-                        setOtcSelectedPatient(null);
-                        setOtcSearchQuery("");
-                        setShowOTCSaleModal(true);
-                      }
-                    }}
-                    className="flex items-center gap-2 p-1.5 cursor-pointer rounded hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 font-medium"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Direct Medicine Sale</span>
-                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => handleOpenSalesReturn()}
                     className="flex items-center gap-2 p-1.5 cursor-pointer rounded hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-medium"
