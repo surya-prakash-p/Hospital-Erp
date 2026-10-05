@@ -195,20 +195,25 @@ export default function PharmacyPage() {
   const [poAddQty, setPoAddQty] = useState(100);
   const [poAddPrice, setPoAddPrice] = useState("");
 
-  // Quick POS-Style Medicine & Stock Entry Bar States
-  const [quickMedSearch, setQuickMedSearch] = useState("");
-  const [quickSelectedMed, setQuickSelectedMed] = useState(null);
-  const [quickStockAction, setQuickStockAction] = useState("Add Stock"); // "Add Stock", "Reduce Stock", "Physical Count Correction"
-  const [quickQty, setQuickQty] = useState(80);
-  const [quickPrice, setQuickPrice] = useState("");
-  const [quickBatch, setQuickBatch] = useState("");
-  const [quickExpDate, setQuickExpDate] = useState("");
-  const [quickShowDropdown, setQuickShowDropdown] = useState(false);
-  const [isSubmittingQuickStock, setIsSubmittingQuickStock] = useState(false);
-  const [isQuickNewMedMode, setIsQuickNewMedMode] = useState(false);
-  const [quickNewGeneric, setQuickNewGeneric] = useState("");
-  const [quickNewSellingPrice, setQuickNewSellingPrice] = useState("");
-  const quickMedInputRef = useRef(null);
+  // Stock Adjustment Modal Search State
+  const [adjustMedSearch, setAdjustMedSearch] = useState("");
+
+  // Purchase Inward & Stock Entry Modal (Traditional Pharmacy Model)
+  const [isPurchaseInwardOpen, setIsPurchaseInwardOpen] = useState(false);
+  const [inwardSupplier, setInwardSupplier] = useState("ABC Pharma");
+  const [inwardInvoiceNo, setInwardInvoiceNo] = useState("");
+  const [inwardDate, setInwardDate] = useState("");
+  const [inwardItems, setInwardItems] = useState([]);
+  const [inwardMedSearch, setInwardMedSearch] = useState("");
+  const [inwardShowDropdown, setInwardShowDropdown] = useState(false);
+  const [inwardSelectedMed, setInwardSelectedMed] = useState(null);
+  const [inwardBatch, setInwardBatch] = useState("");
+  const [inwardExp, setInwardExp] = useState("");
+  const [inwardQty, setInwardQty] = useState(50);
+  const [inwardPrice, setInwardPrice] = useState("");
+  const [inwardMrp, setInwardMrp] = useState("");
+  const [inwardRack, setInwardRack] = useState("Rack A-01");
+  const [isSubmittingInward, setIsSubmittingInward] = useState(false);
 
   const [isGRNModalOpen, setIsGRNModalOpen] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
@@ -847,16 +852,6 @@ export default function PharmacyPage() {
     });
   }, [medicines, searchQuery, categoryFilter, statusFilter, invoiceFilter, importedInvoices, drugRegister]);
 
-  // Filtered medicines for Quick POS-Style Bar
-  const filteredQuickMeds = useMemo(() => {
-    if (!quickMedSearch.trim()) return [];
-    const q = quickMedSearch.trim().toLowerCase();
-    return medicines.filter(m => 
-      (m.medicine_name || "").toLowerCase().includes(q) ||
-      (m.generic_name || "").toLowerCase().includes(q) ||
-      (m.brand || "").toLowerCase().includes(q)
-    ).slice(0, 10);
-  }, [medicines, quickMedSearch]);
 
   const poSelectedMed = useMemo(() => {
     return medicines.find(m => m.medicine_name === poAddMedName) || null;
@@ -888,177 +883,170 @@ export default function PharmacyPage() {
     return { lastPrice, newPrice, diff, pct };
   }, [grnSelectedMed, grnAddPrice]);
 
-  const quickPriceDiffInfo = useMemo(() => {
-    if (!quickSelectedMed) return null;
-    const lastPrice = (quickSelectedMed.purchase_price !== undefined && quickSelectedMed.purchase_price !== null && quickSelectedMed.purchase_price !== "")
-      ? Number(quickSelectedMed.purchase_price)
-      : (quickSelectedMed.batches?.[0]?.purchase_price ? Number(quickSelectedMed.batches[0].purchase_price) : 0);
-    const newPrice = quickPrice !== "" ? (parseFloat(quickPrice) || 0) : lastPrice;
-    const diff = newPrice - lastPrice;
-    const pct = lastPrice > 0 ? ((diff / lastPrice) * 100).toFixed(1) : "0";
-    return { lastPrice, newPrice, diff, pct };
-  }, [quickSelectedMed, quickPrice]);
+  // Open Stock Adjustment Modal (Popup) with preselected or selectable medicine
+  const handleOpenAdjustModal = (med = null) => {
+    if (userRole === "Store Manager") {
+      showToast("Access Denied: Store Managers cannot adjust stock.", "error");
+      return;
+    }
+    if (med) {
+      setAdjustingMed(med);
+      setAdjustmentData({
+        medicine: med.medicine_name,
+        batch_number: (med.batches && med.batches.length > 0) ? med.batches[0].batch_number : "",
+        adjustment_type: "Add Stock",
+        quantity: 10,
+        purchase_price: med.purchase_price !== undefined ? String(med.purchase_price) : "",
+        reason: "",
+        remarks: ""
+      });
+    } else {
+      setAdjustingMed(null);
+      setAdjustMedSearch("");
+      setAdjustmentData({
+        medicine: "",
+        batch_number: "",
+        adjustment_type: "Add Stock",
+        quantity: 10,
+        purchase_price: "",
+        reason: "",
+        remarks: ""
+      });
+    }
+    setShowAdjustModal(true);
+  };
 
-  const handleSelectQuickMed = (med) => {
-    setQuickSelectedMed(med);
-    setQuickMedSearch(med.medicine_name);
-    setQuickShowDropdown(false);
-    setIsQuickNewMedMode(false);
+  // Purchase Inward & Stock Entry Modal (Old-School Traditional Pharmacy Model)
+  const inwardPriceDiffInfo = useMemo(() => {
+    if (!inwardSelectedMed || !inwardPrice) return null;
+    const cur = parseFloat(inwardPrice) || 0;
+    const last = Number(inwardSelectedMed.purchase_price) || 0;
+    if (last === 0) return { lastPrice: 0, newPrice: cur, diff: 0, pct: "0.0", isFirst: true };
+    const diff = cur - last;
+    const pct = ((diff / last) * 100).toFixed(1);
+    return { lastPrice: last, newPrice: cur, diff, pct, isFirst: false };
+  }, [inwardSelectedMed, inwardPrice]);
+
+  const handleOpenPurchaseInwardModal = () => {
+    setInwardSupplier(suppliers[0]?.name || "ABC Pharma");
+    setInwardInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setInwardDate(new Date().toISOString().split("T")[0]);
+    setInwardItems([]);
+    setInwardMedSearch("");
+    setInwardSelectedMed(null);
+    setInwardBatch("");
+    setInwardExp("");
+    setInwardQty(50);
+    setInwardPrice("");
+    setInwardMrp("");
+    setIsPurchaseInwardOpen(true);
+  };
+
+  const handleSelectInwardMed = (med) => {
+    setInwardSelectedMed(med);
+    setInwardMedSearch(med.medicine_name);
+    setInwardShowDropdown(false);
     const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
       ? Number(med.purchase_price)
       : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
-    setQuickPrice(lastP > 0 ? String(lastP) : "");
+    setInwardPrice(lastP > 0 ? String(lastP) : "");
+    const mrp = Number(med.mrp || med.selling_price || (lastP > 0 ? lastP * 1.25 : 0));
+    setInwardMrp(mrp > 0 ? String(mrp) : "");
+    setInwardRack(med.rack_location || "Rack A-01");
     if (med.batches && med.batches.length > 0) {
-      setQuickBatch(med.batches[0].batch_number || "");
-      setQuickExpDate(med.batches[0].exp_date || "");
+      setInwardBatch(med.batches[0].batch_number || "");
+      setInwardExp(med.batches[0].exp_date ? med.batches[0].exp_date.slice(0, 7) : "");
     } else {
       const cleanPrefix = med.medicine_name.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "MED";
-      setQuickBatch(`BATCH-${cleanPrefix}-${Date.now().toString().slice(-4)}`);
-      setQuickExpDate(new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+      setInwardBatch(`BT-${cleanPrefix}-${Date.now().toString().slice(-4)}`);
+      setInwardExp(new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0].slice(0, 7));
     }
   };
 
-  const handleStartQuickNewMed = () => {
-    setIsQuickNewMedMode(true);
-    setQuickSelectedMed(null);
-    setQuickShowDropdown(false);
-    setQuickNewGeneric(quickMedSearch.trim());
-    setQuickPrice("");
-    setQuickNewSellingPrice("");
-    const cleanPrefix = quickMedSearch.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "MED";
-    setQuickBatch(`BATCH-${cleanPrefix}-${Date.now().toString().slice(-4)}`);
-    setQuickExpDate(new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-  };
-
-  const handleResetQuickBar = () => {
-    setQuickMedSearch("");
-    setQuickSelectedMed(null);
-    setQuickStockAction("Add Stock");
-    setQuickQty(80);
-    setQuickPrice("");
-    setQuickBatch("");
-    setQuickExpDate("");
-    setQuickShowDropdown(false);
-    setIsQuickNewMedMode(false);
-    setQuickNewGeneric("");
-    setQuickNewSellingPrice("");
-  };
-
-  const handleSubmitQuickStock = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (isSubmittingQuickStock) return;
-
-    if (userRole === "Store Manager" && quickStockAction !== "Add Stock") {
-      showToast("Access Denied: Store Managers can only add stock.", "error");
+  const handleAddInwardItem = () => {
+    const medName = inwardSelectedMed ? inwardSelectedMed.medicine_name : inwardMedSearch.trim();
+    if (!medName) {
+      showToast("Please enter or select a medicine name", "error");
       return;
     }
-
-    if (isQuickNewMedMode) {
-      const medName = quickMedSearch.trim();
-      if (!medName) {
-        showToast("Please enter a valid medicine name", "error");
-        return;
-      }
-      const qtyNum = parseInt(quickQty) || 0;
-      const pPrice = parseFloat(quickPrice) || 0;
-      const sPrice = parseFloat(quickNewSellingPrice) || (pPrice > 0 ? pPrice * 1.2 : 0);
-      const cleanPrefix = medName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "MED";
-      const batchNum = quickBatch.trim() || `BATCH-${cleanPrefix}-${Date.now().toString().slice(-4)}`;
-      const expDate = quickExpDate || new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
-      setIsSubmittingQuickStock(true);
-      try {
-        await createMedicine({
-          medicine_name: medName,
-          generic_name: quickNewGeneric.trim() || medName,
-          category: "Regular Medicine",
-          dosage_form: "Tablet",
-          purchase_price: pPrice,
-          last_purchase_price: pPrice,
-          selling_price: sPrice,
-          mrp: sPrice,
-          stock: qtyNum,
-          current_stock: qtyNum,
-          rack_location: "Rack A-01",
-          min_stock: 50,
-          max_stock: 500,
-          reorder_level: 100,
-          batch_number: batchNum,
-          expiry_date: expDate
-        });
-
-        if (typeof window !== 'undefined') {
-          const batches = JSON.parse(localStorage.getItem('hospital_batches')) || [];
-          batches.unshift({
-            batch_number: batchNum,
-            medicine: medName,
-            medicine_name: medName,
-            current_stock: qtyNum,
-            total_units: qtyNum,
-            pack_size: 10,
-            no_of_packs: Math.ceil(qtyNum / 10),
-            purchase_price: pPrice,
-            mrp: sPrice,
-            selling_price: sPrice,
-            exp_date: expDate,
-            expiry_date: expDate,
-            supplier: "ABC Pharma",
-            rack_location: "Rack A-01"
-          });
-          localStorage.setItem('hospital_batches', JSON.stringify(batches));
-        }
-
-        showToast(`Successfully registered ${medName} with ${qtyNum} units stock!`, "success");
-        handleResetQuickBar();
-        await loadAllData();
-      } catch {
-        showToast("Failed to register medicine", "error");
-      } finally {
-        setIsSubmittingQuickStock(false);
-      }
+    const qty = parseInt(inwardQty) || 0;
+    if (qty <= 0) {
+      showToast("Please enter a valid quantity", "error");
       return;
     }
+    const cleanMedPrefix = medName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "MED";
+    const batchNo = inwardBatch.trim() || `BT-${cleanMedPrefix}-${Date.now().toString().slice(-4)}`;
+    const expDate = inwardExp || new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0].slice(0, 7);
+    const pPrice = parseFloat(inwardPrice) || 0;
+    const lastPrice = inwardSelectedMed ? (Number(inwardSelectedMed.purchase_price) || 0) : 0;
+    const diff = pPrice - lastPrice;
+    const mrp = parseFloat(inwardMrp) || (pPrice > 0 ? parseFloat((pPrice * 1.25).toFixed(2)) : 0);
 
-    if (!quickSelectedMed) {
-      showToast("Please select a medicine first", "error");
-      return;
-    }
-
-    const qtyNum = parseInt(quickQty) || 0;
-    if (qtyNum <= 0) {
-      showToast("Please enter a quantity greater than 0", "error");
-      return;
-    }
-
-    const medName = quickSelectedMed.medicine_name;
-    const cleanPrefix = medName.replace(/[^a-zA-Z0-9]/g, "").substring(0, 4).toUpperCase() || "MED";
-    const batchNum = quickBatch.trim() || (quickSelectedMed.batches?.[0]?.batch_number || `BATCH-${cleanPrefix}-${Date.now().toString().slice(-4)}`);
-    const expDate = quickExpDate || (quickSelectedMed.batches?.[0]?.exp_date || new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-    const pPrice = quickPrice !== "" ? parseFloat(quickPrice) || 0 : undefined;
-
-    setIsSubmittingQuickStock(true);
-    try {
-      await adjustStock({
+    setInwardItems(prev => [
+      ...prev,
+      {
         medicine: medName,
-        batch_number: batchNum,
-        adjustment_type: quickStockAction,
-        quantity: qtyNum,
-        purchase_price: pPrice,
-        reason: quickStockAction === "Add Stock" ? "Quick Stock Inward / Replenishment" : "Stock Adjustment",
-        remarks: `Quick Entry via POS Bar by ${pharmacistName}`,
+        medicine_name: medName,
+        generic_name: inwardSelectedMed?.generic_name || medName,
+        batch_number: batchNo,
         exp_date: expDate,
-        performed_by: pharmacistName
+        quantity: qty,
+        purchase_price: pPrice,
+        last_purchase_price: lastPrice,
+        price_diff: diff,
+        mrp: mrp,
+        selling_price: mrp,
+        rack_location: inwardRack || "Rack A-01",
+        line_total: parseFloat((qty * pPrice).toFixed(2))
+      }
+    ]);
+
+    // Reset item builder
+    setInwardMedSearch("");
+    setInwardSelectedMed(null);
+    setInwardBatch("");
+    setInwardExp("");
+    setInwardQty(50);
+    setInwardPrice("");
+    setInwardMrp("");
+  };
+
+  const handleRemoveInwardItem = (index) => {
+    setInwardItems(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleConfirmPurchaseInward = async () => {
+    if (!inwardSupplier.trim()) {
+      showToast("Please specify the supplier / distributor name", "error");
+      return;
+    }
+    if (!inwardInvoiceNo.trim()) {
+      showToast("Please enter the invoice / bill number", "error");
+      return;
+    }
+    if (inwardItems.length === 0) {
+      showToast("Please add at least one medicine item to this inward bill", "error");
+      return;
+    }
+
+    try {
+      setIsSubmittingInward(true);
+      await receiveGoods({
+        supplier: inwardSupplier.trim(),
+        invoice_number: inwardInvoiceNo.trim(),
+        invoice_date: inwardDate || new Date().toISOString().split("T")[0],
+        items: inwardItems
       });
 
-      const oldStock = Number(quickSelectedMed.stock) || 0;
-      const finalStock = quickStockAction === "Add Stock" ? oldStock + qtyNum : quickStockAction === "Reduce Stock" ? Math.max(0, oldStock - qtyNum) : qtyNum;
-      showToast(`Stock updated for ${medName}! Old: ${oldStock} -> New: ${finalStock} units`, "success");
-      handleResetQuickBar();
+      showToast(`Successfully inwarded ${inwardItems.length} medicine(s) into inventory! Stock updated.`, "success");
+      setIsPurchaseInwardOpen(false);
+      setInwardItems([]);
       await loadAllData();
-    } catch {
-      showToast("Failed to update stock", "error");
+    } catch (err) {
+      console.error("Purchase inward error:", err);
+      showToast("Failed to process purchase inward", "error");
     } finally {
-      setIsSubmittingQuickStock(false);
+      setIsSubmittingInward(false);
     }
   };
 
@@ -4210,20 +4198,13 @@ export default function PharmacyPage() {
         return;
       }
 
-      // 16. Alt + A -> Add Medicine / Quick Stock Entry
+      // 16. Alt + A -> Add Medicine Catalog Entry
       if (isAlt && key.toLowerCase() === 'a') {
         e.preventDefault();
         if (activeTab !== 'inventory') {
           handleTabChange('inventory');
         }
-        setTimeout(() => {
-          if (quickMedInputRef.current) {
-            quickMedInputRef.current.focus();
-            showToast("Quick Medicine & Stock Entry focused (Alt + A)", "info");
-          } else {
-            setIsAddModalOpen(true);
-          }
-        }, 100);
+        setIsAddModalOpen(true);
         return;
       }
 
@@ -4286,7 +4267,7 @@ export default function PharmacyPage() {
       }
 
       // 18. ARROW KEYS NAVIGATION: ArrowLeft / ArrowRight -> Cycle Tabs
-      const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
+      const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || isPurchaseInwardOpen || Boolean(selectedMedicine);
       if (!isInput && !isAnyModalOpen && (key === 'ArrowLeft' || key === 'ArrowRight')) {
         e.preventDefault();
         const tabOrder = ['dashboard', 'inventory', 'dispensing', 'registers', 'logistics'];
@@ -5218,6 +5199,24 @@ export default function PharmacyPage() {
               </button>
               <button
                 type="button"
+                onClick={() => handleOpenAdjustModal(null)}
+                className="px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                title="Adjust stock in popup"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Adjust Stock</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenPurchaseInwardModal}
+                className="px-2.5 py-1 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                title="Traditional purchase inward & supplier bill entry"
+              >
+                <PackageCheck className="w-3.5 h-3.5" />
+                <span>Purchase Inward</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   const nextStatus = statusFilter === "Low Stock" ? "All" : "Low Stock";
                   setStatusFilter(nextStatus);
@@ -5424,329 +5423,6 @@ export default function PharmacyPage() {
               </button>
             </div>
           )}
-
-          {/* Quick POS-Billing Style Medicine & Stock Adjustment Bar */}
-          <div className="bg-gradient-to-r from-indigo-50/80 via-white to-slate-50 p-2.5 rounded-lg border border-indigo-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-                  <Plus className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-800 tracking-tight">Quick Medicine &amp; Stock Entry</span>
-                  <span className="text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded border border-indigo-200 uppercase tracking-wide">
-                    Fast POS Mode
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-500 hidden md:inline">
-                  Search &amp; adjust stock or register medicines with real-time price difference tracking
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (userRole === "Pharmacist") {
-                      showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
-                    } else {
-                      setIsAddModalOpen(true);
-                    }
-                  }}
-                  className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <FileText className="w-3 h-3" />
-                  <span>Advanced 20-Field Catalog Form</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Bar Input Strip */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Medicine Autocomplete Search Input */}
-              <div className="relative flex-1 min-w-[220px]">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  <input
-                    ref={quickMedInputRef}
-                    type="text"
-                    placeholder="Search medicine to add stock (e.g. Dolo 650, Paracetamol)..."
-                    value={quickMedSearch}
-                    onFocus={() => { if (quickMedSearch.trim().length >= 1) setQuickShowDropdown(true); }}
-                    onChange={(e) => {
-                      setQuickMedSearch(e.target.value);
-                      setQuickShowDropdown(true);
-                      if (quickSelectedMed && e.target.value !== quickSelectedMed.medicine_name) {
-                        setQuickSelectedMed(null);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (filteredQuickMeds.length > 0 && !quickSelectedMed) {
-                          handleSelectQuickMed(filteredQuickMeds[0]);
-                        } else if (quickSelectedMed || isQuickNewMedMode) {
-                          handleSubmitQuickStock();
-                        }
-                      } else if (e.key === "Escape") {
-                        setQuickShowDropdown(false);
-                      }
-                    }}
-                    className="w-full h-8 pl-8 pr-7 text-xs font-semibold text-slate-900 bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 placeholder:text-slate-400"
-                  />
-                  {quickMedSearch && (
-                    <button
-                      type="button"
-                      onClick={handleResetQuickBar}
-                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Autocomplete Dropdown */}
-                {quickShowDropdown && quickMedSearch.trim().length >= 1 && (
-                  <div className="absolute left-0 top-full mt-1 w-full max-h-56 overflow-y-auto bg-white rounded-lg shadow-xl border border-slate-200 z-50 divide-y divide-slate-100">
-                    {filteredQuickMeds.map((m) => (
-                      <div
-                        key={m.medicine_name}
-                        onClick={() => handleSelectQuickMed(m)}
-                        className="p-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-bold text-slate-900">{m.medicine_name}</div>
-                          <div className="text-[10px] text-slate-500">
-                            {m.generic_name} &bull; {m.category} &bull; Rack: {m.rack_location || "N/A"}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">{m.stock} units</span>
-                          <div className="text-[10px] text-slate-500 mt-0.5">Last Purchase: ₹{Number(m.purchase_price || 0).toFixed(2)}</div>
-                        </div>
-                      </div>
-                    ))}
-                    <div
-                      onClick={handleStartQuickNewMed}
-                      className="p-2 bg-indigo-50/70 hover:bg-indigo-100 cursor-pointer text-indigo-700 font-bold text-xs flex items-center gap-1.5"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Register new medicine catalog entry &quot;{quickMedSearch}&quot;</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Controls when an Existing Medicine is Selected */}
-              {quickSelectedMed && (
-                <>
-                  {/* Current Stock Tag */}
-                  <div className="bg-slate-100 border border-slate-300 rounded px-2 py-1 text-xs shrink-0">
-                    <span className="text-slate-500 text-[9px] uppercase font-bold mr-1">Current Stock:</span>
-                    <span className="font-mono font-bold text-slate-900">{quickSelectedMed.stock} units</span>
-                  </div>
-
-                  {/* Stock Action Selector */}
-                  <div className="flex items-center rounded border border-slate-300 bg-white p-0.5 text-xs font-semibold shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setQuickStockAction("Add Stock")}
-                      className={`px-2 py-0.5 rounded text-[10px] transition cursor-pointer ${
-                        quickStockAction === "Add Stock" ? "bg-emerald-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      + Add Stock
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuickStockAction("Reduce Stock")}
-                      className={`px-2 py-0.5 rounded text-[10px] transition cursor-pointer ${
-                        quickStockAction === "Reduce Stock" ? "bg-rose-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      - Reduce
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuickStockAction("Physical Count Correction")}
-                      className={`px-2 py-0.5 rounded text-[10px] transition cursor-pointer ${
-                        quickStockAction === "Physical Count Correction" ? "bg-amber-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      = Correction
-                    </button>
-                  </div>
-
-                  {/* Quantity Input with Presets */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <div className="w-16">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={quickQty}
-                        onChange={(e) => setQuickQty(parseInt(e.target.value) || 0)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSubmitQuickStock(); }}
-                        className="h-8 text-xs font-mono font-bold text-center border-slate-300 bg-white"
-                        placeholder="Qty"
-                      />
-                    </div>
-                    <div className="hidden sm:flex items-center gap-0.5">
-                      {[10, 50, 80, 100].map((amt) => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setQuickQty(amt)}
-                          className={`h-7 px-1 text-[10px] font-mono font-semibold rounded border cursor-pointer ${
-                            quickQty === amt ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                          }`}
-                        >
-                          +{amt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Resulting Stock Preview Badge */}
-                  <div className="bg-emerald-50 border border-emerald-300 rounded px-2 py-1 text-xs shrink-0">
-                    <span className="text-emerald-700 text-[9px] uppercase font-bold mr-1">New Total:</span>
-                    <span className="font-mono font-extrabold text-emerald-900">
-                      {quickStockAction === "Add Stock"
-                        ? (Number(quickSelectedMed.stock) || 0) + (parseInt(quickQty) || 0)
-                        : quickStockAction === "Reduce Stock"
-                        ? Math.max(0, (Number(quickSelectedMed.stock) || 0) - (parseInt(quickQty) || 0))
-                        : (parseInt(quickQty) || 0)
-                      } units
-                    </span>
-                  </div>
-
-                  {/* Purchase Price Input & Price Difference Badge */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <div className="relative w-20">
-                      <span className="absolute left-1.5 top-2 text-[10px] text-slate-400 font-bold">₹</span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={quickPrice}
-                        onChange={(e) => setQuickPrice(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSubmitQuickStock(); }}
-                        placeholder="Price"
-                        className="h-8 pl-4 text-xs font-mono font-bold border-slate-300 bg-white"
-                      />
-                    </div>
-
-                    {/* Real-Time Price Difference Badge */}
-                    {quickPriceDiffInfo && (
-                      <div className={`px-2 py-1 rounded text-[10px] font-semibold flex items-center gap-1 border shrink-0 ${
-                        quickPriceDiffInfo.diff > 0
-                          ? "bg-amber-50 text-amber-900 border-amber-300"
-                          : quickPriceDiffInfo.diff < 0
-                          ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-                          : "bg-slate-100 text-slate-700 border-slate-300"
-                      }`}>
-                        <span>Last: ₹{quickPriceDiffInfo.lastPrice.toFixed(2)}</span>
-                        <span>|</span>
-                        <span className="font-mono font-bold">
-                          Diff: {quickPriceDiffInfo.diff > 0 ? `+₹${quickPriceDiffInfo.diff.toFixed(2)} (+${quickPriceDiffInfo.pct}%)` : quickPriceDiffInfo.diff < 0 ? `-₹${Math.abs(quickPriceDiffInfo.diff).toFixed(2)} (${quickPriceDiffInfo.pct}%)` : '₹0.00 (0%)'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Batch Input (Optional) */}
-                  <div className="w-24 hidden lg:block shrink-0">
-                    <Input
-                      value={quickBatch}
-                      onChange={(e) => setQuickBatch(e.target.value)}
-                      placeholder="Batch No"
-                      className="h-8 text-[11px] font-mono uppercase border-slate-300 bg-white"
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <Button
-                    type="button"
-                    onClick={handleSubmitQuickStock}
-                    disabled={isSubmittingQuickStock}
-                    className="h-8 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-2xs cursor-pointer flex items-center gap-1 shrink-0"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{isSubmittingQuickStock ? "Updating..." : "Add to Inventory"}</span>
-                  </Button>
-                </>
-              )}
-
-              {/* Fast Registration Mode for New Medicine */}
-              {isQuickNewMedMode && (
-                <div className="flex flex-wrap items-center gap-1.5 w-full bg-amber-50/70 p-2 rounded border border-amber-200 mt-1">
-                  <span className="text-[9px] font-bold bg-amber-600 text-white px-1.5 py-0.5 rounded uppercase">New Drug</span>
-                  
-                  <div className="w-36">
-                    <Input
-                      value={quickNewGeneric}
-                      onChange={(e) => setQuickNewGeneric(e.target.value)}
-                      placeholder="Generic Formula *"
-                      className="h-7 text-[11px] border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div className="w-16">
-                    <Input
-                      type="number"
-                      min="1"
-                      value={quickQty}
-                      onChange={(e) => setQuickQty(parseInt(e.target.value) || 0)}
-                      placeholder="Qty *"
-                      className="h-7 text-[11px] font-mono font-bold text-center border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div className="w-20 relative">
-                    <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold">₹</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={quickPrice}
-                      onChange={(e) => setQuickPrice(e.target.value)}
-                      placeholder="Purchase"
-                      className="h-7 pl-4 text-[11px] font-mono font-bold border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div className="w-20 relative">
-                    <span className="absolute left-1.5 top-1.5 text-[9px] text-slate-400 font-bold">₹</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={quickNewSellingPrice}
-                      onChange={(e) => setQuickNewSellingPrice(e.target.value)}
-                      placeholder="MRP"
-                      className="h-7 pl-4 text-[11px] font-mono font-bold border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div className="w-24">
-                    <Input
-                      value={quickBatch}
-                      onChange={(e) => setQuickBatch(e.target.value)}
-                      placeholder="Batch No"
-                      className="h-7 text-[11px] font-mono uppercase border-slate-300 bg-white"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleSubmitQuickStock}
-                    disabled={isSubmittingQuickStock}
-                    className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs cursor-pointer flex items-center gap-1"
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>{isSubmittingQuickStock ? "Saving..." : "Register & Add Stock"}</span>
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={handleResetQuickBar}
-                    className="h-7 px-2 text-[11px] text-slate-500 hover:text-slate-700 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* High-Density Traditional Desktop Inventory ERP Table */}
           <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-0">
@@ -7756,188 +7432,268 @@ export default function PharmacyPage() {
       )}
 
       {/* Stock Adjustment Modal */}
-      {showAdjustModal && adjustingMed && (
+      {showAdjustModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-bold text-slate-900 font-serif flex items-center gap-1.5">
-                <Sliders className="w-5 h-5 text-amber-500" /> Stock Adjustment
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-serif flex items-center gap-1.5">
+                  <Sliders className="w-5 h-5 text-amber-500" /> Stock Adjustment
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Adjust current stock, add inward batch, or correct physical count in popup
+                </p>
+              </div>
               <button 
-                onClick={() => setShowAdjustModal(false)} 
-                className="text-slate-400 hover:text-slate-700"
+                onClick={() => { setShowAdjustModal(false); setAdjustingMed(null); }} 
+                className="text-slate-400 hover:text-slate-700 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
             <div className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <Label className="font-bold text-slate-500">Medicine &amp; Current Stock</Label>
-                <div className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded">
-                  <div className="font-semibold text-slate-800">{adjustingMed.medicine_name}</div>
-                  <div className="text-[11px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
-                    Current: {adjustingMed.stock || 0} units
+              {!adjustingMed ? (
+                <div className="space-y-1">
+                  <Label className="font-bold text-slate-700">Select Medicine to Adjust *</Label>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Type medicine name (e.g. Dolo 650, Paracetamol)..."
+                      value={adjustMedSearch}
+                      onChange={(e) => setAdjustMedSearch(e.target.value)}
+                      className="w-full h-8 pl-8 pr-2.5 text-xs font-semibold text-slate-900 bg-white border border-slate-300 rounded focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                    />
+                    {adjustMedSearch.trim() && (
+                      <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white rounded-lg shadow-xl border border-slate-200 z-50 divide-y divide-slate-100">
+                        {medicines.filter(m => (m.medicine_name || "").toLowerCase().includes(adjustMedSearch.toLowerCase())).slice(0, 8).map(m => (
+                          <div
+                            key={m.medicine_name}
+                            onClick={() => {
+                              setAdjustingMed(m);
+                              setAdjustMedSearch("");
+                              setAdjustmentData({
+                                medicine: m.medicine_name,
+                                batch_number: (m.batches && m.batches.length > 0) ? m.batches[0].batch_number : "",
+                                adjustment_type: "Add Stock",
+                                quantity: 10,
+                                purchase_price: m.purchase_price !== undefined ? String(m.purchase_price) : "",
+                                reason: "",
+                                remarks: ""
+                              });
+                            }}
+                            className="p-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between text-xs"
+                          >
+                            <div>
+                              <div className="font-bold text-slate-900">{m.medicine_name}</div>
+                              <div className="text-[10px] text-slate-500">{m.generic_name} &bull; Rack: {m.rack_location || "N/A"}</div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">{m.stock} units</span>
+                              <div className="text-[10px] text-slate-500">Last: ₹{Number(m.purchase_price || 0).toFixed(2)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="font-bold text-slate-500">Batch Number *</Label>
-                <select
-                  value={adjustmentData.batch_number || ""}
-                  onChange={(e) => setAdjustmentData(prev => ({ ...prev, batch_number: e.target.value }))}
-                  className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none"
-                >
-                  <option value="">-- Create New Batch or Select --</option>
-                  {(adjustingMed.batches || []).map(b => (
-                    <option key={b.batch_number} value={b.batch_number}>
-                      {b.batch_number} (Qty: {b.current_stock})
-                    </option>
-                  ))}
-                  <option value="NEW_BATCH">[+] Create New Batch</option>
-                </select>
-              </div>
-
-              {adjustmentData.batch_number === "NEW_BATCH" && (
-                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                  <div className="space-y-1">
-                    <Label className="font-bold text-slate-500">New Batch ID *</Label>
-                    <Input
-                      placeholder="e.g. BATCH-999"
-                      value={adjustmentData.new_batch_id || ""}
-                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, new_batch_id: e.target.value }))}
-                      className="h-8 text-xs border-slate-200"
-                    />
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-bold text-slate-700">Selected Medicine</Label>
+                    <button
+                      type="button"
+                      onClick={() => setAdjustingMed(null)}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline"
+                    >
+                      Change Medicine
+                    </button>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="font-bold text-slate-500">Expiry Date *</Label>
-                    <Input
-                      type="date"
-                      value={adjustmentData.new_batch_exp || ""}
-                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, new_batch_exp: e.target.value }))}
-                      className="h-8 text-xs border-slate-200"
-                    />
+                  <div className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded">
+                    <div>
+                      <div className="font-semibold text-slate-800">{adjustingMed.medicine_name}</div>
+                      <div className="text-[10px] text-slate-500">{adjustingMed.generic_name}</div>
+                    </div>
+                    <div className="text-[11px] font-mono font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-200">
+                      Current: {adjustingMed.stock || 0} units
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="font-bold text-slate-500">Adjustment Type *</Label>
-                  <select
-                    value={adjustmentData.adjustment_type || ""}
-                    onChange={(e) => setAdjustmentData(prev => ({ ...prev, adjustment_type: e.target.value }))}
-                    className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none"
-                  >
-                    <option value="Add Stock">+ Add Stock</option>
-                    <option value="Reduce Stock">- Reduce Stock</option>
-                    <option value="Damaged">Damaged</option>
-                    <option value="Expired">Expired</option>
-                    <option value="Returned">Returned</option>
-                    <option value="Physical Count Correction">Physical Correction</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="font-bold text-slate-500">Quantity *</Label>
-                  <Input
-                    type="number"
-                    value={adjustmentData.quantity || ""}
-                    onChange={(e) => setAdjustmentData(prev => ({ ...prev, quantity: Math.max(0, parseInt(e.target.value) || 0) }))}
-                    className="h-8 text-xs border-slate-200 font-mono font-bold"
-                  />
-                  <div className="flex items-center gap-1 pt-1">
-                    {[10, 50, 80, 100].map(amt => (
-                      <button
-                        key={amt}
-                        type="button"
-                        onClick={() => setAdjustmentData(prev => ({ ...prev, quantity: amt }))}
-                        className={`text-[9px] px-1.5 py-0.5 rounded border font-mono cursor-pointer ${
-                          adjustmentData.quantity === amt ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        +{amt}
-                      </button>
-                    ))}
+              {adjustingMed ? (
+                <>
+                  <div className="space-y-1">
+                    <Label className="font-bold text-slate-500">Batch Number *</Label>
+                    <select
+                      value={adjustmentData.batch_number || ""}
+                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, batch_number: e.target.value }))}
+                      className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none"
+                    >
+                      <option value="">-- Create New Batch or Select --</option>
+                      {(adjustingMed.batches || []).map(b => (
+                        <option key={b.batch_number} value={b.batch_number}>
+                          {b.batch_number} (Qty: {b.current_stock})
+                        </option>
+                      ))}
+                      <option value="NEW_BATCH">[+] Create New Batch</option>
+                    </select>
                   </div>
-                </div>
-              </div>
 
-              {/* Live Resulting Stock Preview */}
-              <div className="bg-emerald-50 border border-emerald-300 rounded p-2 text-xs flex items-center justify-between">
-                <span className="text-emerald-800 font-semibold">Resulting Stock Preview:</span>
-                <span className="font-mono font-extrabold text-emerald-950 text-sm">
-                  {adjustmentData.adjustment_type === "Add Stock" || adjustmentData.adjustment_type === "Returned"
-                    ? (Number(adjustingMed.stock) || 0) + (parseInt(adjustmentData.quantity) || 0)
-                    : adjustmentData.adjustment_type === "Physical Count Correction"
-                    ? (parseInt(adjustmentData.quantity) || 0)
-                    : Math.max(0, (Number(adjustingMed.stock) || 0) - (parseInt(adjustmentData.quantity) || 0))
-                  } units
-                </span>
-              </div>
-
-              {/* Purchase Price Input & Price Difference */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="font-bold text-slate-500">Purchase Price (₹)</Label>
-                  <span className="text-[10px] text-slate-500">
-                    Last Purchase: ₹{Number(adjustingMed.purchase_price || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder={String(adjustingMed.purchase_price || "0.00")}
-                    value={adjustmentData.purchase_price ?? ""}
-                    onChange={(e) => setAdjustmentData(prev => ({ ...prev, purchase_price: e.target.value }))}
-                    className="h-8 text-xs font-mono border-slate-200"
-                  />
-                  {adjustmentData.purchase_price !== undefined && adjustmentData.purchase_price !== "" && (
-                    <div className={`px-2 py-1 rounded text-[10px] font-semibold border shrink-0 ${
-                      (parseFloat(adjustmentData.purchase_price) || 0) > (Number(adjustingMed.purchase_price) || 0)
-                        ? "bg-amber-50 text-amber-900 border-amber-300"
-                        : (parseFloat(adjustmentData.purchase_price) || 0) < (Number(adjustingMed.purchase_price) || 0)
-                        ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-                        : "bg-slate-100 text-slate-700 border-slate-300"
-                    }`}>
-                      Diff: {(parseFloat(adjustmentData.purchase_price) || 0) > (Number(adjustingMed.purchase_price) || 0)
-                        ? `+₹${((parseFloat(adjustmentData.purchase_price) || 0) - (Number(adjustingMed.purchase_price) || 0)).toFixed(2)}`
-                        : (parseFloat(adjustmentData.purchase_price) || 0) < (Number(adjustingMed.purchase_price) || 0)
-                        ? `-₹${Math.abs((parseFloat(adjustmentData.purchase_price) || 0) - (Number(adjustingMed.purchase_price) || 0)).toFixed(2)}`
-                        : '₹0.00 (Same)'}
+                  {adjustmentData.batch_number === "NEW_BATCH" && (
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="space-y-1">
+                        <Label className="font-bold text-slate-500">New Batch ID *</Label>
+                        <Input
+                          placeholder="e.g. BATCH-999"
+                          value={adjustmentData.new_batch_id || ""}
+                          onChange={(e) => setAdjustmentData(prev => ({ ...prev, new_batch_id: e.target.value }))}
+                          className="h-8 text-xs border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="font-bold text-slate-500">Expiry Date *</Label>
+                        <Input
+                          type="date"
+                          value={adjustmentData.new_batch_exp || ""}
+                          onChange={(e) => setAdjustmentData(prev => ({ ...prev, new_batch_exp: e.target.value }))}
+                          className="h-8 text-xs border-slate-200"
+                        />
+                      </div>
                     </div>
                   )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="font-bold text-slate-500">Adjustment Type *</Label>
+                      <select
+                        value={adjustmentData.adjustment_type || ""}
+                        onChange={(e) => setAdjustmentData(prev => ({ ...prev, adjustment_type: e.target.value }))}
+                        className="w-full h-8 rounded border border-slate-200 bg-white px-2 focus:outline-none"
+                      >
+                        <option value="Add Stock">+ Add Stock</option>
+                        <option value="Reduce Stock">- Reduce Stock</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Returned">Returned</option>
+                        <option value="Physical Count Correction">Physical Correction</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="font-bold text-slate-500">Quantity *</Label>
+                      <Input
+                        type="number"
+                        value={adjustmentData.quantity || ""}
+                        onChange={(e) => setAdjustmentData(prev => ({ ...prev, quantity: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="h-8 text-xs border-slate-200 font-mono font-bold"
+                      />
+                      <div className="flex items-center gap-1 pt-1">
+                        {[10, 50, 80, 100].map(amt => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setAdjustmentData(prev => ({ ...prev, quantity: amt }))}
+                            className={`text-[9px] px-1.5 py-0.5 rounded border font-mono cursor-pointer ${
+                              adjustmentData.quantity === amt ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            +{amt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Resulting Stock Preview */}
+                  <div className="bg-emerald-50 border border-emerald-300 rounded p-2 text-xs flex items-center justify-between">
+                    <span className="text-emerald-800 font-semibold">Resulting Stock Preview:</span>
+                    <span className="font-mono font-extrabold text-emerald-950 text-sm">
+                      {adjustmentData.adjustment_type === "Add Stock" || adjustmentData.adjustment_type === "Returned"
+                        ? (Number(adjustingMed.stock) || 0) + (parseInt(adjustmentData.quantity) || 0)
+                        : adjustmentData.adjustment_type === "Physical Count Correction"
+                        ? (parseInt(adjustmentData.quantity) || 0)
+                        : Math.max(0, (Number(adjustingMed.stock) || 0) - (parseInt(adjustmentData.quantity) || 0))
+                      } units
+                    </span>
+                  </div>
+
+                  {/* Purchase Price Input & Price Difference */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-bold text-slate-500">Purchase Price (₹)</Label>
+                      <span className="text-[10px] text-slate-500">
+                        Last Purchase: ₹{Number(adjustingMed.purchase_price || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder={String(adjustingMed.purchase_price || "0.00")}
+                        value={adjustmentData.purchase_price ?? ""}
+                        onChange={(e) => setAdjustmentData(prev => ({ ...prev, purchase_price: e.target.value }))}
+                        className="h-8 text-xs font-mono border-slate-200"
+                      />
+                      {adjustmentData.purchase_price !== undefined && adjustmentData.purchase_price !== "" && (
+                        <div className={`px-2 py-1 rounded text-[10px] font-semibold border shrink-0 ${
+                          (parseFloat(adjustmentData.purchase_price) || 0) > (Number(adjustingMed.purchase_price) || 0)
+                            ? "bg-amber-50 text-amber-900 border-amber-300"
+                            : (parseFloat(adjustmentData.purchase_price) || 0) < (Number(adjustingMed.purchase_price) || 0)
+                            ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                            : "bg-slate-100 text-slate-700 border-slate-300"
+                        }`}>
+                          Diff: {(parseFloat(adjustmentData.purchase_price) || 0) > (Number(adjustingMed.purchase_price) || 0)
+                            ? `+₹${((parseFloat(adjustmentData.purchase_price) || 0) - (Number(adjustingMed.purchase_price) || 0)).toFixed(2)}`
+                            : (parseFloat(adjustmentData.purchase_price) || 0) < (Number(adjustingMed.purchase_price) || 0)
+                            ? `-₹${Math.abs((parseFloat(adjustmentData.purchase_price) || 0) - (Number(adjustingMed.purchase_price) || 0)).toFixed(2)}`
+                            : '₹0.00 (Same)'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="font-bold text-slate-500">Reason / Notes *</Label>
+                    <Input
+                      placeholder="e.g. Expired batch replacement / Stock inward"
+                      value={adjustmentData.reason || ""}
+                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, reason: e.target.value }))}
+                      className="h-8 text-xs border-slate-200"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="font-bold text-slate-500">Remarks (Optional)</Label>
+                    <Input
+                      placeholder="Internal audit remarks"
+                      value={adjustmentData.remarks || ""}
+                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, remarks: e.target.value }))}
+                      className="h-8 text-xs border-slate-200"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 text-center text-slate-400 italic bg-slate-50 rounded border border-dashed border-slate-200">
+                  Please search and select a medicine above to view batch details and adjust stock.
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="font-bold text-slate-500">Reason / Notes *</Label>
-                <Input
-                  placeholder="e.g. Expired batch replacement / Stock inward"
-                  value={adjustmentData.reason || ""}
-                  onChange={(e) => setAdjustmentData(prev => ({ ...prev, reason: e.target.value }))}
-                  className="h-8 text-xs border-slate-200"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="font-bold text-slate-500">Remarks (Optional)</Label>
-                <Input
-                  placeholder="Internal audit remarks"
-                  value={adjustmentData.remarks || ""}
-                  onChange={(e) => setAdjustmentData(prev => ({ ...prev, remarks: e.target.value }))}
-                  className="h-8 text-xs border-slate-200"
-                />
-              </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-3">
-              <Button onClick={() => setShowAdjustModal(false)} variant="outline" size="sm" className="h-8 text-xs border-slate-200 cursor-pointer">
+              <Button 
+                onClick={() => { setShowAdjustModal(false); setAdjustingMed(null); }} 
+                variant="outline" 
+                size="sm" 
+                className="h-8 text-xs border-slate-200 cursor-pointer"
+              >
                 Cancel
               </Button>
               <Button
+                disabled={!adjustingMed}
                 onClick={async () => {
+                  if (!adjustingMed) return;
                   if (userRole === "Store Manager" && adjustmentData.adjustment_type !== "Add Stock") {
                     showToast("Access Denied: Store Managers can only add stock.", "error");
                     return;
@@ -7970,12 +7726,13 @@ export default function PharmacyPage() {
                     });
                     showToast("Stock adjustment saved successfully!", "success");
                     setShowAdjustModal(false);
+                    setAdjustingMed(null);
                     await loadAllData();
                   } catch {
                     showToast("Stock adjustment failed", "error");
                   }
                 }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8 px-4 cursor-pointer"
               >
                 Save Adjustment
               </Button>
@@ -7983,6 +7740,311 @@ export default function PharmacyPage() {
           </div>
         </div>
       )}
+
+      {/* ── Traditional Purchase Inward / Stock Entry Modal (Popup) ── */}
+      <Dialog open={isPurchaseInwardOpen} onOpenChange={setIsPurchaseInwardOpen}>
+        <DialogContent className="max-w-4xl bg-white p-6 rounded-xl border border-slate-300 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <PackageCheck className="w-5 h-5 text-emerald-600" />
+                Purchase Inward &amp; Stock Entry (Supplier Bill)
+              </span>
+              <span className="text-xs font-mono font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                Traditional Pharmacy GRN
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Inward newly purchased medicines into pharmacy inventory with supplier invoice number, batch codes, expiry dates, and real-time purchase rate tracking.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2 text-xs max-h-[75vh] overflow-y-auto pr-1">
+            {/* Invoice & Supplier Header Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-slate-700">Supplier / Vendor *</Label>
+                <select
+                  value={inwardSupplier}
+                  onChange={(e) => setInwardSupplier(e.target.value)}
+                  className="w-full h-8 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:outline-none focus:border-indigo-600"
+                >
+                  {suppliers.map(s => (
+                    <option key={s.name} value={s.name}>{s.name} ({s.code || 'Vendor'})</option>
+                  ))}
+                  <option value="Direct Inward / Spot Purchase">Direct Inward / Spot Purchase</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-slate-700">Supplier Invoice / Bill No. *</Label>
+                <Input
+                  value={inwardInvoiceNo}
+                  onChange={(e) => setInwardInvoiceNo(e.target.value)}
+                  placeholder="e.g. INV-2026-9041"
+                  className="h-8 text-xs font-mono font-bold border-slate-300 bg-white uppercase"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-slate-700">Invoice Date *</Label>
+                <Input
+                  type="date"
+                  value={inwardDate}
+                  onChange={(e) => setInwardDate(e.target.value)}
+                  className="h-8 text-xs font-mono border-slate-300 bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Medicine Inward Item Builder */}
+            <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5 text-emerald-700" /> Add Medicine to This Inward Bill
+                </span>
+                {inwardPriceDiffInfo && (
+                  <div className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                    inwardPriceDiffInfo.diff > 0
+                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                      : inwardPriceDiffInfo.diff < 0
+                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                      : "bg-slate-100 text-slate-700 border-slate-300"
+                  }`}>
+                    {inwardPriceDiffInfo.isFirst ? "First Purchase Entry" : (
+                      <span>
+                        Last Purchase: ₹{inwardPriceDiffInfo.lastPrice.toFixed(2)} | Diff: {inwardPriceDiffInfo.diff > 0 ? `+₹${inwardPriceDiffInfo.diff.toFixed(2)} (+${inwardPriceDiffInfo.pct}%)` : inwardPriceDiffInfo.diff < 0 ? `-₹${Math.abs(inwardPriceDiffInfo.diff).toFixed(2)} (${inwardPriceDiffInfo.pct}%)` : '₹0.00 (Same)'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                {/* Search Medicine */}
+                <div className="sm:col-span-4 relative">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">Medicine Name *</Label>
+                  <div className="relative">
+                    <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Type or search medicine (e.g. Dolo 650)..."
+                      value={inwardMedSearch}
+                      onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
+                      onChange={(e) => {
+                        setInwardMedSearch(e.target.value);
+                        setInwardShowDropdown(true);
+                        if (inwardSelectedMed && e.target.value !== inwardSelectedMed.medicine_name) {
+                          setInwardSelectedMed(null);
+                        }
+                      }}
+                      className="w-full h-8 pl-7 pr-2 text-xs font-semibold rounded border border-slate-300 bg-white focus:outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                  {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
+                    <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white rounded-lg shadow-xl border border-slate-200 z-50 divide-y divide-slate-100">
+                      {medicines.filter(m => (m.medicine_name || "").toLowerCase().includes(inwardMedSearch.toLowerCase())).slice(0, 8).map(m => (
+                        <div
+                          key={m.medicine_name}
+                          onClick={() => handleSelectInwardMed(m)}
+                          className="p-2 hover:bg-emerald-50 cursor-pointer flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900">{m.medicine_name}</div>
+                            <div className="text-[10px] text-slate-500">{m.generic_name} &bull; Rack: {m.rack_location || 'A-1'}</div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Stock: {m.stock}</span>
+                            <div className="text-[10px] text-slate-500">Last: ₹{Number(m.purchase_price || 0).toFixed(2)}</div>
+                          </div>
+                        </div>
+                      ))}
+                      <div
+                        onClick={() => {
+                          setInwardShowDropdown(false);
+                          setInwardSelectedMed(null);
+                        }}
+                        className="p-1.5 text-center bg-slate-50 hover:bg-slate-100 text-[10px] text-emerald-800 font-bold cursor-pointer"
+                      >
+                        Use &quot;{inwardMedSearch}&quot; as New Drug
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Batch No */}
+                <div className="sm:col-span-2">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">Batch No. *</Label>
+                  <Input
+                    value={inwardBatch}
+                    onChange={(e) => setInwardBatch(e.target.value)}
+                    placeholder="e.g. BT-9081"
+                    className="h-8 text-xs font-mono uppercase border-slate-300 bg-white"
+                  />
+                </div>
+
+                {/* Expiry Date */}
+                <div className="sm:col-span-2">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">Expiry (MM-YY) *</Label>
+                  <Input
+                    type="month"
+                    value={inwardExp}
+                    onChange={(e) => setInwardExp(e.target.value)}
+                    className="h-8 text-xs font-mono border-slate-300 bg-white"
+                  />
+                </div>
+
+                {/* Quantity */}
+                <div className="sm:col-span-1">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">Qty *</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={inwardQty}
+                    onChange={(e) => setInwardQty(parseInt(e.target.value) || 0)}
+                    className="h-8 text-xs font-mono font-bold text-center border-slate-300 bg-white"
+                  />
+                </div>
+
+                {/* Purchase Rate */}
+                <div className="sm:col-span-1">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">Rate (₹) *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={inwardPrice}
+                    onChange={(e) => setInwardPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 text-xs font-mono font-bold text-right border-slate-300 bg-white"
+                  />
+                </div>
+
+                {/* MRP */}
+                <div className="sm:col-span-1">
+                  <Label className="text-[10px] font-bold text-slate-600 block mb-1">MRP (₹)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={inwardMrp}
+                    onChange={(e) => setInwardMrp(e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 text-xs font-mono text-right border-slate-300 bg-white"
+                  />
+                </div>
+
+                {/* Add to Bill Button */}
+                <div className="sm:col-span-1">
+                  <Button
+                    type="button"
+                    onClick={handleAddInwardItem}
+                    className="w-full h-8 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer"
+                  >
+                    + Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Inward Items Table */}
+            <div className="border border-slate-300 rounded-lg overflow-hidden bg-white shadow-2xs">
+              <table className="w-full text-left border-collapse text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 font-bold uppercase text-[10px] text-slate-700 divide-x divide-slate-300">
+                    <th className="p-2 w-10 text-center">#</th>
+                    <th className="p-2 min-w-[150px]">Medicine</th>
+                    <th className="p-2 text-center font-mono">Batch No.</th>
+                    <th className="p-2 text-center">Expiry</th>
+                    <th className="p-2 text-center">Qty</th>
+                    <th className="p-2 text-right">Purchase Rate</th>
+                    <th className="p-2 text-right">MRP</th>
+                    <th className="p-2 text-right">Line Total</th>
+                    <th className="p-2 w-10 text-center"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {inwardItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-slate-400 italic">
+                        No medicines added to this inward bill yet. Enter medicine details above and click &quot;+ Add&quot;.
+                      </td>
+                    </tr>
+                  ) : (
+                    inwardItems.map((item, index) => (
+                      <tr key={index} className="hover:bg-slate-50 divide-x divide-slate-200">
+                        <td className="p-2 text-center font-mono text-slate-500">{index + 1}</td>
+                        <td className="p-2 font-bold text-slate-900">
+                          {item.medicine}
+                          <span className="block text-[10px] text-slate-400 font-normal">{item.generic_name}</span>
+                        </td>
+                        <td className="p-2 text-center font-mono font-semibold text-slate-800">{item.batch_number}</td>
+                        <td className="p-2 text-center font-mono text-slate-600">{item.exp_date}</td>
+                        <td className="p-2 text-center font-mono font-bold text-indigo-700">{item.quantity}</td>
+                        <td className="p-2 text-right font-mono font-semibold text-slate-800">
+                          ₹{Number(item.purchase_price).toFixed(2)}
+                          {item.last_purchase_price > 0 && (
+                            <div className="text-[9px]">
+                              {item.price_diff > 0 ? (
+                                <span className="text-amber-700 font-bold">+₹{item.price_diff.toFixed(2)}</span>
+                              ) : item.price_diff < 0 ? (
+                                <span className="text-emerald-700 font-bold">-₹{Math.abs(item.price_diff).toFixed(2)}</span>
+                              ) : (
+                                <span className="text-slate-400">Same</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2 text-right font-mono text-slate-600">₹{Number(item.mrp || 0).toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono font-bold text-slate-900">₹{Number(item.line_total || 0).toFixed(2)}</td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInwardItem(index)}
+                            className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Bill Totals Summary */}
+            <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between text-xs gap-3">
+              <div className="flex items-center gap-4">
+                <span>Total Items: <strong className="font-mono text-slate-900">{inwardItems.length}</strong></span>
+                <span>Total Units: <strong className="font-mono text-indigo-700">{inwardItems.reduce((acc, it) => acc + (it.quantity || 0), 0)} units</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600 font-semibold uppercase text-[10px]">Total Inward Value:</span>
+                <span className="font-mono font-black text-slate-900 text-sm">
+                  ₹{inwardItems.reduce((acc, it) => acc + (it.line_total || 0), 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-3 mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPurchaseInwardOpen(false)}
+              className="h-8 text-xs border-slate-300 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmPurchaseInward}
+              disabled={isSubmittingInward || inwardItems.length === 0}
+              className="h-8 px-4 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>{isSubmittingInward ? "Saving Inward..." : "Save & Add to Inventory"}</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Medicine Modal */}
       {showEditMedModal && editingMed && (
