@@ -385,20 +385,26 @@ export default function PharmacyPage() {
   async function loadAllData() {
     try {
       setLoading(true);
-      const [meds, q, reg, pos, returns] = await Promise.all([
+      const [medsRes, qRes, regRes, posRes, returnsRes] = await Promise.allSettled([
         getMedicines(),
         getQueue(),
         getDrugRegister(),
         getPurchaseOrders(),
         getSalesReturns()
       ]);
-      setMedicines(meds || []);
-      setQueue(q || []);
-      setDrugRegister(reg || []);
-      setPurchaseOrders(pos || []);
-      setSalesReturnsList(returns || []);
+      if (medsRes.status === 'fulfilled') setMedicines(medsRes.value || []);
+      if (qRes.status === 'fulfilled') setQueue(qRes.value || []);
+      if (regRes.status === 'fulfilled') setDrugRegister(regRes.value || []);
+      if (posRes.status === 'fulfilled') setPurchaseOrders(posRes.value || []);
+      if (returnsRes.status === 'fulfilled') setSalesReturnsList(returnsRes.value || []);
+
+      const anyRejected = [medsRes, qRes, regRes, posRes, returnsRes].some(r => r.status === 'rejected');
+      if (anyRejected && medsRes.status === 'rejected') {
+        showToast("Error loading medicines catalog", "error");
+        console.error("Pharmacy load error:", { medsRes, qRes, regRes, posRes, returnsRes });
+      }
     } catch (err) {
-      showToast("Error loading data from Frappe", "error");
+      showToast("Error loading pharmacy data", "error");
       console.error(err);
     } finally {
       setLoading(false);
