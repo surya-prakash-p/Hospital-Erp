@@ -14,15 +14,18 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Default to closed (collapsed = true) as requested by user
+  const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Initialize from localStorage
+  // Initialize from localStorage (default to closed if not set)
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("thangam_sidebar_collapsed");
+      const stored = localStorage.getItem("thangam_sidebar_collapsed_v2");
       if (stored !== null) {
         setCollapsed(stored === "true");
+      } else {
+        setCollapsed(true);
       }
     } catch {
       // ignore
@@ -33,7 +36,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setCollapsed((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem("thangam_sidebar_collapsed", String(next));
+        localStorage.setItem("thangam_sidebar_collapsed_v2", String(next));
       } catch {
         // ignore
       }
@@ -45,10 +48,18 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setMobileOpen((prev) => !prev);
   };
 
-  // Keyboard shortcut Ctrl+\ or Cmd+\ to toggle sidebar
+  // Keyboard shortcut Ctrl + < (or legacy Ctrl+\ / Cmd+\) to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "\\" || e.code === "Backslash")) {
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+      const isCtrlLess = isCtrlOrMeta && (
+        e.key === "<" ||
+        (e.shiftKey && (e.key === "," || e.code === "Comma")) ||
+        e.key === "\\" ||
+        e.code === "Backslash"
+      );
+
+      if (isCtrlLess) {
         const target = e.target as HTMLElement;
         const isInput =
           target &&

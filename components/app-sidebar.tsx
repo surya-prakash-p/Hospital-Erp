@@ -13,7 +13,6 @@ import {
   Receipt,
   PanelLeft,
   PanelLeftClose,
-  PanelLeftOpen,
   LayoutDashboard,
   Users,
   Bot,
@@ -58,6 +57,33 @@ export function AppSidebar() {
   const { user, logout, hasRole, hasPermission } = useAuth();
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 180);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Don't render sidebar on login page or when user is not logged in
   if (pathname === "/login" || !user) {
@@ -96,7 +122,9 @@ export function AppSidebar() {
     return false;
   });
 
-  const sidebarWidth = collapsed ? 64 : 240;
+  const isExpanded = !collapsed || isHovered;
+  const asideWidth = isExpanded ? 240 : 64;
+  const spacerWidth = collapsed ? 64 : 240;
 
   const displayName = user?.full_name || user?.name || "Surya Prakash";
   const displayRole = user?.roles?.length ? user.roles[0] : "Hospital Admin";
@@ -108,102 +136,108 @@ export function AppSidebar() {
     .toUpperCase() || "SP";
 
   // Reusable Navigation Link Renderer
-  const renderNavLinks = (isMobileView = false) => (
-    <ul className="space-y-1 px-2">
-      {allowedNav.map((item) => {
-        const Icon = item.icon;
-        const isParentActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+  const renderNavLinks = (isMobileView = false) => {
+    const showFull = isMobileView || isExpanded;
+    return (
+      <ul className="space-y-1 px-2">
+        {allowedNav.map((item) => {
+          const Icon = item.icon;
+          const isParentActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
 
-        const linkContent = (
-          <Link
-            href={item.href}
-            onClick={() => {
-              if (isMobileView) setMobileOpen(false);
-            }}
-            className={`flex items-center gap-3 rounded-lg text-xs transition-colors duration-150 ${
-              !isMobileView && collapsed ? "justify-center p-2.5" : "px-3 py-2.5"
-            } ${
-              isParentActive
-                ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
-            }`}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {(isMobileView || !collapsed) && (
-              <span className="truncate leading-tight text-[12px]">{item.name}</span>
-            )}
-          </Link>
-        );
-
-        if (!isMobileView && collapsed) {
-          return (
-            <li key={item.name}>
-              <Tooltip>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                <TooltipContent side="right" sideOffset={12} className="text-xs font-semibold">
-                  {item.name}
-                </TooltipContent>
-              </Tooltip>
-            </li>
+          const linkContent = (
+            <Link
+              href={item.href}
+              onClick={() => {
+                setIsHovered(false);
+                if (isMobileView) setMobileOpen(false);
+              }}
+              className={`flex items-center gap-3 rounded-lg text-xs transition-colors duration-150 ${
+                !showFull ? "justify-center p-2.5" : "px-3 py-2.5"
+              } ${
+                isParentActive
+                  ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 font-medium"
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {showFull && (
+                <span className="truncate leading-tight text-[12px]">{item.name}</span>
+              )}
+            </Link>
           );
-        }
 
-        return <li key={item.name}>{linkContent}</li>;
-      })}
-    </ul>
-  );
+          if (!showFull) {
+            return (
+              <li key={item.name}>
+                <Tooltip>
+                  <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={12} className="text-xs font-semibold">
+                    {item.name}
+                  </TooltipContent>
+                </Tooltip>
+              </li>
+            );
+          }
+
+          return <li key={item.name}>{linkContent}</li>;
+        })}
+      </ul>
+    );
+  };
 
   // Reusable User Profile Dropdown Button
-  const renderUserProfile = (isMobileView = false) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={`w-full flex items-center rounded-xl p-2 transition-all duration-150 outline-none cursor-pointer border border-transparent hover:border-slate-200 hover:bg-slate-100/80 group ${
-            !isMobileView && collapsed ? "justify-center" : "justify-between gap-2.5"
-          }`}
-          title={!isMobileView && collapsed ? `${displayName} (${displayRole})` : undefined}
-          aria-label="User account and profile menu"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Avatar Circle */}
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-gradient-to-br from-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
-              {user?.avatar || user?.doctor_image ? (
-                <img
-                  src={user.avatar || user.doctor_image}
-                  alt={displayName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span>{userInitials}</span>
+  const renderUserProfile = (isMobileView = false) => {
+    const showFull = isMobileView || isExpanded;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`w-full flex items-center rounded-xl p-2 transition-all duration-150 outline-none cursor-pointer border border-transparent hover:border-slate-200 hover:bg-slate-100/80 group ${
+              !showFull ? "justify-center" : "justify-between gap-2.5"
+            }`}
+            title={!showFull ? `${displayName} (${displayRole})` : undefined}
+            aria-label="User account and profile menu"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Avatar Circle */}
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-gradient-to-br from-indigo-600 to-purple-700 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
+                {user?.avatar || user?.doctor_image ? (
+                  <img
+                    src={user.avatar || user.doctor_image}
+                    alt={displayName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{userInitials}</span>
+                )}
+              </div>
+
+              {/* Name & Role (Expanded / Mobile) */}
+              {showFull && (
+                <div className="text-left min-w-0 flex-1">
+                  <div className="font-bold text-slate-900 text-xs leading-tight truncate group-hover:text-indigo-600 transition-colors">
+                    {displayName}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium leading-tight truncate mt-0.5">
+                    {displayRole}
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Name & Role (Expanded / Mobile) */}
-            {(isMobileView || !collapsed) && (
-              <div className="text-left min-w-0 flex-1">
-                <div className="font-bold text-slate-900 text-xs leading-tight truncate group-hover:text-indigo-600 transition-colors">
-                  {displayName}
-                </div>
-                <div className="text-[10px] text-slate-500 font-medium leading-tight truncate mt-0.5">
-                  {displayRole}
-                </div>
-              </div>
+            {showFull && (
+              <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0" />
             )}
-          </div>
+          </button>
+        </DropdownMenuTrigger>
 
-          {(isMobileView || !collapsed) && (
-            <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0" />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent
-        className="w-56 rounded-xl p-1 shadow-xl border border-slate-200 bg-white z-[100]"
-        align={!isMobileView && collapsed ? "start" : "end"}
-        side={!isMobileView && collapsed ? "right" : "top"}
-        sideOffset={8}
-      >
+        <DropdownMenuContent
+          className="w-56 rounded-xl p-1 shadow-xl border border-slate-200 bg-white z-[100]"
+          align={!showFull ? "start" : "end"}
+          side={!showFull ? "right" : "top"}
+          sideOffset={8}
+        >
         <DropdownMenuLabel className="px-2.5 py-1.5 border-b border-slate-100 mb-0.5 font-normal">
           <div className="font-semibold text-slate-900 text-[14px] leading-tight truncate">{displayName}</div>
           <div className="text-[12px] font-normal text-slate-500 mt-0.5 truncate">{user?.email || "user@thangamhospital.com"}</div>
@@ -264,6 +298,7 @@ export function AppSidebar() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+};
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -271,23 +306,30 @@ export function AppSidebar() {
           DESKTOP SIDEBAR
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <aside
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onPointerEnter={handleMouseEnter}
+        onDragEnter={handleMouseEnter}
         style={{
-          width: sidebarWidth,
-          minWidth: sidebarWidth,
-          transition: "width 200ms cubic-bezier(0.4, 0, 0.2, 1), min-width 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+          width: asideWidth,
+          minWidth: asideWidth,
+          transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1), min-width 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms ease",
         }}
-        className="hidden md:flex fixed top-0 left-0 bottom-0 z-30 flex-col border-r border-slate-200 bg-white shadow-2xs overflow-hidden select-none"
+        className={`hidden md:flex fixed top-0 left-0 bottom-0 flex-col border-r border-slate-200 bg-white select-none ${
+          isHovered && collapsed ? "z-40 shadow-2xl ring-1 ring-slate-900/10" : "z-30 shadow-2xs"
+        } overflow-hidden`}
       >
         {/* Top Header with Brand and Toggle Button */}
         <div
           className={`h-14 border-b border-slate-200 flex items-center shrink-0 bg-slate-50/40 transition-colors ${
-            collapsed ? "justify-center px-2" : "justify-between px-3"
+            !isExpanded ? "justify-center px-2" : "justify-between px-3"
           }`}
         >
-          {/* Logo & Branding - completely hidden when collapsed */}
-          {!collapsed && (
+          {/* Logo & Branding - visible when expanded */}
+          {isExpanded && (
             <Link
               href="/"
+              onClick={() => setIsHovered(false)}
               className="flex items-center gap-2.5 min-w-0 overflow-hidden outline-none group"
               title="Thangam Hospital ERP"
             >
@@ -309,16 +351,19 @@ export function AppSidebar() {
             </Link>
           )}
 
-          {/* Top Sidebar Toggle Button (Icon-Only, centered when collapsed) */}
+          {/* Top Sidebar Toggle Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={toggleCollapsed}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleCollapsed();
+                }}
                 className={`rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer outline-none shrink-0 ${
-                  collapsed ? "w-10 h-10 flex items-center justify-center" : "p-1.5"
+                  !isExpanded ? "w-10 h-10 flex items-center justify-center" : "p-1.5"
                 }`}
-                aria-label={collapsed ? "Expand sidebar (Ctrl+\\)" : "Collapse sidebar (Ctrl+\\)"}
+                aria-label={collapsed ? "Pin sidebar open (Ctrl + <)" : "Collapse sidebar to hover mode (Ctrl + <)"}
               >
                 {collapsed ? (
                   <PanelLeft className="w-5 h-5 text-slate-600" />
@@ -328,7 +373,7 @@ export function AppSidebar() {
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={12} className="text-xs font-semibold">
-              {collapsed ? "Expand sidebar (Ctrl+\\)" : "Collapse sidebar (Ctrl+\\)"}
+              {collapsed ? "Pin sidebar open (Ctrl + <)" : "Collapse sidebar to hover mode (Ctrl + <)"}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -336,7 +381,7 @@ export function AppSidebar() {
         {/* Scrollable Navigation Area */}
         <div className="flex-1 overflow-y-auto min-h-0 py-3 space-y-3">
           <div>
-            {!collapsed && (
+            {isExpanded && (
               <p className="px-3.5 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
                 Main Menu
               </p>
@@ -354,9 +399,9 @@ export function AppSidebar() {
       {/* Spacer div to keep main content perfectly aligned without jumping */}
       <div
         style={{
-          width: sidebarWidth,
-          minWidth: sidebarWidth,
-          transition: "width 200ms cubic-bezier(0.4, 0, 0.2, 1), min-width 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+          width: spacerWidth,
+          minWidth: spacerWidth,
+          transition: "width 220ms cubic-bezier(0.4, 0, 0.2, 1), min-width 220ms cubic-bezier(0.4, 0, 0.2, 1)",
         }}
         className="hidden md:block shrink-0"
         aria-hidden="true"

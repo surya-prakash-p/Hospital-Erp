@@ -8,7 +8,7 @@ import {
   PlusCircle, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Calendar,
   ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw,
-  Package, ShieldCheck
+  Package, ShieldCheck, Keyboard
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import {
   recordFinanceTransaction, executeSalesReturn, getSalesReturns
 } from "@/lib/hospital-service";
 import PharmacyPOSView, { printPharmacyInvoiceReceipt } from "@/components/pharmacy/PharmacyPOSView";
+import { ShortcutsGuideModal } from "@/components/shortcuts-guide-modal";
 
 export default function PharmacyPage() {
   const searchParams = useSearchParams();
@@ -3252,6 +3253,74 @@ export default function PharmacyPage() {
     setShowBulkPOModal(true);
   };
 
+  const handleGeneratePurchaseOrdersShortcut = () => {
+    if (activeTab !== 'logistics') {
+      handleTabChange('logistics');
+    }
+    if (purchaseRecommendations.length > 0) {
+      handleBulkGeneratePOs();
+    } else {
+      setIsPOModalOpen(true);
+      showToast("Opened Purchase Order Generator (Alt + G)", "info");
+    }
+  };
+
+  const handleAddSupplierShortcut = () => {
+    if (activeTab !== 'logistics') {
+      handleTabChange('logistics');
+    }
+    openAddSupplierModal();
+    showToast("Opened Add Supplier form (Alt + Shift + S)", "info");
+  };
+
+  // Handle URL action parameters (e.g. from global Alt+G / Alt+Shift+S / Alt+A / Alt+D)
+  const actionParam = searchParams?.get("action");
+  const filterParam = searchParams?.get("filter");
+
+  useEffect(() => {
+    if (!actionParam) return;
+    if (actionParam === "generate_po") {
+      setActiveTab("logistics");
+      setTimeout(() => {
+        handleGeneratePurchaseOrdersShortcut();
+      }, 150);
+      router.replace("/pharmacy?tab=logistics");
+    } else if (actionParam === "add_supplier") {
+      setActiveTab("logistics");
+      setTimeout(() => {
+        handleAddSupplierShortcut();
+      }, 150);
+      router.replace("/pharmacy?tab=logistics");
+    } else if (actionParam === "add_medicine") {
+      setActiveTab("inventory");
+      setTimeout(() => {
+        setIsAddModalOpen(true);
+      }, 150);
+      router.replace("/pharmacy?tab=inventory");
+    } else if (actionParam === "download_reports") {
+      setActiveTab("inventory");
+      setTimeout(() => {
+        setShowDownloadReportsModal(true);
+      }, 150);
+      router.replace("/pharmacy?tab=inventory");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionParam]);
+
+  useEffect(() => {
+    if (!filterParam) return;
+    if (filterParam === "low_stock") {
+      setActiveTab("inventory");
+      setStatusFilter("Low Stock");
+      router.replace("/pharmacy?tab=inventory");
+    } else if (filterParam === "expiring") {
+      setActiveTab("inventory");
+      setStatusFilter("Expiring / Expired");
+      router.replace("/pharmacy?tab=inventory");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterParam]);
+
   const handleConfirmAndDownloadBulkPOs = async () => {
     const bySupplier = {};
     bulkPOItems.forEach(rec => {
@@ -3569,6 +3638,11 @@ export default function PharmacyPage() {
           setShowShortcutsModal(false);
           return;
         }
+        if (isAddSupplierModalOpen) {
+          e.preventDefault();
+          setIsAddSupplierModalOpen(false);
+          return;
+        }
         if (showDownloadReportsModal) {
           e.preventDefault();
           setShowDownloadReportsModal(false);
@@ -3652,6 +3726,11 @@ export default function PharmacyPage() {
           if (showShortcutsModal) {
             e.preventDefault();
             setShowShortcutsModal(false);
+            return;
+          }
+          if (isAddSupplierModalOpen) {
+            e.preventDefault();
+            setIsAddSupplierModalOpen(false);
             return;
           }
           if (showDownloadReportsModal) {
@@ -3903,7 +3982,21 @@ export default function PharmacyPage() {
         return;
       }
 
-      // 17. Alt + Shift + P -> Generate Purchase Order (PO)
+      // 17. Alt + G -> Generate Purchase Orders (Auto/Manual PO)
+      if (isAlt && !isCtrlOrMeta && key.toLowerCase() === 'g') {
+        e.preventDefault();
+        handleGeneratePurchaseOrdersShortcut();
+        return;
+      }
+
+      // Alt + Shift + S -> Add Drug Supplier Modal
+      if (isAlt && e.shiftKey && !isCtrlOrMeta && key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleAddSupplierShortcut();
+        return;
+      }
+
+      // Alt + Shift + P -> Review & Edit Bulk POs
       if (isAlt && e.shiftKey && key.toLowerCase() === 'p') {
         e.preventDefault();
         if (activeTab !== 'logistics') {
@@ -3922,8 +4015,33 @@ export default function PharmacyPage() {
         return;
       }
 
+      // Alt + B -> View Bills (switch to POS dashboard if on another tab)
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'b') {
+        if (activeTab !== 'dashboard') {
+          e.preventDefault();
+          handleTabChange('dashboard');
+        }
+        return;
+      }
+
+      // Alt + M -> Focus Medicine Search (switch to POS dashboard if on another tab)
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'm') {
+        if (activeTab !== 'dashboard') {
+          e.preventDefault();
+          handleTabChange('dashboard');
+        }
+        return;
+      }
+
+      // ? or F1 -> Toggle Keyboard Shortcuts Modal Guide (when not typing in text field)
+      if (!isInput && (key === '?' || key === 'F1')) {
+        e.preventDefault();
+        setShowShortcutsModal(prev => !prev);
+        return;
+      }
+
       // 18. ARROW KEYS NAVIGATION: ArrowLeft / ArrowRight -> Cycle Tabs
-      const isAnyModalOpen = showShortcutsModal || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
+      const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
       if (!isInput && !isAnyModalOpen && (key === 'ArrowLeft' || key === 'ArrowRight')) {
         e.preventDefault();
         const tabOrder = ['dashboard', 'inventory', 'dispensing', 'registers', 'logistics'];
@@ -4010,6 +4128,7 @@ export default function PharmacyPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeTab, 
     queue, 
@@ -4038,7 +4157,9 @@ export default function PharmacyPage() {
     showSalesReturnModal, 
     selectedMedicine,
     showDispenseReceiptModal,
-    userRole
+    userRole,
+    isAddSupplierModalOpen,
+    purchaseRecommendations
   ]);
 
   return (
@@ -4773,6 +4894,8 @@ export default function PharmacyPage() {
             }}
             onOpenExport={() => setShowDownloadReportsModal(true)}
             onOpenShortcuts={() => setShowShortcutsModal(true)}
+            onAddSupplier={handleAddSupplierShortcut}
+            onGeneratePOs={handleGeneratePurchaseOrdersShortcut}
             showToast={showToast}
             selectedWalkIn={selectedWalkIn}
             onClearWalkIn={() => setSelectedWalkIn(null)}
@@ -5700,6 +5823,7 @@ export default function PharmacyPage() {
                   >
                     <ShoppingCart className="w-3.5 h-3.5" />
                     <span>Generate Purchase Orders</span>
+                    <span className="text-[9px] font-mono bg-indigo-800 text-indigo-100 px-1 py-0.2 rounded border border-indigo-400">Alt + G</span>
                     <ChevronDown className="w-3.5 h-3.5 opacity-80" />
                   </button>
                 </DropdownMenuTrigger>
@@ -5712,7 +5836,7 @@ export default function PharmacyPage() {
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <div className="font-bold text-slate-900">Review &amp; Edit Purchase Orders</div>
-                        <span className="text-[9px] font-mono bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded border border-indigo-200">Alt + Shift + P</span>
+                        <span className="text-[9px] font-mono bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded border border-indigo-200">Alt + G</span>
                       </div>
                       <div className="text-[10px] text-slate-500">Auto-generate orders from system suggestions</div>
                     </div>
@@ -6233,9 +6357,11 @@ export default function PharmacyPage() {
                 <Button 
                   onClick={openAddSupplierModal} 
                   size="xs" 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] h-7 px-2.5 flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[10px] h-7 px-2.5 flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer"
                 >
-                  <Plus className="w-3 h-3" /> Add Supplier
+                  <Plus className="w-3 h-3" />
+                  <span>Add Supplier</span>
+                  <span className="text-[9px] font-mono bg-indigo-800 text-indigo-100 px-1 py-0.2 rounded border border-indigo-400">Alt + S</span>
                 </Button>
               </div>
 
@@ -9787,6 +9913,12 @@ export default function PharmacyPage() {
           </div>
         </div>
       )}
+
+      {/* Keyboard Shortcuts Guide Modal */}
+      <ShortcutsGuideModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+      />
 
       {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs */}
       <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">

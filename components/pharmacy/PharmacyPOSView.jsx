@@ -6,7 +6,7 @@ import {
   RotateCcw, Printer, CheckCircle, Calendar, Pill, DollarSign,
   AlertCircle, ChevronDown, ArrowRight, User, Stethoscope,
   Clock, ShieldAlert, PackageCheck, FileText, X,
-  Percent, RefreshCw, Receipt, Download, Check
+  Percent, RefreshCw, Receipt, Download, Check, Keyboard, PlusCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,6 +204,8 @@ export default function PharmacyPOSView({
   onOpenAddBatch,
   onOpenExport,
   onOpenShortcuts,
+  onAddSupplier,
+  onGeneratePOs,
   showToast,
   selectedWalkIn = null,
   onClearWalkIn,
@@ -1127,24 +1129,61 @@ export default function PharmacyPOSView({
       }
 
       // Alt + B -> View Bills / Invoices History
-      if (isAlt && key.toLowerCase() === 'b') {
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'b') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         loadSavedBills();
         setShowViewBillsModal(true);
         return;
       }
 
-      // Alt + S -> Focus Medicine Search
-      if (isAlt && key.toLowerCase() === 's') {
+      // Alt + G -> Generate Purchase Orders
+      if (isAlt && !isCtrlOrMeta && !e.shiftKey && key.toLowerCase() === 'g') {
         e.preventDefault();
+        e.stopImmediatePropagation();
+        onGeneratePOs?.();
+        return;
+      }
+
+      // Alt + Shift + S -> Add Drug Supplier
+      if (isAlt && !isCtrlOrMeta && e.shiftKey && key.toLowerCase() === 's') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onAddSupplier?.();
+        return;
+      }
+
+      // Alt + U -> Open Medicine Substitute Modal
+      if (isAlt && !isCtrlOrMeta && key.toLowerCase() === 'u') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleOpenSubstitute();
+        return;
+      }
+
+      // Alt + M or / (when not in input) -> Focus Medicine Search
+      const targetEl = e.target;
+      const isTyping = targetEl && (targetEl.tagName === "INPUT" || targetEl.tagName === "TEXTAREA" || targetEl.isContentEditable);
+      if ((isAlt && key.toLowerCase() === 'm') || (key === '/' && !isTyping)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
         return;
       }
 
-      // Alt + N -> Quick OTC / Add Service
+      // ? or F1 -> Open Shortcuts Guide Modal
+      if (!isTyping && (key === '?' || key === 'F1')) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onOpenShortcuts?.();
+        return;
+      }
+
+      // Alt + N -> Quick OTC Sale
       if (isAlt && key.toLowerCase() === 'n') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         onOpenOTCSale?.();
         return;
       }
@@ -1152,6 +1191,7 @@ export default function PharmacyPOSView({
       // Alt + O -> Outside Purchase
       if (isAlt && key.toLowerCase() === 'o') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleAddOutsidePurchase();
         return;
       }
@@ -1159,49 +1199,84 @@ export default function PharmacyPOSView({
       // Alt + P -> Patient Focus (isolated from Shift)
       if (isAlt && !e.shiftKey && key.toLowerCase() === 'p') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         patientInputRef.current?.focus();
         patientInputRef.current?.select();
         return;
       }
 
-      // Alt + T -> Doctor Toggle / Focus
+      // Alt + T -> Toggle Doctor (Walk-in Customer vs Hospital Doctor)
       if (isAlt && key.toLowerCase() === 't') {
         e.preventDefault();
-        setIsHospitalPrescription(true);
-        if (!doctorName) setDoctorName("Dr. Arun Kumar, MBBS, MD");
-        setTimeout(() => {
-          doctorInputRef.current?.focus();
-          doctorInputRef.current?.select();
-        }, 50);
+        e.stopImmediatePropagation();
+        setIsHospitalPrescription((prev) => {
+          const next = !prev;
+          if (next) {
+            if (!doctorName) setDoctorName("Dr. Arun Kumar, MBBS, MD");
+            setTimeout(() => {
+              doctorInputRef.current?.focus();
+              doctorInputRef.current?.select();
+            }, 50);
+          } else {
+            setDoctorName("");
+          }
+          return next;
+        });
         return;
       }
 
-      // Alt + D -> Discount Focus
-      if (isAlt && key.toLowerCase() === 'd') {
+      // Alt + Shift + D -> Focus Discount
+      if (isAlt && e.shiftKey && key.toLowerCase() === 'd') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         discountInputRef.current?.focus();
         discountInputRef.current?.select();
+        return;
+      }
+
+      // Alt + D -> Download & Export
+      if (isAlt && !e.shiftKey && key.toLowerCase() === 'd') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onOpenExport?.();
         return;
       }
 
       // Alt + I -> Invoice No Focus
       if (isAlt && key.toLowerCase() === 'i') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         invoiceInputRef.current?.focus();
         invoiceInputRef.current?.select();
         return;
       }
 
-      // Alt + R -> Remarks Focus / Sales Return
+      // Alt + R -> Sales Return
       if (isAlt && key.toLowerCase() === 'r') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         onOpenSalesReturn?.();
+        return;
+      }
+
+      // Alt + Q -> Next Patient in Queue
+      if (isAlt && key.toLowerCase() === 'q') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const waitingQueue = (queue || []).filter(item => item.appointment_status === 'Pharmacy' || item.status === 'Waiting');
+        const nextPatient = waitingQueue[0] || (queue || [])[0];
+        if (nextPatient) {
+          onSelectQueueItem?.(nextPatient);
+        } else {
+          showToast?.("No waiting patients in prescription queue.", "info");
+        }
         return;
       }
 
       // Alt + C -> Collect & Dispense
       if (isAlt && key.toLowerCase() === 'c') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleMasterSaveBill({ isCollectAndDispense: true });
         return;
       }
@@ -1209,6 +1284,7 @@ export default function PharmacyPOSView({
       // Ctrl + P -> Print & Save
       if (isCtrlOrMeta && key.toLowerCase() === 'p') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleMasterSaveBill({ autoPrint: true });
         return;
       }
@@ -1216,14 +1292,36 @@ export default function PharmacyPOSView({
       // Ctrl + Enter -> Save Bill Primary Action
       if (isCtrlOrMeta && key === 'Enter') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleMasterSaveBill();
         return;
       }
 
-      // Delete key -> Delete selected row
-      if (key === 'Delete' && selectedRowIndex >= 0 && billingItems[selectedRowIndex]) {
+      // Delete key -> Delete selected row (only when not typing in text field)
+      if (key === 'Delete' && !isTyping && selectedRowIndex >= 0 && billingItems[selectedRowIndex]) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleDeleteRow(selectedRowIndex);
+        return;
+      }
+
+      // ↑ / ↓ -> Navigate bill table rows when not in an input
+      if (!isTyping && !showSearchDropdown && billingItems.length > 0 && (key === 'ArrowUp' || key === 'ArrowDown')) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (key === 'ArrowDown') {
+          setSelectedRowIndex((prev) => (prev < billingItems.length - 1 ? prev + 1 : 0));
+        } else {
+          setSelectedRowIndex((prev) => (prev > 0 ? prev - 1 : billingItems.length - 1));
+        }
+        return;
+      }
+
+      // Enter -> Open Substitute Finder on highlighted row when not in an input
+      if (!isTyping && key === 'Enter' && !isCtrlOrMeta && selectedRowIndex >= 0 && billingItems[selectedRowIndex]) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleOpenSubstitute(selectedRowIndex);
         return;
       }
     };
@@ -1234,7 +1332,9 @@ export default function PharmacyPOSView({
     billingItems, selectedRowIndex, showSubstituteModal, showDiscountModal,
     showServiceItemModal, showMoreDetailsModal, showViewBillsModal, settlingBill,
     showSearchDropdown, showPatientDropdown, posSearchQuery, tableCalculations,
-    isHospitalPrescription, doctorName
+    isHospitalPrescription, doctorName, queue, onSelectQueueItem, onAddSupplier,
+    onGeneratePOs, onOpenExport, onOpenOTCSale, onOpenSalesReturn, onOpenShortcuts,
+    showToast
   ]);
 
   return (
@@ -1251,7 +1351,7 @@ export default function PharmacyPOSView({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search medicines by name, generic molecule, barcode or batch... (Press Alt + S)"
+              placeholder="Search medicines by name, generic molecule, barcode or batch... (Press / or Alt + M)"
               value={posSearchQuery}
               onChange={(e) => {
                 setPosSearchQuery(e.target.value);
@@ -1312,7 +1412,7 @@ export default function PharmacyPOSView({
               </button>
             )}
             <span className="absolute right-2 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-300 pointer-events-none shadow-2xs">
-              Alt + S
+              Alt + M
             </span>
           </div>
 
@@ -1400,6 +1500,17 @@ export default function PharmacyPOSView({
         <div className="flex items-center gap-1.5 flex-wrap shrink-0">
           <button
             type="button"
+            onClick={onOpenShortcuts}
+            className="px-2 py-1 text-[11px] font-semibold bg-white text-slate-700 border border-slate-300 rounded hover:bg-slate-50 shadow-2xs flex items-center gap-1 cursor-pointer"
+            title="View Keyboard Shortcuts Guide (?)"
+          >
+            <Keyboard className="w-3 h-3 text-slate-500" />
+            <span>Shortcuts</span>
+            <span className="text-[9px] bg-slate-100 text-slate-600 px-1 rounded border border-slate-200 font-mono">?</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               loadSavedBills();
               setShowViewBillsModal(true);
@@ -1421,7 +1532,16 @@ export default function PharmacyPOSView({
                 <ChevronDown className="w-3 h-3 opacity-80" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
+            <DropdownMenuContent align="end" className="w-56 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
+              <DropdownMenuItem onClick={onOpenShortcuts} className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
+                <Keyboard className="w-3.5 h-3.5 text-amber-600" /> Keyboard Shortcuts (?)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onGeneratePOs} className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
+                <ShoppingCart className="w-3.5 h-3.5 text-indigo-600" /> Generate POs (Alt + G)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onAddSupplier} className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-600" /> Add Supplier (Alt + Shift + S)
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { loadSavedBills(); setShowViewBillsModal(true); }} className="flex items-center gap-2 cursor-pointer">
                 <Receipt className="w-3.5 h-3.5 text-indigo-600" /> View Bills / Invoices (Alt + B)
               </DropdownMenuItem>
@@ -1467,7 +1587,7 @@ export default function PharmacyPOSView({
                   <tr key={`empty-${emptyIdx}`} className="border-b border-slate-100 text-slate-300 divide-x divide-slate-100">
                     <td className="text-center font-mono text-[10px] py-2 align-middle">{emptyIdx === 0 ? "1" : ""}</td>
                     <td className="px-3 text-slate-400 font-normal py-2 align-middle">
-                      {emptyIdx === 0 ? "Search product above or press Alt + S to begin billing..." : ""}
+                      {emptyIdx === 0 ? "Search product above or press / or Alt + M to begin billing..." : ""}
                     </td>
                     <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                   </tr>
@@ -1639,7 +1759,7 @@ export default function PharmacyPOSView({
             onClick={() => handleOpenSubstitute()}
             className="px-2.5 py-1 text-xs font-bold bg-slate-900 text-white rounded hover:bg-black shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
-            <span className="bg-slate-700 text-blue-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + S</span>
+            <span className="bg-slate-700 text-blue-300 text-[9px] px-1 py-0.2 rounded font-mono">Alt + U</span>
             <span>Substitute</span>
           </button>
 
@@ -1788,11 +1908,11 @@ export default function PharmacyPOSView({
             </div>
           )}
 
-          {/* Discount % with Alt D */}
+          {/* Discount % with Alt + Shift + D */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-[10px] font-bold text-slate-600 uppercase">Discount %</Label>
-              <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1 rounded border">Alt + D</span>
+              <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1 rounded border">Alt + Shift + D</span>
             </div>
             <input
               ref={discountInputRef}
@@ -1839,11 +1959,10 @@ export default function PharmacyPOSView({
         {/* Row 2: Remarks, Next Order (Days), Payment Mode */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 pt-1 border-t border-slate-200/80">
           
-          {/* Remarks with Alt R */}
+          {/* Remarks */}
           <div className="space-y-1 md:col-span-2">
             <div className="flex items-center justify-between">
               <Label className="text-[10px] font-bold text-slate-600 uppercase">Remarks</Label>
-              <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1 rounded border">Alt + R</span>
             </div>
             <input
               ref={remarksInputRef}
@@ -1974,11 +2093,11 @@ export default function PharmacyPOSView({
 
         <button
           type="button"
-          onClick={() => setShowServiceItemModal(true)}
+          onClick={() => onOpenOTCSale?.()}
           className="px-3 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Add Service Items</span>
+          <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Quick OTC Sale</span>
           <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Alt + N</span>
         </button>
 
