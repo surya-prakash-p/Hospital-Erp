@@ -1265,14 +1265,6 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Ctrl + P -> Print & Save
-      if (isCtrlOrMeta && key.toLowerCase() === 'p') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        handleMasterSaveBill({ autoPrint: true });
-        return;
-      }
-
       // Ctrl + Enter -> Save Bill Primary Action
       if (isCtrlOrMeta && key === 'Enter') {
         e.preventDefault();
@@ -2059,16 +2051,6 @@ export default function PharmacyPOSView({
           6. BOTTOM BILLING ACTION BUTTONS (Large POS Buttons matching Reference)
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={() => handleMasterSaveBill({ autoPrint: true })}
-          className="px-3.5 py-1.5 text-xs font-bold bg-slate-800 text-white rounded-lg hover:bg-slate-900 shadow-xs flex items-center gap-1.5 cursor-pointer"
-        >
-          <Printer className="w-3.5 h-3.5 text-blue-400" />
-          <span>Print & Save</span>
-          <span className="bg-slate-700 text-slate-200 text-[9px] px-1 py-0.2 rounded font-mono">Ctrl + P</span>
-        </button>
-
         {/* Primary Save Action */}
         <button
           type="button"

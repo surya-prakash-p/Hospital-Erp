@@ -110,11 +110,6 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
         description: "Selects the next patient waiting in the OPD/prescription queue.",
       },
       {
-        keys: [{ kbd: "Ctrl" }, "+", { kbd: "P" }],
-        action: "Print & Save",
-        description: "Saves the invoice and triggers the application's receipt printing flow.",
-      },
-      {
         keys: [{ kbd: "Ctrl" }, "+", { kbd: "Enter" }],
         action: "Confirm / Dispense",
         description: "Submits and records the current dispensation/billing entry.",
