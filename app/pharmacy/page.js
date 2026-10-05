@@ -8,7 +8,7 @@ import {
   PlusCircle, Printer, ShieldAlert, Search, FileText, Download, 
   Trash2, Eye, ClipboardList, ShoppingCart, DollarSign, Calendar,
   ArrowRight, X, Loader2, ChevronDown, Edit3, Sliders, ShoppingBag, MoreHorizontal, RotateCcw,
-  Package, ShieldCheck, Keyboard, Check
+  Package, ShieldCheck, Keyboard, Check, TrendingUp
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -206,6 +206,16 @@ export default function PharmacyPage() {
   const [inwardInvoiceNo, setInwardInvoiceNo] = useState("INV-2026-1315");
   const [inwardDate, setInwardDate] = useState("2026-05-10");
   const [inwardPurchaseType, setInwardPurchaseType] = useState("Regular Purchase");
+  const [inwardPurchaseTypesList, setInwardPurchaseTypesList] = useState([
+    "Regular Purchase",
+    "Emergency Purchase",
+    "Return Inward",
+    "Consignment",
+    "Direct Local Purchase",
+    "Institutional Supply"
+  ]);
+  const [showAddPurchaseTypeModal, setShowAddPurchaseTypeModal] = useState(false);
+  const [newPurchaseTypeName, setNewPurchaseTypeName] = useState("");
   const [inwardRemarks, setInwardRemarks] = useState("");
   const [inwardBillDiscountPct, setInwardBillDiscountPct] = useState("0.00");
   const [inwardAdditionalCharges, setInwardAdditionalCharges] = useState("0.00");
@@ -1277,10 +1287,12 @@ export default function PharmacyPage() {
         supplier: inwardSupplier.trim(),
         invoice_number: inwardInvoiceNo.trim(),
         invoice_date: inwardDate || new Date().toISOString().split("T")[0],
+        purchase_type: inwardPurchaseType,
+        remarks: inwardRemarks,
         items: inwardItems
       });
 
-      showToast(`Successfully inwarded ${inwardItems.length} medicine(s) into inventory! Stock updated.`, "success");
+      showToast(`Successfully inwarded ${inwardItems.length} medicine(s) into inventory! Stock updated & rates recorded.`, "success");
       setIsPurchaseInwardOpen(false);
       setInwardItems([]);
       await loadAllData();
@@ -7984,11 +7996,11 @@ export default function PharmacyPage() {
         </div>
       )}
 
-      {/* ── Desktop Purchase Inward & Stock Entry Modal (Supplier Bill Matching Photo) ── */}
+      {/* ── Desktop Purchase Inward & Stock Entry Modal (Supplier Bill with Rate Diff) ── */}
       <Dialog open={isPurchaseInwardOpen} onOpenChange={setIsPurchaseInwardOpen}>
-        <DialogContent className="max-w-7xl w-[98vw] max-h-[96vh] flex flex-col bg-slate-100 p-4 rounded-xl border border-slate-300 shadow-2xl overflow-hidden focus:outline-none text-xs">
+        <DialogContent className="max-w-7xl w-[98vw] max-h-[96vh] flex flex-col bg-slate-100 p-3.5 sm:p-4 rounded-xl border border-slate-300 shadow-2xl overflow-hidden focus:outline-none text-xs">
           {/* Header Bar */}
-          <DialogHeader className="shrink-0 pb-2 border-b border-slate-300 flex flex-row items-center justify-between">
+          <DialogHeader className="shrink-0 pb-1.5 border-b border-slate-300 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <PackageCheck className="w-5 h-5 text-blue-700" />
               <div>
@@ -7996,7 +8008,7 @@ export default function PharmacyPage() {
                   Purchase Inward &amp; Stock Entry (Supplier Bill)
                 </DialogTitle>
                 <DialogDescription className="text-[11px] text-slate-500">
-                  Enter supplier invoice, adjust inventory stock, and track medicine purchase amounts (Last Rate vs New Rate).
+                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Last Rate vs New Rate).
                 </DialogDescription>
               </div>
             </div>
@@ -8007,11 +8019,11 @@ export default function PharmacyPage() {
             </div>
           </DialogHeader>
 
-          <div className="space-y-2.5 pt-2 text-xs flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="space-y-2 pt-1 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
             {/* 1. Top Section: 3-Column Supplier & Invoice Info Card */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-white rounded-lg border border-slate-300 shadow-2xs shrink-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs shrink-0">
               {/* Col 1: Supplier / Vendor */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label className="w-28 text-xs font-bold text-slate-700 shrink-0">Supplier / Vendor</Label>
                   <div className="flex-1 flex items-center gap-1">
@@ -8025,7 +8037,7 @@ export default function PharmacyPage() {
                           setInwardSupplierPhone(found.mobileNumber || "9840012345");
                         }
                       }}
-                      className="flex-1 h-7.5 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                      className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                     >
                       {suppliers.map(s => (
                         <option key={s.name} value={`${s.name} (${s.code || 'SUP-1001'})`}>
@@ -8039,7 +8051,7 @@ export default function PharmacyPage() {
                     <button
                       type="button"
                       onClick={() => openAddSupplierModal()}
-                      className="h-7.5 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs"
+                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs"
                       title="Add / Edit Supplier"
                     >
                       ...
@@ -8048,12 +8060,12 @@ export default function PharmacyPage() {
                 </div>
 
                 <div className="flex items-start gap-2">
-                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0 pt-1">Address</Label>
+                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0 pt-0.5">Address</Label>
                   <textarea
                     value={inwardSupplierAddress}
                     onChange={(e) => setInwardSupplierAddress(e.target.value)}
                     rows={2}
-                    className="flex-1 text-xs rounded border border-slate-300 bg-white px-2 py-1 focus:border-blue-600 focus:outline-none resize-none font-medium text-slate-700"
+                    className="flex-1 text-xs rounded border border-slate-300 bg-white px-2 py-0.5 focus:border-blue-600 focus:outline-none resize-none font-medium text-slate-700"
                   />
                 </div>
 
@@ -8063,20 +8075,20 @@ export default function PharmacyPage() {
                     type="text"
                     value={inwardSupplierPhone}
                     onChange={(e) => setInwardSupplierPhone(e.target.value)}
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-mono"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-mono"
                   />
                 </div>
               </div>
 
               {/* Col 2: Invoice / Bill Details */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Invoice / Bill No. :</Label>
                   <input
                     type="text"
                     value={inwardInvoiceNo}
                     onChange={(e) => setInwardInvoiceNo(e.target.value)}
-                    className="flex-1 h-7.5 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none uppercase"
+                    className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none uppercase"
                   />
                 </div>
 
@@ -8086,22 +8098,38 @@ export default function PharmacyPage() {
                     type="date"
                     value={inwardDate}
                     onChange={(e) => setInwardDate(e.target.value)}
-                    className="flex-1 h-7.5 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Purchase Type :</Label>
-                  <select
-                    value={inwardPurchaseType}
-                    onChange={(e) => setInwardPurchaseType(e.target.value)}
-                    className="flex-1 h-7.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-medium"
-                  >
-                    <option value="Regular Purchase">Regular Purchase</option>
-                    <option value="Emergency Purchase">Emergency Purchase</option>
-                    <option value="Return Inward">Return Inward</option>
-                    <option value="Consignment">Consignment</option>
-                  </select>
+                  <div className="flex-1 flex items-center gap-1">
+                    <select
+                      value={inwardPurchaseType}
+                      onChange={(e) => {
+                        if (e.target.value === "__add_new__") {
+                          setShowAddPurchaseTypeModal(true);
+                        } else {
+                          setInwardPurchaseType(e.target.value);
+                        }
+                      }}
+                      className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-medium"
+                    >
+                      {inwardPurchaseTypesList.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                      <option value="__add_new__" className="font-bold text-blue-700">+ Add New Purchase Type...</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPurchaseTypeModal(true)}
+                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-bold cursor-pointer text-xs"
+                      title="Add New Purchase Type"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -8111,13 +8139,13 @@ export default function PharmacyPage() {
                     value={inwardRemarks}
                     onChange={(e) => setInwardRemarks(e.target.value)}
                     placeholder="Optional remarks..."
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Col 3: Bill Charges */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Bill Discount (%)</Label>
                   <input
@@ -8125,7 +8153,7 @@ export default function PharmacyPage() {
                     step="0.01"
                     value={inwardBillDiscountPct}
                     onChange={(e) => setInwardBillDiscountPct(e.target.value)}
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
                   />
                 </div>
 
@@ -8136,7 +8164,7 @@ export default function PharmacyPage() {
                     step="0.01"
                     value={inwardAdditionalCharges}
                     onChange={(e) => setInwardAdditionalCharges(e.target.value)}
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
                   />
                 </div>
 
@@ -8147,7 +8175,7 @@ export default function PharmacyPage() {
                     step="0.01"
                     value={inwardFreight}
                     onChange={(e) => setInwardFreight(e.target.value)}
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
                   />
                 </div>
 
@@ -8158,16 +8186,16 @@ export default function PharmacyPage() {
                     step="0.01"
                     value={inwardRoundOff}
                     onChange={(e) => setInwardRoundOff(e.target.value)}
-                    className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 2. Add Medicine Entry Bar (Cream / Yellow Highlight Matching Photo) */}
-            <div className="bg-[#fef9c3] border border-amber-300 rounded-lg p-2 flex items-center gap-2.5 flex-wrap shadow-2xs shrink-0" ref={inwardSearchContainerRef}>
+            {/* 2. Add Medicine Entry Bar (Professional Slate Theme) */}
+            <div className="bg-slate-50 border border-slate-300/90 rounded-lg p-2 flex items-center gap-2 flex-wrap shadow-2xs shrink-0" ref={inwardSearchContainerRef}>
               <div className="flex items-center gap-1.5 flex-1 min-w-[260px]">
-                <Label className="font-bold text-slate-900 whitespace-nowrap text-xs">Add Medicine :</Label>
+                <Label className="font-bold text-slate-800 whitespace-nowrap text-xs">Add Medicine :</Label>
                 <div className="relative flex-1">
                   <input
                     ref={inwardSearchInputRef}
@@ -8228,7 +8256,7 @@ export default function PharmacyPage() {
                               <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
                             </div>
                             <div className="text-right font-mono">
-                              <span className="text-[10px] text-slate-500">Last Pur: ₹{lastP.toFixed(2)}</span>
+                              <span className="text-[10px] text-slate-500">{lastP > 0 ? `Last Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
                               <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
                             </div>
                           </div>
@@ -8255,7 +8283,7 @@ export default function PharmacyPage() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-800 whitespace-nowrap">Batch No.</Label>
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Batch No.</Label>
                 <input
                   type="text"
                   value={inwardBatch}
@@ -8266,7 +8294,7 @@ export default function PharmacyPage() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-800 whitespace-nowrap">Expiry Date</Label>
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Expiry Date</Label>
                 <input
                   type="date"
                   value={inwardExp}
@@ -8276,7 +8304,7 @@ export default function PharmacyPage() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-800 whitespace-nowrap">Qty.</Label>
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Qty.</Label>
                 <input
                   type="number"
                   min="1"
@@ -8287,7 +8315,7 @@ export default function PharmacyPage() {
               </div>
 
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-800 whitespace-nowrap">Rate (₹)</Label>
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Rate (₹)</Label>
                 <input
                   type="number"
                   step="0.01"
@@ -8302,7 +8330,7 @@ export default function PharmacyPage() {
               <button
                 type="button"
                 onClick={handleAddInwardEntryFromBar}
-                className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-2xs flex items-center gap-1 cursor-pointer text-xs"
+                className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-xs flex items-center gap-1 cursor-pointer text-xs transition"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add [Enter]</span>
@@ -8310,20 +8338,21 @@ export default function PharmacyPage() {
             </div>
 
             {/* 3. Inward Bill Items Table (Matching Photo High-Density Classic Blue Table) */}
-            <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[220px]">
-              <div className="overflow-auto flex-1 min-h-0">
+            <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[160px]">
+              <div className="overflow-auto flex-1 min-h-0 max-h-[260px]">
                 <table className="w-full text-left border-collapse text-xs select-text">
                   <thead className="sticky top-0 z-10 bg-blue-700 text-white font-bold uppercase text-[11px] tracking-wider border-b border-blue-800">
                     <tr className="divide-x divide-blue-600">
                       <th className="py-2 px-2 text-center w-12">S.No</th>
                       <th className="py-2 px-2.5 min-w-[170px]">Medicine Name</th>
-                      <th className="py-2 px-2 min-w-[110px]">Company</th>
+                      <th className="py-2 px-2 min-w-[100px]">Company</th>
                       <th className="py-2 px-2 text-center w-28">Batch No.</th>
                       <th className="py-2 px-2 text-center w-24">Expiry Date</th>
                       <th className="py-2 px-2 text-center w-20">Pack</th>
                       <th className="py-2 px-2 text-center w-16">Qty</th>
                       <th className="py-2 px-2 text-right w-24">Last Rate (₹)</th>
                       <th className="py-2 px-2 text-right w-24">New Rate (₹)</th>
+                      <th className="py-2 px-2 text-center w-28">Rate Diff (₹)</th>
                       <th className="py-2 px-2 text-right w-20">MRP (₹)</th>
                       <th className="py-2 px-2.5 text-right w-28">Line Total (₹)</th>
                       <th className="py-2 px-2 text-center w-16">Action</th>
@@ -8332,8 +8361,8 @@ export default function PharmacyPage() {
                   <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-800">
                     {inwardItems.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center py-10 text-slate-400 font-medium">
-                          No medicines in inward bill. Use the yellow bar above to add medicines.
+                        <td colSpan={13} className="text-center py-8 text-slate-400 font-medium">
+                          No medicines in inward bill. Use the entry bar above to add medicines.
                         </td>
                       </tr>
                     ) : (
@@ -8341,8 +8370,8 @@ export default function PharmacyPage() {
                         const isSelected = selectedInwardRowIndex === idx;
                         const pPrice = parseFloat(item.purchase_price) || 0;
                         const lastPrice = Number(item.last_purchase_price) || 0;
-                        const diff = pPrice - lastPrice;
                         const isFirst = lastPrice === 0;
+                        const diff = pPrice - lastPrice;
                         const qty = parseInt(item.quantity, 10) || 0;
                         const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
                         const mrpVal = Number(item.mrp || 0).toFixed(2);
@@ -8394,42 +8423,82 @@ export default function PharmacyPage() {
                               {item.quantity}
                             </td>
 
-                            {/* 8. Last Rate (Medicine amount last time) */}
+                            {/* 8. Last Rate (Read-Only) */}
                             <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isSelected ? "text-white" : "text-slate-600"}`}>
                               {isFirst ? (
-                                <span className={isSelected ? "text-sky-100 italic text-[10px]" : "text-slate-400 italic text-[10px]"}>First Pur</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-normal italic ${
+                                  isSelected ? "bg-sky-700 text-sky-100" : "bg-slate-100 text-slate-500"
+                                }`}>
+                                  New Item
+                                </span>
                               ) : (
-                                <span>{lastPrice.toFixed(2)}</span>
+                                <span>₹{lastPrice.toFixed(2)}</span>
                               )}
                             </td>
 
-                            {/* 9. New Rate (Medicine amount now vs last time) */}
-                            <td className={`py-1.5 px-2 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              <div className="flex items-center justify-end gap-1">
-                                <span>{pPrice.toFixed(2)}</span>
-                                {!isFirst && diff !== 0 && (
-                                  <span className={`text-[9px] px-1 rounded font-normal ${
-                                    diff > 0 
-                                      ? (isSelected ? "bg-amber-400 text-amber-950 font-bold" : "bg-amber-100 text-amber-900 font-bold")
-                                      : (isSelected ? "bg-emerald-300 text-emerald-950 font-bold" : "bg-emerald-100 text-emerald-800 font-bold")
-                                  }`}>
-                                    {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)}
-                                  </span>
-                                )}
-                              </div>
+                            {/* 9. New Rate (Editable) */}
+                            <td className={`py-1 px-1.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.purchase_price}
+                                onChange={(e) => handleUpdateInwardRow(idx, "purchase_price", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className={`w-20 h-6 px-1.5 text-right font-mono font-bold rounded border text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                                  isSelected 
+                                    ? "bg-sky-700 text-white border-sky-400 placeholder-sky-200" 
+                                    : "bg-white text-slate-900 border-slate-300"
+                                }`}
+                              />
                             </td>
 
-                            {/* 10. MRP */}
+                            {/* 10. Rate Diff (₹) */}
+                            <td className="py-1.5 px-2 text-center font-mono">
+                              {isFirst ? (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-normal italic ${
+                                  isSelected ? "bg-sky-700 text-sky-100" : "bg-slate-100 text-slate-500"
+                                }`}>
+                                  No Prev. Rate
+                                </span>
+                              ) : diff > 0 ? (
+                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                  isSelected 
+                                    ? "bg-rose-900 text-rose-100 border border-rose-400" 
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                                }`}>
+                                  ▲ +₹{diff.toFixed(2)}
+                                </span>
+                              ) : diff < 0 ? (
+                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                                  isSelected 
+                                    ? "bg-emerald-900 text-emerald-100 border border-emerald-400" 
+                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                }`}>
+                                  ▼ -₹{Math.abs(diff).toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded ${
+                                  isSelected 
+                                    ? "bg-sky-700 text-sky-100" 
+                                    : "bg-slate-100 text-slate-600"
+                                }`}>
+                                  ₹0.00
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 11. MRP */}
                             <td className={`py-1.5 px-2 text-right font-mono ${isSelected ? "text-white" : "text-slate-700"}`}>
-                              {mrpVal}
+                              ₹{mrpVal}
                             </td>
 
-                            {/* 11. Line Total */}
+                            {/* 12. Line Total (New Rate × Qty) */}
                             <td className={`py-1.5 px-2.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              {Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ₹{Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
 
-                            {/* 12. Action */}
+                            {/* 13. Action */}
                             <td className="py-1.5 px-2 text-center">
                               <button
                                 type="button"
@@ -8455,6 +8524,64 @@ export default function PharmacyPage() {
               </div>
             </div>
 
+            {/* Rate Difference Summary Strip */}
+            {(() => {
+              let increased = 0;
+              let decreased = 0;
+              let noChange = 0;
+              let newItems = 0;
+              let totalDiff = 0;
+              let diffCount = 0;
+
+              inwardItems.forEach(it => {
+                const p = parseFloat(it.purchase_price) || 0;
+                const lastP = Number(it.last_purchase_price) || 0;
+                if (lastP === 0) {
+                  newItems++;
+                } else {
+                  const d = p - lastP;
+                  totalDiff += d;
+                  diffCount++;
+                  if (d > 0) increased++;
+                  else if (d < 0) decreased++;
+                  else noChange++;
+                }
+              });
+
+              const avgDiff = diffCount > 0 ? (totalDiff / diffCount) : 0;
+
+              return (
+                <div className="bg-white rounded-lg border border-slate-300 p-2 px-3 flex items-center justify-between text-xs text-slate-700 shrink-0 shadow-2xs">
+                  <div className="flex items-center gap-3.5 flex-wrap">
+                    <span className="font-bold text-slate-900 flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-blue-600" /> Rate Difference Summary:
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                      Price Increased: <strong className="text-rose-700 font-bold">{increased} Items</strong>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                      Price Decreased: <strong className="text-emerald-700 font-bold">{decreased} Items</strong>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                      No Change: <strong className="text-slate-700 font-bold">{noChange} Items</strong>
+                    </span>
+                    {newItems > 0 && (
+                      <span className="text-slate-500 text-[11px] italic">({newItems} New Item{newItems > 1 ? 's' : ''})</span>
+                    )}
+                  </div>
+                  <div className="font-mono text-xs">
+                    <span className="text-slate-500">Average Rate Difference: </span>
+                    <strong className={`font-bold ${avgDiff > 0 ? "text-rose-600" : avgDiff < 0 ? "text-emerald-600" : "text-slate-800"}`}>
+                      {avgDiff > 0 ? `+₹${avgDiff.toFixed(2)}` : avgDiff < 0 ? `-₹${Math.abs(avgDiff).toFixed(2)}` : `₹0.00`}
+                    </strong>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* 4. Bottom 3 Summary Cards (Item Summary, Additional Details, Grand Total) */}
             {(() => {
               const subTotal = inwardItems.reduce((acc, it) => acc + (parseFloat(it.line_total) || (it.quantity * it.purchase_price) || 0), 0);
@@ -8466,22 +8593,22 @@ export default function PharmacyPage() {
               const totalUnits = inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0);
 
               return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
                   {/* Card 1: Item Summary */}
                   <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow-2xs">
                     <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
                       Item Summary
                     </div>
-                    <div className="p-3 space-y-2.5">
+                    <div className="p-2.5 space-y-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold text-slate-700">Total Items :</Label>
-                        <div className="w-32 h-7 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-sm text-slate-900 shadow-inner">
+                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-xs text-slate-900 shadow-inner">
                           {inwardItems.length}
                         </div>
                       </div>
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold text-slate-700">Total Quantity :</Label>
-                        <div className="w-32 h-7 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-black text-sm text-slate-900 shadow-inner">
+                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-black text-xs text-slate-900 shadow-inner">
                           {totalUnits}
                         </div>
                       </div>
@@ -8493,13 +8620,13 @@ export default function PharmacyPage() {
                     <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
                       Additional Details
                     </div>
-                    <div className="p-2.5 space-y-2">
+                    <div className="p-2 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0">Payment Mode :</Label>
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Payment Mode :</Label>
                         <select
                           value={inwardPaymentMode}
                           onChange={(e) => setInwardPaymentMode(e.target.value)}
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                         >
                           <option value="Credit">Credit</option>
                           <option value="Cash">Cash</option>
@@ -8510,61 +8637,61 @@ export default function PharmacyPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0">Due Days :</Label>
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Due Days :</Label>
                         <input
                           type="number"
                           value={inwardDueDays}
                           onChange={(e) => setInwardDueDays(parseInt(e.target.value, 10) || 0)}
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 font-mono focus:border-blue-600 focus:outline-none"
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 font-mono focus:border-blue-600 focus:outline-none"
                         />
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0">Reference No. :</Label>
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Reference No. :</Label>
                         <input
                           type="text"
                           value={inwardReferenceNo}
                           onChange={(e) => setInwardReferenceNo(e.target.value)}
                           placeholder="Ref / PO No..."
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Card 3: Calculations & Grand Total Banner */}
-                  <div className="bg-white rounded-lg border border-slate-300 p-2.5 shadow-2xs space-y-1.5">
+                  <div className="bg-white rounded-lg border border-slate-300 p-2 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Sub Total (₹)</span>
-                      <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-300 px-3 py-0.5 rounded w-36 text-right">
+                      <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
                         {subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Bill Discount (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-3 py-0.5 rounded w-36 text-right">
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
                         {discAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Additional Charges (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-3 py-0.5 rounded w-36 text-right">
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
                         {addChg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Freight (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-3 py-0.5 rounded w-36 text-right">
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
                         {frt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700">Round Off (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-3 py-0.5 rounded w-36 text-right">
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
                         {rnd.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -8584,7 +8711,7 @@ export default function PharmacyPage() {
             })()}
 
             {/* Modal Bottom Action Bar */}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-300 shrink-0">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-300 shrink-0">
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -8628,6 +8755,85 @@ export default function PharmacyPage() {
               </div>
             </div>
           </div>
+
+          {/* Add New Purchase Type Modal */}
+          {showAddPurchaseTypeModal && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 duration-150">
+                <div className="bg-blue-700 text-white px-3.5 py-2.5 flex items-center justify-between">
+                  <h3 className="font-bold text-xs">Add New Purchase Type</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddPurchaseTypeModal(false);
+                      setNewPurchaseTypeName("");
+                    }}
+                    className="text-white hover:text-rose-200 font-bold text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-3.5 space-y-3">
+                  <div>
+                    <Label className="text-xs font-bold text-slate-700">Purchase Type Name</Label>
+                    <input
+                      type="text"
+                      value={newPurchaseTypeName}
+                      onChange={(e) => setNewPurchaseTypeName(e.target.value)}
+                      placeholder="e.g. Sample / Trial Inward, Institutional Tender..."
+                      className="w-full h-8 px-2.5 text-xs rounded border border-slate-300 mt-1 focus:border-blue-600 focus:outline-none"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newPurchaseTypeName.trim()) {
+                          e.preventDefault();
+                          const trimmed = newPurchaseTypeName.trim();
+                          if (!inwardPurchaseTypesList.includes(trimmed)) {
+                            setInwardPurchaseTypesList(prev => [...prev, trimmed]);
+                          }
+                          setInwardPurchaseType(trimmed);
+                          setNewPurchaseTypeName("");
+                          setShowAddPurchaseTypeModal(false);
+                          showToast(`Added purchase type: ${trimmed}`, "success");
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowAddPurchaseTypeModal(false);
+                        setNewPurchaseTypeName("");
+                      }}
+                      className="h-7.5 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={!newPurchaseTypeName.trim()}
+                      onClick={() => {
+                        const trimmed = newPurchaseTypeName.trim();
+                        if (trimmed) {
+                          if (!inwardPurchaseTypesList.includes(trimmed)) {
+                            setInwardPurchaseTypesList(prev => [...prev, trimmed]);
+                          }
+                          setInwardPurchaseType(trimmed);
+                          setNewPurchaseTypeName("");
+                          setShowAddPurchaseTypeModal(false);
+                          showToast(`Added purchase type: ${trimmed}`, "success");
+                        }
+                      }}
+                      className="h-7.5 text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold"
+                    >
+                      Save Purchase Type
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Browse Medicine Helper Modal */}
           {showInwardBrowseMedModal && (
