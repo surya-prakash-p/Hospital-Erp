@@ -20,6 +20,11 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: "1. Procurement, Inventory & Logistics",
     items: [
       {
+        keys: [{ kbd: "Alt" }, "+", { kbd: "I" }],
+        action: "Purchase Inward (Supplier Bill)",
+        description: "Opens POS-style purchase inward & stock entry with real-time rate variance.",
+      },
+      {
         keys: [{ kbd: "Alt" }, "+", { kbd: "G" }],
         action: "Generate Purchase Orders",
         description: "Opens bulk/manual Purchase Order creation.",
