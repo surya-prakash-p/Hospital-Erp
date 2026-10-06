@@ -4394,7 +4394,7 @@ export default function PharmacyPage() {
       const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
       if (!isInput && !isAnyModalOpen && (key === 'ArrowLeft' || key === 'ArrowRight')) {
         e.preventDefault();
-        const tabOrder = ['dashboard', 'purchase-inward', 'inventory', 'dispensing', 'registers', 'logistics'];
+        const tabOrder = ['dashboard', 'inventory', 'dispensing', 'registers', 'logistics'];
         const curIdx = tabOrder.indexOf(activeTab);
         if (curIdx !== -1) {
           const nextIdx = key === 'ArrowRight' 
@@ -7362,44 +7362,8 @@ export default function PharmacyPage() {
             TAB: PURCHASE INWARD & STOCK ENTRY (DEDICATED FULL PAGE)
             ======================================================== */}
         <TabsContent value="purchase-inward" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
-          {/* 1. Header Bar */}
-          <div className="flex items-center justify-between bg-white px-3.5 py-1.5 rounded-lg border border-slate-300 shadow-2xs shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                <PackageCheck className="w-4 h-4" />
-              </div>
-              <div>
-                <h1 className="text-sm font-bold tracking-tight text-slate-900 leading-none">
-                  Purchase Inward &amp; Stock Entry (Supplier Bill)
-                </h1>
-                <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Old Rate vs New Rate).
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleTabChange('dashboard')}
-                className="h-7 px-2.5 text-xs font-semibold border-slate-300 hover:bg-slate-100 cursor-pointer"
-              >
-                ← Back to POS Billing
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleTabChange('inventory')}
-                className="h-7 px-2.5 text-xs font-semibold border-slate-300 hover:bg-slate-100 cursor-pointer"
-              >
-                <Package className="w-3.5 h-3.5 mr-1 text-slate-600" />
-                Inventory Master
-              </Button>
-            </div>
-          </div>
-
           <div className="space-y-2 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
-            {/* 2. Top Section: 3-Column Supplier & Invoice Info Card */}
+            {/* 1. Top Section: 3-Column Supplier & Invoice Info Card */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs shrink-0">
               {/* Col 1: Supplier / Vendor */}
               <div className="space-y-1.5">
@@ -11431,10 +11395,9 @@ export default function PharmacyPage() {
 
       {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs */}
       <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
           {[
-            { id: "dashboard", label: "POS Billing", shortcut: "Alt + 1" },
-            { id: "purchase-inward", label: "Purchase Inward", shortcut: "Alt + I" },
+            { id: "dashboard", label: "Billing", shortcut: "Alt + 1" },
             { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
             { id: "dispensing", label: "Prescription Queue", shortcut: "Alt + 3" },
             { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
