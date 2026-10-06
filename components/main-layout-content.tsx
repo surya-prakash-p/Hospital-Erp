@@ -67,6 +67,13 @@ export function MainLayoutContent({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Alt + I -> Navigate to Pharmacy Purchase Inward & Stock Entry
+      if (isAlt && !isCtrlOrMeta && !isShift && key.toLowerCase() === "i") {
+        e.preventDefault();
+        router.push("/pharmacy?tab=purchase-inward");
+        return;
+      }
+
       // Alt + G -> Navigate to Pharmacy Purchase Orders
       if (isAlt && !isCtrlOrMeta && !isShift && key.toLowerCase() === "g") {
         e.preventDefault();

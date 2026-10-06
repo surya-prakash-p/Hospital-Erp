@@ -41,7 +41,7 @@ export default function PharmacyPage() {
   const [activeTab, setActiveTab] = useState(tabParam || "dashboard");
 
   useEffect(() => {
-    if (tabParam && ["dashboard", "inventory", "dispensing", "registers", "logistics"].includes(tabParam)) {
+    if (tabParam && ["dashboard", "inventory", "dispensing", "registers", "logistics", "purchase-inward"].includes(tabParam)) {
       setActiveTab(tabParam);
     } else if (!tabParam) {
       setActiveTab("dashboard");
@@ -198,13 +198,12 @@ export default function PharmacyPage() {
   // Stock Adjustment Modal Search State
   const [adjustMedSearch, setAdjustMedSearch] = useState("");
 
-  // Purchase Inward & Stock Entry Modal (Traditional Pharmacy Model Matching Photo)
-  const [isPurchaseInwardOpen, setIsPurchaseInwardOpen] = useState(false);
-  const [inwardSupplier, setInwardSupplier] = useState("ABC Pharma (SUP-1001)");
-  const [inwardSupplierAddress, setInwardSupplierAddress] = useState("123, Pharmacy Street,\nCoimbatore - 641001");
-  const [inwardSupplierPhone, setInwardSupplierPhone] = useState("9840012345");
-  const [inwardInvoiceNo, setInwardInvoiceNo] = useState("INV-2026-1315");
-  const [inwardDate, setInwardDate] = useState("2026-05-10");
+  // Purchase Inward & Stock Entry (Dedicated View)
+  const [inwardSupplier, setInwardSupplier] = useState("");
+  const [inwardSupplierAddress, setInwardSupplierAddress] = useState("");
+  const [inwardSupplierPhone, setInwardSupplierPhone] = useState("");
+  const [inwardInvoiceNo, setInwardInvoiceNo] = useState("");
+  const [inwardDate, setInwardDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [inwardPurchaseType, setInwardPurchaseType] = useState("Regular Purchase");
   const [inwardPurchaseTypesList, setInwardPurchaseTypesList] = useState([
     "Regular Purchase",
@@ -217,10 +216,10 @@ export default function PharmacyPage() {
   const [showAddPurchaseTypeModal, setShowAddPurchaseTypeModal] = useState(false);
   const [newPurchaseTypeName, setNewPurchaseTypeName] = useState("");
   const [inwardRemarks, setInwardRemarks] = useState("");
-  const [inwardBillDiscountPct, setInwardBillDiscountPct] = useState("0.00");
-  const [inwardAdditionalCharges, setInwardAdditionalCharges] = useState("0.00");
-  const [inwardFreight, setInwardFreight] = useState("0.00");
-  const [inwardRoundOff, setInwardRoundOff] = useState("0.00");
+  const [inwardBillDiscountPct, setInwardBillDiscountPct] = useState("");
+  const [inwardAdditionalCharges, setInwardAdditionalCharges] = useState("");
+  const [inwardFreight, setInwardFreight] = useState("");
+  const [inwardRoundOff, setInwardRoundOff] = useState("");
   const [inwardPaymentMode, setInwardPaymentMode] = useState("Credit");
   const [inwardDueDays, setInwardDueDays] = useState(30);
   const [inwardReferenceNo, setInwardReferenceNo] = useState("");
@@ -968,161 +967,16 @@ export default function PharmacyPage() {
   }, []);
 
   const handleOpenPurchaseInwardModal = () => {
-    const defaultSup = suppliers[0]?.name ? `${suppliers[0].name} (${suppliers[0].code || 'SUP-1001'})` : "ABC Pharma (SUP-1001)";
-    setInwardSupplier(defaultSup);
-    setInwardSupplierAddress("123, Pharmacy Street,\nCoimbatore - 641001");
-    setInwardSupplierPhone("9840012345");
-    setInwardInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
-    setInwardDate(new Date().toISOString().split("T")[0]);
-    setInwardPurchaseType("Regular Purchase");
-    setInwardRemarks("");
-    setInwardBillDiscountPct("0.00");
-    setInwardAdditionalCharges("0.00");
-    setInwardFreight("0.00");
-    setInwardRoundOff("0.00");
-    setInwardPaymentMode("Credit");
-    setInwardDueDays(30);
-    setInwardReferenceNo("");
-    
-    // Sample / initial items if none exist
-    if (inwardItems.length === 0) {
-      setInwardItems([
-        {
-          id: `inw-1-${Date.now()}`,
-          medicine: "Paracetamol 650mg",
-          medicine_name: "Paracetamol 650mg",
-          generic_name: "Paracetamol",
-          company: "Cipla Ltd",
-          batch_number: "PM-EXP6M",
-          exp_date: "2027-12-05",
-          pack_size: "10 Tabs",
-          quantity: 100,
-          current_stock: 45,
-          last_purchase_price: 60.00,
-          purchase_price: 60.00,
-          price_diff: 0.00,
-          mrp: 80.00,
-          selling_price: 80.00,
-          rack_location: "A-01",
-          line_total: 6000.00
-        },
-        {
-          id: `inw-2-${Date.now()}`,
-          medicine: "Amoxicillin 500mg",
-          medicine_name: "Amoxicillin 500mg",
-          generic_name: "Amoxicillin",
-          company: "Mox 500",
-          batch_number: "AM-EXP30D",
-          exp_date: "2026-08-20",
-          pack_size: "10 Caps",
-          quantity: 50,
-          current_stock: 20,
-          last_purchase_price: 42.00,
-          purchase_price: 42.00,
-          price_diff: 0.00,
-          mrp: 78.00,
-          selling_price: 78.00,
-          rack_location: "A-02",
-          line_total: 2100.00
-        },
-        {
-          id: `inw-3-${Date.now()}`,
-          medicine: "Cetirizine 10mg",
-          medicine_name: "Cetirizine 10mg",
-          generic_name: "Cetirizine",
-          company: "Okacet",
-          batch_number: "CT-STABLE",
-          exp_date: "2027-01-01",
-          pack_size: "30 Tabs",
-          quantity: 100,
-          current_stock: 80,
-          last_purchase_price: 12.00,
-          purchase_price: 12.00,
-          price_diff: 0.00,
-          mrp: 28.00,
-          selling_price: 28.00,
-          rack_location: "B-01",
-          line_total: 1200.00
-        },
-        {
-          id: `inw-4-${Date.now()}`,
-          medicine: "Pantoprazole 40mg",
-          medicine_name: "Pantoprazole 40mg",
-          generic_name: "Pantoprazole",
-          company: "Pantocid 40",
-          batch_number: "PAN40644Y7D",
-          exp_date: "2029-11-01",
-          pack_size: "8 Tabs",
-          quantity: 50,
-          current_stock: 15,
-          last_purchase_price: 62.00,
-          purchase_price: 62.00,
-          price_diff: 0.00,
-          mrp: 110.00,
-          selling_price: 110.00,
-          rack_location: "B-02",
-          line_total: 3100.00
-        },
-        {
-          id: `inw-5-${Date.now()}`,
-          medicine: "Azithromycin 500mg",
-          medicine_name: "Azithromycin 500mg",
-          generic_name: "Azithromycin",
-          company: "Cipla Ltd",
-          batch_number: "AZT5024",
-          exp_date: "2026-03-18",
-          pack_size: "3 Tabs",
-          quantity: 60,
-          current_stock: 30,
-          last_purchase_price: 55.00,
-          purchase_price: 55.00,
-          price_diff: 0.00,
-          mrp: 105.00,
-          selling_price: 105.00,
-          rack_location: "C-01",
-          line_total: 3300.00
-        },
-        {
-          id: `inw-6-${Date.now()}`,
-          medicine: "Metformin 500mg",
-          medicine_name: "Metformin 500mg",
-          generic_name: "Metformin",
-          company: "Sun Pharma",
-          batch_number: "MET5024",
-          exp_date: "2026-09-10",
-          pack_size: "10 Tabs",
-          quantity: 100,
-          current_stock: 90,
-          last_purchase_price: 28.00,
-          purchase_price: 28.00,
-          price_diff: 0.00,
-          mrp: 28.00,
-          selling_price: 28.00,
-          rack_location: "C-02",
-          line_total: 2800.00
-        },
-        {
-          id: `inw-7-${Date.now()}`,
-          medicine: "Amlodipine 5mg",
-          medicine_name: "Amlodipine 5mg",
-          generic_name: "Amlodipine",
-          company: "Cipla Ltd",
-          batch_number: "AML524",
-          exp_date: "2026-07-25",
-          pack_size: "10 Tabs",
-          quantity: 100,
-          current_stock: 50,
-          last_purchase_price: 32.00,
-          purchase_price: 32.00,
-          price_diff: 0.00,
-          mrp: 32.00,
-          selling_price: 32.00,
-          rack_location: "A-01",
-          line_total: 3200.00
-        }
-      ]);
+    // If supplier is not already selected, keep it empty or select clean default
+    if (!inwardSupplier && suppliers.length > 0) {
+      const s = suppliers[0];
+      const supVal = `${s.name} (${s.code || 'SUP-1001'})`;
+      setInwardSupplier(supVal);
+      const addrParts = [s.addressLine1, s.city, s.pincode].filter(Boolean);
+      setInwardSupplierAddress(addrParts.join(", "));
+      setInwardSupplierPhone(s.mobileNumber || "");
     }
-
+    
     setInwardMedSearch("");
     setInwardSelectedMed(null);
     setInwardBatch("");
@@ -1133,7 +987,7 @@ export default function PharmacyPage() {
     setInwardShowDropdown(false);
     setInwardHighlightedSearchIndex(0);
     setSelectedInwardRowIndex(0);
-    setIsPurchaseInwardOpen(true);
+    handleTabChange("purchase-inward");
     setTimeout(() => {
       inwardSearchInputRef.current?.focus();
     }, 120);
@@ -1293,9 +1147,15 @@ export default function PharmacyPage() {
       });
 
       showToast(`Successfully inwarded ${inwardItems.length} medicine(s) into inventory! Stock updated & rates recorded.`, "success");
-      setIsPurchaseInwardOpen(false);
       setInwardItems([]);
+      setInwardInvoiceNo("");
+      setInwardRemarks("");
+      setInwardBillDiscountPct("");
+      setInwardAdditionalCharges("");
+      setInwardFreight("");
+      setInwardRoundOff("");
       await loadAllData();
+      handleTabChange("inventory");
     } catch (err) {
       console.error("Purchase inward error:", err);
       showToast("Failed to process purchase inward", "error");
@@ -4130,7 +3990,8 @@ export default function PharmacyPage() {
         target.tagName === 'INPUT' || 
         target.tagName === 'TEXTAREA' || 
         target.tagName === 'SELECT' || 
-        target.isContentEditable
+        target.isContentEditable ||
+        Boolean(target.closest?.('input, textarea, select, [contenteditable="true"]'))
       );
 
       const isAlt = e.altKey;
@@ -4225,103 +4086,105 @@ export default function PharmacyPage() {
         }
       }
 
-      // Backspace -> Close active modal or exit view (e.g., Alt + L Low Stock / Inventory) back to POS Billing when not typing characters
+      // Backspace -> Close active modal or exit view back to POS Billing ONLY when NOT inside an input or editable element
       if (key === 'Backspace') {
-        const hasText = isInput && target.value && target.value.length > 0;
-        if (!hasText) {
-          if (showShortcutsModal) {
-            e.preventDefault();
-            setShowShortcutsModal(false);
-            return;
-          }
-          if (isAddSupplierModalOpen) {
-            e.preventDefault();
-            setIsAddSupplierModalOpen(false);
-            return;
-          }
-          if (showDownloadReportsModal) {
-            e.preventDefault();
-            setShowDownloadReportsModal(false);
-            return;
-          }
-          if (showSubmitDispenseModal) {
-            e.preventDefault();
-            setShowSubmitDispenseModal(false);
-            return;
-          }
-          if (showWorkdeskDeleteModal) {
-            e.preventDefault();
-            setShowWorkdeskDeleteModal(false);
-            return;
-          }
-          if (showWorkdeskEditModal) {
-            e.preventDefault();
-            setShowWorkdeskEditModal(false);
-            return;
-          }
-          if (showWorkdeskPartialModal) {
-            e.preventDefault();
-            setShowWorkdeskPartialModal(false);
-            return;
-          }
-          if (showDispenseWorkdeskModal) {
-            e.preventDefault();
-            setShowDispenseWorkdeskModal(false);
-            return;
-          }
-          if (showOTCSaleModal) {
-            e.preventDefault();
-            setShowOTCSaleModal(false);
-            return;
-          }
-          if (isAddModalOpen) {
-            e.preventDefault();
-            setIsAddModalOpen(false);
-            return;
-          }
-          if (isPOModalOpen) {
-            e.preventDefault();
-            setIsPOModalOpen(false);
-            return;
-          }
-          if (showBulkPOModal) {
-            e.preventDefault();
-            setShowBulkPOModal(false);
-            return;
-          }
-          if (showAdjustModal) {
-            e.preventDefault();
-            setShowAdjustModal(false);
-            return;
-          }
-          if (showEditMedModal) {
-            e.preventDefault();
-            setShowEditMedModal(false);
-            return;
-          }
-          if (showSalesReturnModal) {
-            e.preventDefault();
-            setShowSalesReturnModal(false);
-            return;
-          }
-          if (selectedMedicine) {
-            e.preventDefault();
-            setSelectedMedicine(null);
-            return;
-          }
-          if (showDispenseReceiptModal) {
-            e.preventDefault();
-            setShowDispenseReceiptModal(false);
-            return;
-          }
+        if (isInput) {
+          // Inside input/textarea/select/table cell: Backspace must ONLY delete text, never close modals or views
+          return;
+        }
 
-          // If on a sub-view (like Inventory opened via Alt + L, Dispensing, Registers, Logistics), return to POS Billing Dashboard
-          if (activeTab !== 'dashboard') {
-            e.preventDefault();
-            handleTabChange('dashboard');
-            setStatusFilter('All');
-            return;
-          }
+        if (showShortcutsModal) {
+          e.preventDefault();
+          setShowShortcutsModal(false);
+          return;
+        }
+        if (isAddSupplierModalOpen) {
+          e.preventDefault();
+          setIsAddSupplierModalOpen(false);
+          return;
+        }
+        if (showDownloadReportsModal) {
+          e.preventDefault();
+          setShowDownloadReportsModal(false);
+          return;
+        }
+        if (showSubmitDispenseModal) {
+          e.preventDefault();
+          setShowSubmitDispenseModal(false);
+          return;
+        }
+        if (showWorkdeskDeleteModal) {
+          e.preventDefault();
+          setShowWorkdeskDeleteModal(false);
+          return;
+        }
+        if (showWorkdeskEditModal) {
+          e.preventDefault();
+          setShowWorkdeskEditModal(false);
+          return;
+        }
+        if (showWorkdeskPartialModal) {
+          e.preventDefault();
+          setShowWorkdeskPartialModal(false);
+          return;
+        }
+        if (showDispenseWorkdeskModal) {
+          e.preventDefault();
+          setShowDispenseWorkdeskModal(false);
+          return;
+        }
+        if (showOTCSaleModal) {
+          e.preventDefault();
+          setShowOTCSaleModal(false);
+          return;
+        }
+        if (isAddModalOpen) {
+          e.preventDefault();
+          setIsAddModalOpen(false);
+          return;
+        }
+        if (isPOModalOpen) {
+          e.preventDefault();
+          setIsPOModalOpen(false);
+          return;
+        }
+        if (showBulkPOModal) {
+          e.preventDefault();
+          setShowBulkPOModal(false);
+          return;
+        }
+        if (showAdjustModal) {
+          e.preventDefault();
+          setShowAdjustModal(false);
+          return;
+        }
+        if (showEditMedModal) {
+          e.preventDefault();
+          setShowEditMedModal(false);
+          return;
+        }
+        if (showSalesReturnModal) {
+          e.preventDefault();
+          setShowSalesReturnModal(false);
+          return;
+        }
+        if (selectedMedicine) {
+          e.preventDefault();
+          setSelectedMedicine(null);
+          return;
+        }
+        if (showDispenseReceiptModal) {
+          e.preventDefault();
+          setShowDispenseReceiptModal(false);
+          return;
+        }
+
+        // If on a sub-view (like Inventory, Purchase Inward, Dispensing, Registers, Logistics), return to POS Billing Dashboard
+        if (activeTab !== 'dashboard') {
+          e.preventDefault();
+          handleTabChange('dashboard');
+          setStatusFilter('All');
+          return;
         }
       }
 
@@ -4368,6 +4231,13 @@ export default function PharmacyPage() {
         if (targetTab) {
           handleTabChange(targetTab);
         }
+        return;
+      }
+
+      // Alt + I -> Fast Purchase Inward & Stock Entry Page
+      if (isAlt && !isCtrlOrMeta && !e.shiftKey && key.toLowerCase() === 'i') {
+        e.preventDefault();
+        handleOpenPurchaseInwardModal();
         return;
       }
 
@@ -4521,10 +4391,10 @@ export default function PharmacyPage() {
       }
 
       // 18. ARROW KEYS NAVIGATION: ArrowLeft / ArrowRight -> Cycle Tabs
-      const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || isPurchaseInwardOpen || Boolean(selectedMedicine);
+      const isAnyModalOpen = showShortcutsModal || isAddSupplierModalOpen || showDownloadReportsModal || showSubmitDispenseModal || showDispenseWorkdeskModal || showOTCSaleModal || isAddModalOpen || isPOModalOpen || showBulkPOModal || showAdjustModal || showEditMedModal || showSalesReturnModal || Boolean(selectedMedicine);
       if (!isInput && !isAnyModalOpen && (key === 'ArrowLeft' || key === 'ArrowRight')) {
         e.preventDefault();
-        const tabOrder = ['dashboard', 'inventory', 'dispensing', 'registers', 'logistics'];
+        const tabOrder = ['dashboard', 'purchase-inward', 'inventory', 'dispensing', 'registers', 'logistics'];
         const curIdx = tabOrder.indexOf(activeTab);
         if (curIdx !== -1) {
           const nextIdx = key === 'ArrowRight' 
@@ -7486,7 +7356,729 @@ export default function PharmacyPage() {
               </div>
             )}
           </div>
+        </TabsContent>
 
+        {/* ========================================================
+            TAB: PURCHASE INWARD & STOCK ENTRY (DEDICATED FULL PAGE)
+            ======================================================== */}
+        <TabsContent value="purchase-inward" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
+          {/* 1. Header Bar */}
+          <div className="flex items-center justify-between bg-white px-3.5 py-1.5 rounded-lg border border-slate-300 shadow-2xs shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                <PackageCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h1 className="text-sm font-bold tracking-tight text-slate-900 leading-none">
+                  Purchase Inward &amp; Stock Entry (Supplier Bill)
+                </h1>
+                <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Old Rate vs New Rate).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTabChange('dashboard')}
+                className="h-7 px-2.5 text-xs font-semibold border-slate-300 hover:bg-slate-100 cursor-pointer"
+              >
+                ← Back to POS Billing
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTabChange('inventory')}
+                className="h-7 px-2.5 text-xs font-semibold border-slate-300 hover:bg-slate-100 cursor-pointer"
+              >
+                <Package className="w-3.5 h-3.5 mr-1 text-slate-600" />
+                Inventory Master
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
+            {/* 2. Top Section: 3-Column Supplier & Invoice Info Card */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs shrink-0">
+              {/* Col 1: Supplier / Vendor */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0">Supplier / Vendor</Label>
+                  <div className="flex-1 flex items-center gap-1">
+                    <select
+                      value={inwardSupplier}
+                      onChange={(e) => {
+                        setInwardSupplier(e.target.value);
+                        const found = suppliers.find(s => s.name === e.target.value || `${s.name} (${s.code || 'SUP-1001'})` === e.target.value);
+                        if (found) {
+                          const addrParts = [found.addressLine1, found.city, found.pincode].filter(Boolean);
+                          setInwardSupplierAddress(addrParts.join(", "));
+                          setInwardSupplierPhone(found.mobileNumber || "");
+                        } else {
+                          setInwardSupplierAddress("");
+                          setInwardSupplierPhone("");
+                        }
+                      }}
+                      className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                    >
+                      <option value="">Select Supplier...</option>
+                      {suppliers.map(s => {
+                        const val = `${s.name} (${s.code || 'SUP-1001'})`;
+                        return (
+                          <option key={s.name || s.code} value={val}>
+                            {s.name} ({s.code || 'SUP-1001'})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => openAddSupplierModal()}
+                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs"
+                      title="Add / Edit Supplier"
+                    >
+                      ...
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0 pt-0.5">Address</Label>
+                  <textarea
+                    value={inwardSupplierAddress}
+                    onChange={(e) => setInwardSupplierAddress(e.target.value)}
+                    placeholder="Supplier address..."
+                    rows={2}
+                    className="flex-1 text-xs rounded border border-slate-300 bg-white px-2 py-0.5 focus:border-blue-600 focus:outline-none resize-none font-medium text-slate-700"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0">Phone</Label>
+                  <input
+                    type="text"
+                    value={inwardSupplierPhone}
+                    onChange={(e) => setInwardSupplierPhone(e.target.value)}
+                    placeholder="Phone number..."
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Col 2: Invoice / Bill Details */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Invoice / Bill No. :</Label>
+                  <input
+                    type="text"
+                    value={inwardInvoiceNo}
+                    onChange={(e) => setInwardInvoiceNo(e.target.value)}
+                    placeholder="e.g. INV-2026-001"
+                    className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none uppercase"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Invoice Date :</Label>
+                  <input
+                    type="date"
+                    value={inwardDate}
+                    onChange={(e) => setInwardDate(e.target.value)}
+                    className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Purchase Type :</Label>
+                  <div className="flex-1 flex items-center gap-1">
+                    <select
+                      value={inwardPurchaseType}
+                      onChange={(e) => {
+                        if (e.target.value === "__add_new__") {
+                          setShowAddPurchaseTypeModal(true);
+                        } else {
+                          setInwardPurchaseType(e.target.value);
+                        }
+                      }}
+                      className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-medium"
+                    >
+                      {inwardPurchaseTypesList.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                      <option value="__add_new__" className="font-bold text-blue-700">+ Add New Purchase Type...</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPurchaseTypeModal(true)}
+                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-bold cursor-pointer text-xs"
+                      title="Add New Purchase Type"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Remarks</Label>
+                  <input
+                    type="text"
+                    value={inwardRemarks}
+                    onChange={(e) => setInwardRemarks(e.target.value)}
+                    placeholder="Optional remarks..."
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Col 3: Bill Charges */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Bill Discount (%)</Label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inwardBillDiscountPct}
+                    onChange={(e) => setInwardBillDiscountPct(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Additional Charges (₹)</Label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inwardAdditionalCharges}
+                    onChange={(e) => setInwardAdditionalCharges(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Freight (₹)</Label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inwardFreight}
+                    onChange={(e) => setInwardFreight(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Round Off (₹)</Label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inwardRoundOff}
+                    onChange={(e) => setInwardRoundOff(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Add Medicine Entry Bar */}
+            <div className="bg-slate-50 border border-slate-300/90 rounded-lg p-2 flex items-center gap-2 flex-wrap shadow-2xs shrink-0" ref={inwardSearchContainerRef}>
+              <div className="flex items-center gap-1.5 flex-1 min-w-[260px]">
+                <Label className="font-bold text-slate-800 whitespace-nowrap text-xs">Add Medicine :</Label>
+                <div className="relative flex-1">
+                  <input
+                    ref={inwardSearchInputRef}
+                    type="text"
+                    value={inwardMedSearch}
+                    onChange={(e) => {
+                      setInwardMedSearch(e.target.value);
+                      setInwardShowDropdown(true);
+                      setInwardHighlightedSearchIndex(0);
+                    }}
+                    onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
+                    onKeyDown={(e) => {
+                      if (inwardShowDropdown && inwardFilteredResults.length > 0) {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
+                          if (chosen) handleSelectMedForInwardBar(chosen);
+                          return;
+                        }
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
+                          return;
+                        }
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddInwardEntryFromBar();
+                      }
+                    }}
+                    placeholder="Type medicine name / generic name / brand... (e.g. Dolo 650, Paracetamol)"
+                    className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none font-medium text-slate-900"
+                  />
+
+                  {/* Autocomplete Dropdown */}
+                  {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                      {inwardFilteredResults.map((med, idx) => {
+                        const isSel = idx === inwardHighlightedSearchIndex;
+                        const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
+                          ? Number(med.purchase_price)
+                          : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
+                        return (
+                          <div
+                            key={med.name || med.id || idx}
+                            onClick={() => handleSelectMedForInwardBar(med)}
+                            onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
+                            className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
+                              isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
+                            }`}
+                          >
+                            <div>
+                              <div className="font-bold">{med.medicine_name}</div>
+                              <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
+                            </div>
+                            <div className="text-right font-mono">
+                              <span className="text-[10px] text-slate-500">{lastP > 0 ? `Last Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
+                              <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div
+                        onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
+                        className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
+                      >
+                        + Add &quot;{inwardMedSearch}&quot; as New Item to Inward
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowInwardBrowseMedModal(true)}
+                  className="h-8 px-2 bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300 rounded font-bold cursor-pointer text-xs"
+                  title="Browse Medicines"
+                >
+                  ...
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Batch No.</Label>
+                <input
+                  type="text"
+                  value={inwardBatch}
+                  onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
+                  placeholder="e.g. PM-EXP6M"
+                  className="w-28 h-8 px-2 text-xs font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none uppercase"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Expiry Date</Label>
+                <input
+                  type="date"
+                  value={inwardExp}
+                  onChange={(e) => setInwardExp(e.target.value)}
+                  className="w-32 h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Qty.</Label>
+                <input
+                  type="number"
+                  min="1"
+                  value={inwardQty}
+                  onChange={(e) => setInwardQty(e.target.value)}
+                  className="w-16 h-8 px-2 text-xs text-center font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Rate (₹)</Label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={inwardPrice}
+                  onChange={(e) => setInwardPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-20 h-8 px-2 text-xs text-right font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddInwardEntryFromBar}
+                className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-xs flex items-center gap-1 cursor-pointer text-xs transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add [Enter]</span>
+              </button>
+            </div>
+
+            {/* 4. Inward Bill Items Table (Editable Rows) */}
+            <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[180px]">
+              <div className="overflow-auto flex-1 min-h-0">
+                <table className="w-full text-left border-collapse text-xs select-text">
+                  <thead className="sticky top-0 z-10 bg-blue-700 text-white font-bold uppercase text-[11px] tracking-wider border-b border-blue-800">
+                    <tr className="divide-x divide-blue-600">
+                      <th className="py-2 px-2 text-center w-12">S.No</th>
+                      <th className="py-2 px-2.5 min-w-[170px]">Medicine Name</th>
+                      <th className="py-2 px-2 min-w-[100px]">Company</th>
+                      <th className="py-2 px-2 text-center w-28">Batch No.</th>
+                      <th className="py-2 px-2 text-center w-28">Expiry Date</th>
+                      <th className="py-2 px-2 text-center w-20">Pack</th>
+                      <th className="py-2 px-2 text-center w-18">Qty</th>
+                      <th className="py-2 px-2 text-right w-24">Old Rate (₹)</th>
+                      <th className="py-2 px-2 text-right w-24">New Rate (₹)</th>
+                      <th className="py-2 px-2 text-right w-22">MRP (₹)</th>
+                      <th className="py-2 px-2.5 text-right w-28">Line Total (₹)</th>
+                      <th className="py-2 px-2 text-center w-16">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-800">
+                    {inwardItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={12} className="text-center py-10 text-slate-400 font-medium">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <PackageCheck className="w-8 h-8 text-slate-300" />
+                            <p className="text-xs font-semibold text-slate-600">No medicines in inward bill.</p>
+                            <p className="text-[11px] text-slate-400">Use the entry bar above to add medicines or scan barcodes.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      inwardItems.map((item, idx) => {
+                        const isSelected = selectedInwardRowIndex === idx;
+                        const pPrice = parseFloat(item.purchase_price) || 0;
+                        const lastPrice = Number(item.last_purchase_price) || 0;
+                        const isFirst = lastPrice === 0;
+                        const qty = parseInt(item.quantity, 10) || 0;
+                        const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
+
+                        return (
+                          <tr
+                            key={item.id || idx}
+                            onClick={() => setSelectedInwardRowIndex(idx)}
+                            className={`transition divide-x divide-slate-200 ${
+                              isSelected
+                                ? "bg-blue-50/60"
+                                : idx % 2 === 0
+                                ? "bg-white hover:bg-slate-50"
+                                : "bg-slate-50/60 hover:bg-slate-50"
+                            }`}
+                          >
+                            {/* 1. S.No */}
+                            <td className="py-1.5 px-2 text-center font-mono text-slate-600">
+                              {idx + 1}
+                            </td>
+
+                            {/* 2. Medicine Name */}
+                            <td className="py-1.5 px-2.5">
+                              <div className="font-bold text-slate-900">{item.medicine_name || item.medicine}</div>
+                              {item.generic_name && (
+                                <div className="text-[10px] text-slate-500">{item.generic_name}</div>
+                              )}
+                            </td>
+
+                            {/* 3. Company */}
+                            <td className="py-1.5 px-2 text-slate-700">
+                              {item.company || item.brand || "—"}
+                            </td>
+
+                            {/* 4. Batch No (Editable) */}
+                            <td className="py-1 px-1.5 text-center">
+                              <input
+                                type="text"
+                                value={item.batch_number || ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "batch_number", e.target.value.toUpperCase())}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-24 h-6 px-1.5 text-center font-mono font-bold text-xs uppercase bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                              />
+                            </td>
+
+                            {/* 5. Expiry Date (Editable) */}
+                            <td className="py-1 px-1.5 text-center">
+                              <input
+                                type="date"
+                                value={item.exp_date || ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "exp_date", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-28 h-6 px-1 text-center font-mono text-xs bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                              />
+                            </td>
+
+                            {/* 6. Pack (Editable) */}
+                            <td className="py-1 px-1.5 text-center">
+                              <input
+                                type="text"
+                                value={item.pack_size || ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "pack_size", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-16 h-6 px-1 text-center text-xs bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                              />
+                            </td>
+
+                            {/* 7. Qty (Editable) */}
+                            <td className="py-1 px-1.5 text-center">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity || ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "quantity", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-16 h-6 px-1 text-center font-mono font-bold text-xs bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
+                              />
+                            </td>
+
+                            {/* 8. Old Rate (Read-Only) */}
+                            <td className="py-1.5 px-2 text-right font-mono font-semibold text-slate-600">
+                              {isFirst ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-normal italic bg-slate-100 text-slate-500">
+                                  New Item
+                                </span>
+                              ) : (
+                                <span>₹{lastPrice.toFixed(2)}</span>
+                              )}
+                            </td>
+
+                            {/* 9. New Rate (Editable) */}
+                            <td className="py-1 px-1.5 text-right font-mono font-bold">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.purchase_price !== undefined ? item.purchase_price : ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "purchase_price", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-20 h-6 px-1.5 text-right font-mono font-bold rounded border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:border-blue-600"
+                              />
+                            </td>
+
+                            {/* 10. MRP (Editable) */}
+                            <td className="py-1 px-1.5 text-right font-mono">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.mrp !== undefined ? item.mrp : ""}
+                                onChange={(e) => handleUpdateInwardRow(idx, "mrp", e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-18 h-6 px-1.5 text-right font-mono rounded border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:border-blue-600"
+                              />
+                            </td>
+
+                            {/* 11. Line Total */}
+                            <td className="py-1.5 px-2.5 text-right font-mono font-bold text-slate-900">
+                              ₹{Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+
+                            {/* 12. Action */}
+                            <td className="py-1.5 px-2 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveInwardItem(idx);
+                                }}
+                                className="px-2 py-0.5 text-[10px] font-semibold rounded border cursor-pointer transition bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-300"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 5. Bottom 3 Summary Cards */}
+            {(() => {
+              const subTotal = inwardItems.reduce((acc, it) => acc + (parseFloat(it.line_total) || (it.quantity * it.purchase_price) || 0), 0);
+              const discAmt = (subTotal * (parseFloat(inwardBillDiscountPct) || 0)) / 100;
+              const addChg = parseFloat(inwardAdditionalCharges) || 0;
+              const frt = parseFloat(inwardFreight) || 0;
+              const rnd = parseFloat(inwardRoundOff) || 0;
+              const grandTot = Math.max(0, subTotal - discAmt + addChg + frt + rnd);
+              const totalUnits = inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0);
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
+                  {/* Card 1: Item Summary */}
+                  <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow-2xs">
+                    <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
+                      Item Summary
+                    </div>
+                    <div className="p-2.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-slate-700">Total Items :</Label>
+                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-xs text-slate-900 shadow-inner">
+                          {inwardItems.length}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-slate-700">Total Quantity :</Label>
+                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-black text-xs text-slate-900 shadow-inner">
+                          {totalUnits}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Additional Details */}
+                  <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow-2xs">
+                    <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
+                      Additional Details
+                    </div>
+                    <div className="p-2 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Payment Mode :</Label>
+                        <select
+                          value={inwardPaymentMode}
+                          onChange={(e) => setInwardPaymentMode(e.target.value)}
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        >
+                          <option value="Credit">Credit</option>
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Net 30">Net 30</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Due Days :</Label>
+                        <input
+                          type="number"
+                          value={inwardDueDays}
+                          onChange={(e) => setInwardDueDays(parseInt(e.target.value, 10) || 0)}
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 font-mono focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Reference No. :</Label>
+                        <input
+                          type="text"
+                          value={inwardReferenceNo}
+                          onChange={(e) => setInwardReferenceNo(e.target.value)}
+                          placeholder="Ref / PO No..."
+                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Calculations & Grand Total */}
+                  <div className="bg-white rounded-lg border border-slate-300 p-2 shadow-2xs space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Sub Total (₹)</span>
+                      <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
+                        {subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Bill Discount (₹)</span>
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
+                        {discAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Additional Charges (₹)</span>
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
+                        {addChg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Freight (₹)</span>
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
+                        {frt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-700">Round Off (₹)</span>
+                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
+                        {rnd.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 rounded p-2 px-3.5 flex items-center justify-between shadow-md mt-1">
+                      <span className="text-xs font-black text-white uppercase tracking-wider">
+                        Grand Total (₹)
+                      </span>
+                      <span className="text-base font-black font-mono text-emerald-400">
+                        ₹{grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 6. Action Buttons Bar */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-300 shrink-0">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setInwardItems([])}
+                  className="h-8 text-xs border-slate-300 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Clear Table
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleTabChange('dashboard')}
+                  className="h-8 px-4 text-xs border-slate-300 cursor-pointer"
+                >
+                  Return to POS
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleConfirmPurchaseInward}
+                  disabled={isSubmittingInward || inwardItems.length === 0}
+                  className="h-8 px-6 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  {isSubmittingInward ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving to Inventory...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Confirm &amp; Inward Stock ({inwardItems.length} Medicines)</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -7996,807 +8588,140 @@ export default function PharmacyPage() {
         </div>
       )}
 
-      {/* ── Desktop Purchase Inward & Stock Entry Modal (Supplier Bill) ── */}
-      <Dialog open={isPurchaseInwardOpen} onOpenChange={setIsPurchaseInwardOpen}>
-        <DialogContent className="max-w-[98vw] w-[1360px] max-h-[96vh] flex flex-col bg-slate-100 p-3 sm:p-3.5 rounded-xl border border-slate-300 shadow-2xl overflow-hidden focus:outline-none text-xs">
-          {/* Header Bar */}
-          <DialogHeader className="shrink-0 pb-1.5 border-b border-slate-300 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PackageCheck className="w-5 h-5 text-blue-700" />
-              <div>
-                <DialogTitle className="text-sm font-bold text-slate-900 leading-tight">
-                  Purchase Inward &amp; Stock Entry (Supplier Bill)
-                </DialogTitle>
-                <DialogDescription className="text-[11px] text-slate-500">
-                  Enter supplier invoice, adjust inventory stock, and track medicine purchase rates (Old Rate vs New Rate).
-                </DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
-                Purchase Inward Active
-              </span>
-            </div>
-          </DialogHeader>
-
-          <div className="space-y-2 pt-1 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
-            {/* 1. Top Section: 3-Column Supplier & Invoice Info Card */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 p-2.5 bg-white rounded-lg border border-slate-300 shadow-2xs shrink-0">
-              {/* Col 1: Supplier / Vendor */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0">Supplier / Vendor</Label>
-                  <div className="flex-1 flex items-center gap-1">
-                    <select
-                      value={inwardSupplier}
-                      onChange={(e) => {
-                        setInwardSupplier(e.target.value);
-                        const found = suppliers.find(s => s.name === e.target.value || `${s.name} (${s.code || 'SUP-1001'})` === e.target.value);
-                        if (found) {
-                          setInwardSupplierAddress(`${found.addressLine1 || "123, Pharmacy Street"},\n${found.city || "Coimbatore"} - ${found.pincode || "641001"}`);
-                          setInwardSupplierPhone(found.mobileNumber || "9840012345");
-                        }
-                      }}
-                      className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                    >
-                      {suppliers.map(s => (
-                        <option key={s.name} value={`${s.name} (${s.code || 'SUP-1001'})`}>
-                          {s.name} ({s.code || 'SUP-1001'})
-                        </option>
-                      ))}
-                      <option value="ABC Pharma (SUP-1001)">ABC Pharma (SUP-1001)</option>
-                      <option value="XYZ Distributors (SUP-1002)">XYZ Distributors (SUP-1002)</option>
-                      <option value="Special Drugs Ltd (SUP-1003)">Special Drugs Ltd (SUP-1003)</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => openAddSupplierModal()}
-                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs"
-                      title="Add / Edit Supplier"
-                    >
-                      ...
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2">
-                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0 pt-0.5">Address</Label>
-                  <textarea
-                    value={inwardSupplierAddress}
-                    onChange={(e) => setInwardSupplierAddress(e.target.value)}
-                    rows={2}
-                    className="flex-1 text-xs rounded border border-slate-300 bg-white px-2 py-0.5 focus:border-blue-600 focus:outline-none resize-none font-medium text-slate-700"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-28 text-xs font-bold text-slate-700 shrink-0">Phone</Label>
-                  <input
-                    type="text"
-                    value={inwardSupplierPhone}
-                    onChange={(e) => setInwardSupplierPhone(e.target.value)}
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Col 2: Invoice / Bill Details */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Invoice / Bill No. :</Label>
-                  <input
-                    type="text"
-                    value={inwardInvoiceNo}
-                    onChange={(e) => setInwardInvoiceNo(e.target.value)}
-                    className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none uppercase"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Invoice Date :</Label>
-                  <input
-                    type="date"
-                    value={inwardDate}
-                    onChange={(e) => setInwardDate(e.target.value)}
-                    className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Purchase Type :</Label>
-                  <div className="flex-1 flex items-center gap-1">
-                    <select
-                      value={inwardPurchaseType}
-                      onChange={(e) => {
-                        if (e.target.value === "__add_new__") {
-                          setShowAddPurchaseTypeModal(true);
-                        } else {
-                          setInwardPurchaseType(e.target.value);
-                        }
-                      }}
-                      className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none font-medium"
-                    >
-                      {inwardPurchaseTypesList.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                      <option value="__add_new__" className="font-bold text-blue-700">+ Add New Purchase Type...</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddPurchaseTypeModal(true)}
-                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded font-bold cursor-pointer text-xs"
-                      title="Add New Purchase Type"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-32 text-xs font-bold text-slate-700 shrink-0">Remarks</Label>
-                  <input
-                    type="text"
-                    value={inwardRemarks}
-                    onChange={(e) => setInwardRemarks(e.target.value)}
-                    placeholder="Optional remarks..."
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Col 3: Bill Charges */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Bill Discount (%)</Label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={inwardBillDiscountPct}
-                    onChange={(e) => setInwardBillDiscountPct(e.target.value)}
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Additional Charges (₹)</Label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={inwardAdditionalCharges}
-                    onChange={(e) => setInwardAdditionalCharges(e.target.value)}
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Freight (₹)</Label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={inwardFreight}
-                    onChange={(e) => setInwardFreight(e.target.value)}
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Label className="w-36 text-xs font-bold text-slate-700 shrink-0">Round Off (₹)</Label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={inwardRoundOff}
-                    onChange={(e) => setInwardRoundOff(e.target.value)}
-                    className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 text-right font-mono focus:border-blue-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Add Medicine Entry Bar (Professional Slate Theme) */}
-            <div className="bg-slate-50 border border-slate-300/90 rounded-lg p-2 flex items-center gap-2 flex-wrap shadow-2xs shrink-0" ref={inwardSearchContainerRef}>
-              <div className="flex items-center gap-1.5 flex-1 min-w-[260px]">
-                <Label className="font-bold text-slate-800 whitespace-nowrap text-xs">Add Medicine :</Label>
-                <div className="relative flex-1">
-                  <input
-                    ref={inwardSearchInputRef}
-                    type="text"
-                    value={inwardMedSearch}
-                    onChange={(e) => {
-                      setInwardMedSearch(e.target.value);
-                      setInwardShowDropdown(true);
-                      setInwardHighlightedSearchIndex(0);
-                    }}
-                    onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
-                    onKeyDown={(e) => {
-                      if (inwardShowDropdown && inwardFilteredResults.length > 0) {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
-                          if (chosen) handleSelectMedForInwardBar(chosen);
-                          return;
-                        }
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
-                          return;
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
-                          return;
-                        }
-                      } else if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddInwardEntryFromBar();
-                      }
-                    }}
-                    placeholder="Type medicine name / generic name / brand... (e.g. Dolo 650, Paracetamol)"
-                    className="w-full h-8 px-2.5 text-xs bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none font-medium text-slate-900"
-                  />
-
-                  {/* Autocomplete Dropdown */}
-                  {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-64 overflow-y-auto divide-y divide-slate-100">
-                      {inwardFilteredResults.map((med, idx) => {
-                        const isSel = idx === inwardHighlightedSearchIndex;
-                        const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
-                          ? Number(med.purchase_price)
-                          : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
-                        return (
-                          <div
-                            key={med.name || med.id || idx}
-                            onClick={() => handleSelectMedForInwardBar(med)}
-                            onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
-                            className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
-                              isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
-                            }`}
-                          >
-                            <div>
-                              <div className="font-bold">{med.medicine_name}</div>
-                              <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
-                            </div>
-                            <div className="text-right font-mono">
-                              <span className="text-[10px] text-slate-500">{lastP > 0 ? `Last Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
-                              <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      <div
-                        onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
-                        className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
-                      >
-                        + Add &quot;{inwardMedSearch}&quot; as New Item to Inward
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowInwardBrowseMedModal(true)}
-                  className="h-8 px-2 bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300 rounded font-bold cursor-pointer text-xs"
-                  title="Browse Medicines"
-                >
-                  ...
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Batch No.</Label>
-                <input
-                  type="text"
-                  value={inwardBatch}
-                  onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
-                  placeholder="e.g. PM-EXP6M"
-                  className="w-28 h-8 px-2 text-xs font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none uppercase"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Expiry Date</Label>
-                <input
-                  type="date"
-                  value={inwardExp}
-                  onChange={(e) => setInwardExp(e.target.value)}
-                  className="w-32 h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Qty.</Label>
-                <input
-                  type="number"
-                  min="1"
-                  value={inwardQty}
-                  onChange={(e) => setInwardQty(e.target.value)}
-                  className="w-16 h-8 px-2 text-xs text-center font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-semibold text-slate-700 whitespace-nowrap">Rate (₹)</Label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={inwardPrice}
-                  onChange={(e) => setInwardPrice(e.target.value)}
-                  placeholder="0.00"
-                  className="w-20 h-8 px-2 text-xs text-right font-mono font-bold bg-white border border-slate-300 rounded focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
+      {/* Add New Purchase Type Modal Helper */}
+      {showAddPurchaseTypeModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-blue-700 text-white px-3.5 py-2.5 flex items-center justify-between">
+              <h3 className="font-bold text-xs">Add New Purchase Type</h3>
               <button
                 type="button"
-                onClick={handleAddInwardEntryFromBar}
-                className="h-8 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-xs flex items-center gap-1 cursor-pointer text-xs transition"
+                onClick={() => {
+                  setShowAddPurchaseTypeModal(false);
+                  setNewPurchaseTypeName("");
+                }}
+                className="text-white hover:text-rose-200 font-bold text-xs cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add [Enter]</span>
+                ✕
               </button>
             </div>
-
-            {/* 3. Inward Bill Items Table (High-Density Classic Blue Table with Old Rate and New Rate) */}
-            <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[160px]">
-              <div className="overflow-auto flex-1 min-h-0 max-h-[260px]">
-                <table className="w-full text-left border-collapse text-xs select-text">
-                  <thead className="sticky top-0 z-10 bg-blue-700 text-white font-bold uppercase text-[11px] tracking-wider border-b border-blue-800">
-                    <tr className="divide-x divide-blue-600">
-                      <th className="py-2 px-2 text-center w-12">S.No</th>
-                      <th className="py-2 px-2.5 min-w-[170px]">Medicine Name</th>
-                      <th className="py-2 px-2 min-w-[100px]">Company</th>
-                      <th className="py-2 px-2 text-center w-28">Batch No.</th>
-                      <th className="py-2 px-2 text-center w-24">Expiry Date</th>
-                      <th className="py-2 px-2 text-center w-20">Pack</th>
-                      <th className="py-2 px-2 text-center w-16">Qty</th>
-                      <th className="py-2 px-2 text-right w-24">Old Rate (₹)</th>
-                      <th className="py-2 px-2 text-right w-24">New Rate (₹)</th>
-                      <th className="py-2 px-2 text-right w-20">MRP (₹)</th>
-                      <th className="py-2 px-2.5 text-right w-28">Line Total (₹)</th>
-                      <th className="py-2 px-2 text-center w-16">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white font-medium text-slate-800">
-                    {inwardItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={12} className="text-center py-8 text-slate-400 font-medium">
-                          No medicines in inward bill. Use the entry bar above to add medicines.
-                        </td>
-                      </tr>
-                    ) : (
-                      inwardItems.map((item, idx) => {
-                        const isSelected = selectedInwardRowIndex === idx;
-                        const pPrice = parseFloat(item.purchase_price) || 0;
-                        const lastPrice = Number(item.last_purchase_price) || 0;
-                        const isFirst = lastPrice === 0;
-                        const qty = parseInt(item.quantity, 10) || 0;
-                        const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
-                        const mrpVal = Number(item.mrp || 0).toFixed(2);
-
-                        return (
-                          <tr
-                            key={item.id || idx}
-                            onClick={() => setSelectedInwardRowIndex(idx)}
-                            className={`cursor-pointer transition divide-x divide-slate-200 ${
-                              isSelected
-                                ? "bg-sky-600 text-white font-semibold"
-                                : idx % 2 === 0
-                                ? "bg-white hover:bg-blue-50/60"
-                                : "bg-slate-50/70 hover:bg-blue-50/60"
-                            }`}
-                          >
-                            {/* 1. S.No */}
-                            <td className={`py-1.5 px-2 text-center font-mono ${isSelected ? "text-white font-bold" : "text-slate-600"}`}>
-                              {idx + 1}
-                            </td>
-
-                            {/* 2. Medicine Name */}
-                            <td className={`py-1.5 px-2.5 font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              {item.medicine_name || item.medicine}
-                            </td>
-
-                            {/* 3. Company */}
-                            <td className={`py-1.5 px-2 ${isSelected ? "text-white" : "text-slate-700"}`}>
-                              {item.company || item.brand || "Cipla Ltd"}
-                            </td>
-
-                            {/* 4. Batch No */}
-                            <td className={`py-1.5 px-2 text-center font-mono ${isSelected ? "text-white font-bold" : "text-slate-800"}`}>
-                              {item.batch_number || "BATCH-01"}
-                            </td>
-
-                            {/* 5. Expiry Date */}
-                            <td className={`py-1.5 px-2 text-center font-mono ${isSelected ? "text-white" : "text-slate-700"}`}>
-                              {item.exp_date ? (item.exp_date.includes("-") ? item.exp_date.split("-").reverse().join("-") : item.exp_date) : "05-12-2027"}
-                            </td>
-
-                            {/* 6. Pack */}
-                            <td className={`py-1.5 px-2 text-center ${isSelected ? "text-white" : "text-slate-700"}`}>
-                              {item.pack_size || "10 Tabs"}
-                            </td>
-
-                            {/* 7. Qty */}
-                            <td className={`py-1.5 px-2 text-center font-bold font-mono ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              {item.quantity}
-                            </td>
-
-                            {/* 8. Old Rate (Read-Only) */}
-                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${isSelected ? "text-white" : "text-slate-600"}`}>
-                              {isFirst ? (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-normal italic ${
-                                  isSelected ? "bg-sky-700 text-sky-100" : "bg-slate-100 text-slate-500"
-                                }`}>
-                                  New Item
-                                </span>
-                              ) : (
-                                <span>₹{lastPrice.toFixed(2)}</span>
-                              )}
-                            </td>
-
-                            {/* 9. New Rate (Editable) */}
-                            <td className={`py-1 px-1.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.purchase_price}
-                                onChange={(e) => handleUpdateInwardRow(idx, "purchase_price", e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className={`w-20 h-6 px-1.5 text-right font-mono font-bold rounded border text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                                  isSelected 
-                                    ? "bg-sky-700 text-white border-sky-400 placeholder-sky-200" 
-                                    : "bg-white text-slate-900 border-slate-300"
-                                }`}
-                              />
-                            </td>
-
-                            {/* 10. MRP */}
-                            <td className={`py-1.5 px-2 text-right font-mono ${isSelected ? "text-white" : "text-slate-700"}`}>
-                              ₹{mrpVal}
-                            </td>
-
-                            {/* 11. Line Total (New Rate × Qty) */}
-                            <td className={`py-1.5 px-2.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              ₹{Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-
-                            {/* 12. Action */}
-                            <td className="py-1.5 px-2 text-center">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveInwardItem(idx);
-                                }}
-                                className={`px-2 py-0.5 text-[10px] font-semibold rounded border cursor-pointer transition ${
-                                  isSelected 
-                                    ? "bg-white text-rose-700 border-white hover:bg-rose-50" 
-                                    : "bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-300"
-                                }`}
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+            <div className="p-3.5 space-y-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Purchase Type Name</Label>
+                <input
+                  type="text"
+                  value={newPurchaseTypeName}
+                  onChange={(e) => setNewPurchaseTypeName(e.target.value)}
+                  placeholder="e.g. Sample / Trial Inward, Institutional Tender..."
+                  className="w-full h-8 px-2.5 text-xs rounded border border-slate-300 mt-1 focus:border-blue-600 focus:outline-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newPurchaseTypeName.trim()) {
+                      e.preventDefault();
+                      const trimmed = newPurchaseTypeName.trim();
+                      if (!inwardPurchaseTypesList.includes(trimmed)) {
+                        setInwardPurchaseTypesList(prev => [...prev, trimmed]);
+                      }
+                      setInwardPurchaseType(trimmed);
+                      setNewPurchaseTypeName("");
+                      setShowAddPurchaseTypeModal(false);
+                      showToast(`Added purchase type: ${trimmed}`, "success");
+                    }
+                  }}
+                />
               </div>
-            </div>
-
-            {/* 4. Bottom 3 Summary Cards (Item Summary, Additional Details, Grand Total) */}
-            {(() => {
-              const subTotal = inwardItems.reduce((acc, it) => acc + (parseFloat(it.line_total) || (it.quantity * it.purchase_price) || 0), 0);
-              const discAmt = (subTotal * (parseFloat(inwardBillDiscountPct) || 0)) / 100;
-              const addChg = parseFloat(inwardAdditionalCharges) || 0;
-              const frt = parseFloat(inwardFreight) || 0;
-              const rnd = parseFloat(inwardRoundOff) || 0;
-              const grandTot = Math.max(0, subTotal - discAmt + addChg + frt + rnd);
-              const totalUnits = inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0);
-
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
-                  {/* Card 1: Item Summary */}
-                  <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow-2xs">
-                    <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
-                      Item Summary
-                    </div>
-                    <div className="p-2.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-bold text-slate-700">Total Items :</Label>
-                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-xs text-slate-900 shadow-inner">
-                          {inwardItems.length}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-bold text-slate-700">Total Quantity :</Label>
-                        <div className="w-28 h-6.5 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-black text-xs text-slate-900 shadow-inner">
-                          {totalUnits}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Additional Details */}
-                  <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow-2xs">
-                    <div className="bg-blue-100/70 px-3 py-1 text-xs font-bold text-blue-900 border-b border-blue-200">
-                      Additional Details
-                    </div>
-                    <div className="p-2 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Payment Mode :</Label>
-                        <select
-                          value={inwardPaymentMode}
-                          onChange={(e) => setInwardPaymentMode(e.target.value)}
-                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        >
-                          <option value="Credit">Credit</option>
-                          <option value="Cash">Cash</option>
-                          <option value="UPI">UPI</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                          <option value="Net 30">Net 30</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Due Days :</Label>
-                        <input
-                          type="number"
-                          value={inwardDueDays}
-                          onChange={(e) => setInwardDueDays(parseInt(e.target.value, 10) || 0)}
-                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 font-mono focus:border-blue-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-700 shrink-0">Reference No. :</Label>
-                        <input
-                          type="text"
-                          value={inwardReferenceNo}
-                          onChange={(e) => setInwardReferenceNo(e.target.value)}
-                          placeholder="Ref / PO No..."
-                          className="flex-1 h-6.5 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Calculations & Grand Total Banner */}
-                  <div className="bg-white rounded-lg border border-slate-300 p-2 shadow-2xs space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Sub Total (₹)</span>
-                      <span className="font-mono font-bold text-slate-900 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
-                        {subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Bill Discount (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
-                        {discAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Additional Charges (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
-                        {addChg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Freight (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
-                        {frt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-700">Round Off (₹)</span>
-                      <span className="font-mono text-slate-800 bg-slate-50 border border-slate-300 px-2.5 py-0.5 rounded w-32 text-right">
-                        {rnd.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    {/* Highlighted Grand Total Banner (Professional Slate & Emerald) */}
-                    <div className="bg-slate-900 border border-slate-800 rounded p-2 px-3.5 flex items-center justify-between shadow-md mt-1">
-                      <span className="text-xs font-black text-white uppercase tracking-wider">
-                        Grand Total (₹)
-                      </span>
-                      <span className="text-base font-black font-mono text-emerald-400">
-                        ₹{grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Modal Bottom Action Bar */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-300 shrink-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setInwardItems([])}
-                  className="h-8 text-xs border-slate-300 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                  Clear Table
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPurchaseInwardOpen(false)}
-                  className="h-8 px-4 text-xs border-slate-300 cursor-pointer"
+                  onClick={() => {
+                    setShowAddPurchaseTypeModal(false);
+                    setNewPurchaseTypeName("");
+                  }}
+                  className="h-7.5 text-xs"
                 >
                   Cancel
                 </Button>
-
                 <Button
                   type="button"
-                  onClick={handleConfirmPurchaseInward}
-                  disabled={isSubmittingInward || inwardItems.length === 0}
-                  className="h-8 px-6 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  disabled={!newPurchaseTypeName.trim()}
+                  onClick={() => {
+                    const trimmed = newPurchaseTypeName.trim();
+                    if (trimmed) {
+                      if (!inwardPurchaseTypesList.includes(trimmed)) {
+                        setInwardPurchaseTypesList(prev => [...prev, trimmed]);
+                      }
+                      setInwardPurchaseType(trimmed);
+                      setNewPurchaseTypeName("");
+                      setShowAddPurchaseTypeModal(false);
+                      showToast(`Added purchase type: ${trimmed}`, "success");
+                    }
+                  }}
+                  className="h-7.5 text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold"
                 >
-                  {isSubmittingInward ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving to Inventory...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Confirm &amp; Inward Stock ({inwardItems.length} Medicines)</span>
-                    </>
-                  )}
+                  Save Purchase Type
                 </Button>
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Add New Purchase Type Modal */}
-          {showAddPurchaseTypeModal && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden border border-slate-300 animate-in fade-in zoom-in-95 duration-150">
-                <div className="bg-blue-700 text-white px-3.5 py-2.5 flex items-center justify-between">
-                  <h3 className="font-bold text-xs">Add New Purchase Type</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddPurchaseTypeModal(false);
-                      setNewPurchaseTypeName("");
-                    }}
-                    className="text-white hover:text-rose-200 font-bold text-xs cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="p-3.5 space-y-3">
-                  <div>
-                    <Label className="text-xs font-bold text-slate-700">Purchase Type Name</Label>
-                    <input
-                      type="text"
-                      value={newPurchaseTypeName}
-                      onChange={(e) => setNewPurchaseTypeName(e.target.value)}
-                      placeholder="e.g. Sample / Trial Inward, Institutional Tender..."
-                      className="w-full h-8 px-2.5 text-xs rounded border border-slate-300 mt-1 focus:border-blue-600 focus:outline-none"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newPurchaseTypeName.trim()) {
-                          e.preventDefault();
-                          const trimmed = newPurchaseTypeName.trim();
-                          if (!inwardPurchaseTypesList.includes(trimmed)) {
-                            setInwardPurchaseTypesList(prev => [...prev, trimmed]);
-                          }
-                          setInwardPurchaseType(trimmed);
-                          setNewPurchaseTypeName("");
-                          setShowAddPurchaseTypeModal(false);
-                          showToast(`Added purchase type: ${trimmed}`, "success");
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
-                    <Button
-                      type="button"
-                      variant="outline"
+      {/* Browse Medicine Helper Modal */}
+      {showInwardBrowseMedModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden border border-slate-300">
+            <div className="bg-blue-700 text-white px-3 py-2 flex items-center justify-between">
+              <h3 className="font-bold text-xs">Select Medicine for Inward</h3>
+              <button
+                type="button"
+                onClick={() => setShowInwardBrowseMedModal(false)}
+                className="text-white hover:text-rose-200 font-bold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3">
+              <input
+                type="text"
+                value={inwardBrowseQuery}
+                onChange={(e) => setInwardBrowseQuery(e.target.value)}
+                placeholder="Search medicine catalog..."
+                className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-slate-300 rounded focus:border-blue-600 focus:outline-none mb-2"
+                autoFocus
+              />
+              <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded">
+                {medicines
+                  .filter(m =>
+                    !inwardBrowseQuery ||
+                    m.medicine_name.toLowerCase().includes(inwardBrowseQuery.toLowerCase()) ||
+                    (m.generic_name && m.generic_name.toLowerCase().includes(inwardBrowseQuery.toLowerCase()))
+                  )
+                  .slice(0, 30)
+                  .map((m) => (
+                    <div
+                      key={m.name || m.medicine_name}
                       onClick={() => {
-                        setShowAddPurchaseTypeModal(false);
-                        setNewPurchaseTypeName("");
+                        handleSelectMedForInwardBar(m);
+                        setShowInwardBrowseMedModal(false);
+                        setInwardBrowseQuery("");
                       }}
-                      className="h-7.5 text-xs"
+                      className="p-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between text-xs"
                     >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={!newPurchaseTypeName.trim()}
-                      onClick={() => {
-                        const trimmed = newPurchaseTypeName.trim();
-                        if (trimmed) {
-                          if (!inwardPurchaseTypesList.includes(trimmed)) {
-                            setInwardPurchaseTypesList(prev => [...prev, trimmed]);
-                          }
-                          setInwardPurchaseType(trimmed);
-                          setNewPurchaseTypeName("");
-                          setShowAddPurchaseTypeModal(false);
-                          showToast(`Added purchase type: ${trimmed}`, "success");
-                        }
-                      }}
-                      className="h-7.5 text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold"
-                    >
-                      Save Purchase Type
-                    </Button>
-                  </div>
-                </div>
+                      <div>
+                        <div className="font-bold text-slate-800">{m.medicine_name}</div>
+                        <div className="text-[10px] text-slate-500">{m.brand || m.supplier || "Cipla Ltd"} • Rack: {m.rack_location || "A-01"}</div>
+                      </div>
+                      <div className="text-right font-mono font-bold text-blue-700">
+                        Last Pur: ₹{Number(m.purchase_price || m.batches?.[0]?.purchase_price || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
-          )}
-
-          {/* Browse Medicine Helper Modal */}
-          {showInwardBrowseMedModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden border border-slate-300">
-                <div className="bg-blue-700 text-white px-3 py-2 flex items-center justify-between">
-                  <h3 className="font-bold text-xs">Select Medicine for Inward</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowInwardBrowseMedModal(false)}
-                    className="text-white hover:text-rose-200 font-bold text-xs cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="p-3">
-                  <input
-                    type="text"
-                    value={inwardBrowseQuery}
-                    onChange={(e) => setInwardBrowseQuery(e.target.value)}
-                    placeholder="Search medicine catalog..."
-                    className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-slate-300 rounded focus:border-blue-600 focus:outline-none mb-2"
-                    autoFocus
-                  />
-                  <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded">
-                    {medicines
-                      .filter(m =>
-                        !inwardBrowseQuery ||
-                        m.medicine_name.toLowerCase().includes(inwardBrowseQuery.toLowerCase()) ||
-                        (m.generic_name && m.generic_name.toLowerCase().includes(inwardBrowseQuery.toLowerCase()))
-                      )
-                      .slice(0, 30)
-                      .map((m) => (
-                        <div
-                          key={m.name || m.medicine_name}
-                          onClick={() => {
-                            handleSelectMedForInwardBar(m);
-                            setShowInwardBrowseMedModal(false);
-                            setInwardBrowseQuery("");
-                          }}
-                          className="p-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between text-xs"
-                        >
-                          <div>
-                            <div className="font-bold text-slate-800">{m.medicine_name}</div>
-                            <div className="text-[10px] text-slate-500">{m.brand || m.supplier || "Cipla Ltd"} • Rack: {m.rack_location || "A-01"}</div>
-                          </div>
-                          <div className="text-right font-mono font-bold text-blue-700">
-                            Last Pur: ₹{Number(m.purchase_price || m.batches?.[0]?.purchase_price || 0).toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
 
       {/* Edit Medicine Modal */}
       {showEditMedModal && editingMed && (
@@ -11506,9 +11431,10 @@ export default function PharmacyPage() {
 
       {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs */}
       <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 w-full">
           {[
-            { id: "dashboard", label: "Pharmacy", shortcut: "Alt + 1" },
+            { id: "dashboard", label: "POS Billing", shortcut: "Alt + 1" },
+            { id: "purchase-inward", label: "Purchase Inward", shortcut: "Alt + I" },
             { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
             { id: "dispensing", label: "Prescription Queue", shortcut: "Alt + 3" },
             { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },

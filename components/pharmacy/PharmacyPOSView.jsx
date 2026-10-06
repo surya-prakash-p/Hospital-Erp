@@ -1040,43 +1040,51 @@ export default function PharmacyPOSView({
       const isAlt = e.altKey;
       const isCtrlOrMeta = e.ctrlKey || e.metaKey;
       const key = e.key;
-      // Backspace -> Close open modals (View Bills, Settle Bill, etc.) when not typing characters in an input
+      // Backspace -> Close open modals (View Bills, Settle Bill, etc.) ONLY when NOT typing in an input
       if (key === 'Backspace') {
         const target = e.target;
-        const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-        const hasText = isInput && target.value && target.value.length > 0;
+        const isInput = target && (
+          target.tagName === "INPUT" || 
+          target.tagName === "TEXTAREA" || 
+          target.tagName === "SELECT" || 
+          target.isContentEditable ||
+          Boolean(target.closest?.('input, textarea, select, [contenteditable="true"]'))
+        );
 
-        if (!hasText) {
-          if (settlingBill) {
-            e.preventDefault();
-            setSettlingBill(null);
-            return;
-          }
-          if (showViewBillsModal) {
-            e.preventDefault();
-            setShowViewBillsModal(false);
-            return;
-          }
-          if (showSubstituteModal) {
-            e.preventDefault();
-            setShowSubstituteModal(false);
-            return;
-          }
-          if (showDiscountModal) {
-            e.preventDefault();
-            setShowDiscountModal(false);
-            return;
-          }
-          if (showServiceItemModal) {
-            e.preventDefault();
-            setShowServiceItemModal(false);
-            return;
-          }
-          if (showMoreDetailsModal) {
-            e.preventDefault();
-            setShowMoreDetailsModal(false);
-            return;
-          }
+        if (isInput) {
+          // Inside input/textarea/select/table cell: Backspace must ONLY delete text, never close modals or views
+          return;
+        }
+
+        if (settlingBill) {
+          e.preventDefault();
+          setSettlingBill(null);
+          return;
+        }
+        if (showViewBillsModal) {
+          e.preventDefault();
+          setShowViewBillsModal(false);
+          return;
+        }
+        if (showSubstituteModal) {
+          e.preventDefault();
+          setShowSubstituteModal(false);
+          return;
+        }
+        if (showDiscountModal) {
+          e.preventDefault();
+          setShowDiscountModal(false);
+          return;
+        }
+        if (showServiceItemModal) {
+          e.preventDefault();
+          setShowServiceItemModal(false);
+          return;
+        }
+        if (showMoreDetailsModal) {
+          e.preventDefault();
+          setShowMoreDetailsModal(false);
+          return;
         }
       }
 
