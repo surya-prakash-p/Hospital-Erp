@@ -19,6 +19,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// Format Expiry as Month and Year only (MM/YYYY)
+export function formatPosExpiry(val) {
+  if (!val || val === "N/A" || val === "—") return "N/A";
+  const str = String(val).trim();
+  if (/^\d{2}\/\d{4}$/.test(str)) return str;
+  if (/^\d{2}\/\d{2}$/.test(str)) return str;
+  if (/^\d{4}-\d{2}/.test(str)) {
+    const parts = str.split("-");
+    return `${parts[1]}/${parts[0]}`;
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${yyyy}`;
+  }
+  return str;
+}
+
 // Dedicated clean printable receipt function via hidden iframe
 export function printPharmacyInvoiceReceipt(record) {
   if (!record) return;
@@ -550,7 +569,7 @@ export default function PharmacyPOSView({
             dosage_form: matchedMed?.dosage_form || "Tablet",
             category: matchedMed?.category || "Regular Medicine",
             batch: matchedMed?.batch_number || "BT-9041",
-            expiry: matchedMed?.expiry_date ? matchedMed.expiry_date.substring(2, 7).replace("-", "/") : "12/27",
+            expiry: formatPosExpiry(matchedMed?.expiry_date || matchedMed?.exp_date || "12/2027"),
             margin_pct: parseFloat(margin) || 20.0,
             discount_pct: 0,
             qty: prescribedQty,
@@ -655,7 +674,7 @@ export default function PharmacyPOSView({
       dosage_form: med.dosage_form || "Tablet",
       category: med.category || "Regular Medicine",
       batch: med.batch_number || "BT-9021",
-      expiry: med.expiry_date ? med.expiry_date.substring(2, 7).replace("-", "/") : "12/27",
+      expiry: formatPosExpiry(med.expiry_date || med.exp_date || "12/2027"),
       margin_pct: parseFloat(margin) || 20.0,
       discount_pct: 0,
       qty: 1,
@@ -734,7 +753,7 @@ export default function PharmacyPOSView({
           dosage_form: subMed.dosage_form || "Tablet",
           category: subMed.category || "Regular Medicine",
           batch: subMed.batch_number || "BT-9021",
-          expiry: subMed.expiry_date ? subMed.expiry_date.substring(2, 7).replace("-", "/") : "12/27",
+          expiry: formatPosExpiry(subMed.expiry_date || subMed.exp_date || "12/2027"),
           margin_pct: parseFloat(margin) || 20.0,
           selling_price: sp,
           mrp: mrp,
@@ -1458,7 +1477,7 @@ export default function PharmacyPOSView({
                         <div className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
                           <span>{med.generic_name ? `Generic: ${med.generic_name}` : (med.category || "Regular Medicine")}</span>
                           <span>•</span>
-                          <span>Exp: {med.expiry_date || "12/2027"}</span>
+                          <span>Exp: {formatPosExpiry(med.expiry_date || med.exp_date || "12/2027")}</span>
                           <span>•</span>
                           <span>Rack: {med.rack_location || "A-01"}</span>
                         </div>
@@ -1621,7 +1640,7 @@ export default function PharmacyPOSView({
                       {/* 4. Expiry (Non-editable) */}
                       <td className="py-1 px-1 text-center font-mono text-[10px] text-slate-600 select-text">
                         <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                          {item.expiry || "N/A"}
+                          {formatPosExpiry(item.expiry)}
                         </span>
                       </td>
 
@@ -2277,7 +2296,7 @@ export default function PharmacyPOSView({
                 <div className="bg-slate-50 p-3 rounded-lg border space-y-1.5">
                   <div className="font-bold text-slate-900 text-sm">{item.medicine_name}</div>
                   <div className="text-slate-500 font-mono">Category: {item.category}</div>
-                  <div className="text-slate-500 font-mono">Batch: {item.batch} | Expiry: {item.expiry}</div>
+                  <div className="text-slate-500 font-mono">Batch: {item.batch} | Expiry: {formatPosExpiry(item.expiry)}</div>
                   <div className="text-slate-500 font-mono">Pack Size: {item.pack_size || 10} units/pack</div>
                   <div className="text-slate-500 font-mono">HSN Code: {item.hsn_code || "30049099"}</div>
                   <div className="text-slate-500 font-mono">GST Rate: {item.gst_pct || 12}% | Margin: {item.margin_pct}%</div>
