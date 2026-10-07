@@ -1160,6 +1160,35 @@ export default function PharmacyPage() {
     inwardBillDiscountPct, inwardAdditionalCharges, inwardFreight, inwardRoundOff
   ]);
 
+  // Global Keyboard Up / Down Arrow navigation for active tab tables
+  useEffect(() => {
+    const handleGlobalArrowNavigation = (e) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+      
+      // If user is inside the medicine search input with autocomplete, let the input's onKeyDown handle it
+      if (activeEl === inwardSearchInputRef.current) return;
+
+      if (e.key === "ArrowDown") {
+        if (activeTab === "purchase-inward" && inwardItems.length > 0) {
+          if (!isInput) {
+            e.preventDefault();
+            setSelectedInwardRowIndex(prev => (prev < inwardItems.length - 1 ? prev + 1 : 0));
+          }
+        }
+      } else if (e.key === "ArrowUp") {
+        if (activeTab === "purchase-inward" && inwardItems.length > 0) {
+          if (!isInput) {
+            e.preventDefault();
+            setSelectedInwardRowIndex(prev => (prev > 0 ? prev - 1 : inwardItems.length - 1));
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobalArrowNavigation);
+    return () => window.removeEventListener("keydown", handleGlobalArrowNavigation);
+  }, [activeTab, inwardItems.length]);
+
   const DOSAGE_FORM_OPTIONS = [
     "Tablet",
     "Capsule",
@@ -7844,26 +7873,40 @@ export default function PharmacyPage() {
                           }}
                           onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
                           onKeyDown={(e) => {
-                            if (inwardShowDropdown && inwardFilteredResults.length > 0) {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              if (!inwardShowDropdown) {
+                                setInwardShowDropdown(true);
+                                setInwardHighlightedSearchIndex(0);
+                              } else if (inwardFilteredResults.length > 0) {
+                                setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
+                              }
+                              return;
+                            }
+                            if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              if (!inwardShowDropdown) {
+                                setInwardShowDropdown(true);
+                                setInwardHighlightedSearchIndex(inwardFilteredResults.length > 0 ? inwardFilteredResults.length - 1 : 0);
+                              } else if (inwardFilteredResults.length > 0) {
+                                setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
+                              }
+                              return;
+                            }
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (inwardShowDropdown && inwardFilteredResults.length > 0) {
                                 const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
                                 if (chosen) handleSelectMedForInwardBar(chosen);
-                                return;
+                              } else {
+                                handleAddInwardEntryFromBar();
                               }
-                              if (e.key === "ArrowDown") {
-                                e.preventDefault();
-                                setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
-                                return;
-                              }
-                              if (e.key === "ArrowUp") {
-                                e.preventDefault();
-                                setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
-                                return;
-                              }
-                            } else if (e.key === "Enter") {
+                              return;
+                            }
+                            if (e.key === "Escape") {
                               e.preventDefault();
-                              handleAddInwardEntryFromBar();
+                              setInwardShowDropdown(false);
+                              return;
                             }
                           }}
                           placeholder="e.g. Amoxicillin 500mg"
@@ -7938,32 +7981,22 @@ export default function PharmacyPage() {
                     {/* Col 5: Category */}
                     <div>
                       <label className="block text-[11px] font-bold text-slate-700 mb-1">Category</label>
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={inwardCategory}
-                          onChange={(e) => {
-                            if (e.target.value === "__add_custom__") {
-                              setShowAddCategoryModal(true);
-                            } else {
-                              setInwardCategory(e.target.value);
-                            }
-                          }}
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none min-w-0"
-                        >
-                          {inwardCategoriesList.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                          <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowAddCategoryModal(true)}
-                          className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700 shrink-0"
-                          title="Add Custom Category"
-                        >
-                          ...
-                        </button>
-                      </div>
+                      <select
+                        value={inwardCategory}
+                        onChange={(e) => {
+                          if (e.target.value === "__add_custom__") {
+                            setShowAddCategoryModal(true);
+                          } else {
+                            setInwardCategory(e.target.value);
+                          }
+                        }}
+                        className="w-full h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                      >
+                        {inwardCategoriesList.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
+                      </select>
                     </div>
 
                     {/* ===== ROW 2 ===== */}
@@ -8293,8 +8326,6 @@ export default function PharmacyPage() {
                         const pPrice = parseFloat(item.purchase_price) || 0;
                         const qty = parseInt(item.quantity, 10) || 0;
                         const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
-                        const totUnits = item.total_units || (qty * (item.units_per_pack || 10));
-                        const derivedUnit = getDerivedUnitLabel(item.dosage_form, item.pack_size);
 
                         return (
                           <tr
@@ -8302,26 +8333,26 @@ export default function PharmacyPage() {
                             onClick={() => setSelectedInwardRowIndex(idx)}
                             className={`transition divide-x cursor-pointer ${
                               isSelected
-                                ? "bg-[#0070d2] text-white font-semibold divide-blue-500"
+                                ? "bg-blue-50/90 text-slate-900 font-semibold divide-blue-200 border-l-4 border-l-blue-500"
                                 : idx % 2 === 0
                                 ? "bg-white hover:bg-slate-50 text-slate-800 divide-slate-200"
                                 : "bg-slate-50/70 hover:bg-slate-50 text-slate-800 divide-slate-200"
                             }`}
                           >
                             {/* 1. S.No */}
-                            <td className={`py-1.5 px-2 text-center font-mono ${isSelected ? "text-white font-bold" : "text-slate-600"}`}>
+                            <td className={`py-1.5 px-2 text-center font-mono ${isSelected ? "text-blue-800 font-bold" : "text-slate-600"}`}>
                               {idx + 1}
                             </td>
 
                             {/* 2. Item Code */}
-                            <td className={`py-1.5 px-2 text-center font-mono font-bold ${isSelected ? "text-white" : "text-blue-700"}`}>
+                            <td className="py-1.5 px-2 text-center font-mono font-bold text-blue-700">
                               {item.item_code || "—"}
                             </td>
 
                             {/* 3. Medicine Name */}
                             <td className="py-1.5 px-2.5">
-                              <div className={`font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>{item.medicine_name || item.medicine}</div>
-                              <div className={`text-[10px] ${isSelected ? "text-blue-100" : "text-slate-500"}`}>
+                              <div className="font-bold text-slate-900">{item.medicine_name || item.medicine}</div>
+                              <div className="text-[10px] text-slate-500">
                                 {item.dosage_form || "Tablet"} • {item.generic_name || item.medicine_name}
                               </div>
                             </td>
@@ -8336,11 +8367,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-20 h-6 px-1.5 text-center font-mono font-bold text-xs uppercase rounded border focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="w-20 h-6 px-1.5 text-center font-mono font-bold text-xs uppercase rounded border border-slate-300 bg-white text-slate-900 focus:border-blue-600 focus:outline-none"
                               />
                             </td>
 
@@ -8354,11 +8381,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-20 h-6 px-1 text-center text-xs rounded border focus:outline-none font-semibold ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="w-20 h-6 px-1 text-center text-xs rounded border border-slate-300 bg-white text-slate-900 focus:border-blue-600 focus:outline-none font-semibold"
                               />
                             </td>
 
@@ -8376,11 +8399,7 @@ export default function PharmacyPage() {
                                     setSelectedInwardRowIndex(idx);
                                     e.stopPropagation();
                                   }}
-                                  className={`h-6 px-0.5 text-[10px] font-mono font-bold rounded border focus:outline-none ${
-                                    isSelected
-                                      ? "bg-white text-slate-900 border-white/40"
-                                      : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                  }`}
+                                  className="h-6 px-0.5 text-[10px] font-mono font-bold rounded border border-slate-300 bg-white text-slate-900 focus:border-blue-600 focus:outline-none"
                                 >
                                   <option value="">MM</option>
                                   {["01","02","03","04","05","06","07","08","09","10","11","12"].map(m => (
@@ -8398,11 +8417,7 @@ export default function PharmacyPage() {
                                     setSelectedInwardRowIndex(idx);
                                     e.stopPropagation();
                                   }}
-                                  className={`h-6 px-0.5 text-[10px] font-mono font-bold rounded border focus:outline-none ${
-                                    isSelected
-                                      ? "bg-white text-slate-900 border-white/40"
-                                      : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                  }`}
+                                  className="h-6 px-0.5 text-[10px] font-mono font-bold rounded border border-slate-300 bg-white text-slate-900 focus:border-blue-600 focus:outline-none"
                                 >
                                   <option value="">YYYY</option>
                                   {Array.from({ length: 16 }, (_, i) => 2025 + i).map(yr => (
@@ -8424,18 +8439,11 @@ export default function PharmacyPage() {
                                     setSelectedInwardRowIndex(idx);
                                     e.stopPropagation();
                                   }}
-                                  className={`w-12 h-6 px-1 text-center font-mono font-bold text-xs rounded border focus:outline-none ${
-                                    isSelected
-                                      ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                      : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                  }`}
+                                  className="w-12 h-6 px-1 text-center font-mono font-bold text-xs rounded border border-slate-300 bg-white text-slate-900 focus:border-blue-600 focus:outline-none"
                                 />
-                                <span className={`text-[11px] font-semibold ${isSelected ? "text-white" : "text-slate-700"}`}>
+                                <span className="text-[11px] font-semibold text-slate-700">
                                   {item.purchase_unit || "Strip"}
                                 </span>
-                              </div>
-                              <div className={`text-[9px] font-mono mt-0.5 ${isSelected ? "text-blue-100" : "text-slate-500"}`}>
-                                (= {totUnits} {derivedUnit})
                               </div>
                             </td>
 
@@ -8451,11 +8459,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-20 h-6 px-1 text-right font-mono font-bold rounded border text-xs focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="w-20 h-6 px-1 text-right font-mono font-bold rounded border border-slate-300 bg-white text-slate-900 text-xs focus:border-blue-600 focus:outline-none"
                               />
                             </td>
 
@@ -8471,11 +8475,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-16 h-6 px-1 text-right font-mono rounded border text-xs focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="w-16 h-6 px-1 text-right font-mono rounded border border-slate-300 bg-white text-slate-900 text-xs focus:border-blue-600 focus:outline-none"
                               />
                             </td>
 
@@ -8491,11 +8491,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-18 h-6 px-1 text-right font-mono rounded border text-xs focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="w-18 h-6 px-1 text-right font-mono rounded border border-slate-300 bg-white text-slate-900 text-xs focus:border-blue-600 focus:outline-none"
                               />
                             </td>
 
@@ -8508,11 +8504,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`h-6 px-1 text-center font-mono rounded border text-xs focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white text-slate-900 border-white/40"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
+                                className="h-6 px-1 text-center font-mono rounded border border-slate-300 bg-white text-slate-900 text-xs focus:border-blue-600 focus:outline-none"
                               >
                                 <option value="0" className="text-slate-900">0%</option>
                                 <option value="5" className="text-slate-900">5%</option>
@@ -8523,7 +8515,7 @@ export default function PharmacyPage() {
                             </td>
 
                             {/* 12. Amount / Line Total */}
-                            <td className={`py-1.5 px-2.5 text-right font-mono font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>
+                            <td className="py-1.5 px-2.5 text-right font-mono font-bold text-slate-900">
                               {Number(lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
 
@@ -8535,11 +8527,7 @@ export default function PharmacyPage() {
                                   e.stopPropagation();
                                   handleRemoveInwardItem(idx);
                                 }}
-                                className={`px-2 py-0.5 text-[10px] font-semibold rounded border cursor-pointer transition ${
-                                  isSelected
-                                    ? "bg-white/20 hover:bg-rose-600 text-white border-white/40 hover:border-rose-600"
-                                    : "bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-300"
-                                }`}
+                                className="px-2 py-0.5 text-[10px] font-semibold rounded border border-slate-300 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 cursor-pointer transition"
                               >
                                 Delete
                               </button>
@@ -8553,7 +8541,7 @@ export default function PharmacyPage() {
               </div>
             </div>
 
-            {/* Bottom Section: Selected Item Summary & Actions (Matching Mockup) */}
+            {/* Bottom Section: 3 Divided Boxes (Selected Item Summary | Invoice Totals | Actions) */}
             {(() => {
               const activeIdx = (selectedInwardRowIndex >= 0 && selectedInwardRowIndex < inwardItems.length)
                 ? selectedInwardRowIndex
@@ -8585,42 +8573,42 @@ export default function PharmacyPage() {
               }, 0);
 
               return (
-                <div className="bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-3.5 shadow-2xs shrink-0">
-                  <div className="text-xs font-bold text-[#1e3a8a] mb-2.5">
-                    Selected Item Summary
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch shrink-0">
+                  {/* Box 1: Selected Item Summary */}
+                  <div className="lg:col-span-6 bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex flex-col justify-between">
+                    <div className="text-xs font-bold text-[#1e3a8a] mb-2">
+                      Selected Item Summary
+                    </div>
 
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    {/* Metrics Group */}
-                    <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-                      {/* 1. Stock Added */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                      {/* Stock Added */}
                       <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Stock Added</div>
-                        <div className="h-7 px-3 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Stock Added</div>
+                        <div className="h-7 px-2.5 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           +{stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
                         </div>
                       </div>
 
-                      {/* 2. Old Purchase Rate */}
+                      {/* Old Purchase Rate */}
                       <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Old Purchase Rate</div>
-                        <div className="h-7 px-3 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Old Purchase Rate</div>
+                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           ₹ {oldRate > 0 ? oldRate.toFixed(2) : "0.00"}
                         </div>
                       </div>
 
-                      {/* 3. New Purchase Rate */}
+                      {/* New Purchase Rate */}
                       <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">New Purchase Rate</div>
-                        <div className="h-7 px-3 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="text-[10px] font-semibold text-slate-500 mb-1">New Purchase Rate</div>
+                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           ₹ {newRate.toFixed(2)}
                         </div>
                       </div>
 
-                      {/* 4. Rate Difference */}
+                      {/* Rate Difference */}
                       <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Rate Difference</div>
-                        <div className={`h-7 px-3 font-bold font-mono rounded flex items-center text-xs shadow-2xs ${
+                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Rate Difference</div>
+                        <div className={`h-7 px-2.5 font-bold font-mono rounded flex items-center text-xs shadow-2xs ${
                           rateDiff < 0
                             ? 'bg-[#fee2e2] border border-[#fca5a5] text-[#b91c1c]'
                             : rateDiff > 0
@@ -8630,60 +8618,61 @@ export default function PharmacyPage() {
                           ₹ {rateDiff < 0 ? `(${Math.abs(rateDiff).toFixed(2)})` : rateDiff.toFixed(2)}
                         </div>
                       </div>
+                    </div>
+                  </div>
 
-                      <div className="h-7 w-px bg-slate-300 mx-1 hidden lg:block" />
-
-                      {/* 5. Items */}
-                      <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Items</div>
-                        <div className="h-7 min-w-[48px] px-2.5 bg-white border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
-                          {inwardItems.length}
-                        </div>
-                      </div>
-
-                      {/* 6. Total Units */}
-                      <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Total Units</div>
-                        <div className="h-7 min-w-[56px] px-2.5 bg-white border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
-                          {totalUnitsInBill > 0 ? totalUnitsInBill : inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0)}
-                        </div>
-                      </div>
-
-                      {/* 7. Invoice Total */}
-                      <div>
-                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Invoice Total</div>
-                        <div className="h-7 px-3 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] font-black font-mono rounded flex items-center text-xs shadow-2xs">
-                          ₹ {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
+                  {/* Box 2: Invoice Totals */}
+                  <div className="lg:col-span-4 bg-white rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex items-center justify-around gap-3 flex-wrap">
+                    {/* Items */}
+                    <div>
+                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Items</div>
+                      <div className="h-7 min-w-[48px] px-2.5 bg-[#f8fafc] border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
+                        {inwardItems.length}
                       </div>
                     </div>
 
-                    {/* Actions Group */}
-                    <div className="flex items-center gap-2.5 ml-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('dashboard')}
-                        className="h-8 px-4 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-300 rounded-md text-slate-700 cursor-pointer shadow-2xs transition"
-                      >
-                        Back
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleConfirmPurchaseInward}
-                        disabled={isSubmittingInward || inwardItems.length === 0}
-                        className="h-8 px-5 text-xs bg-[#065f46] hover:bg-[#044e39] text-white font-bold rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
-                      >
-                        {isSubmittingInward ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Adding...</span>
-                          </>
-                        ) : (
-                          <span>Add to Inventory</span>
-                        )}
-                      </button>
+                    {/* Total Units */}
+                    <div>
+                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Total Units</div>
+                      <div className="h-7 min-w-[56px] px-2.5 bg-[#f8fafc] border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
+                        {totalUnitsInBill > 0 ? totalUnitsInBill : inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0)}
+                      </div>
                     </div>
+
+                    {/* Invoice Total */}
+                    <div>
+                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Invoice Total</div>
+                      <div className="h-7 px-3 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] font-black font-mono rounded flex items-center text-xs shadow-2xs">
+                        ₹ {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Box 3: Actions */}
+                  <div className="lg:col-span-2 bg-white rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('dashboard')}
+                      className="h-8 px-3.5 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-300 rounded-md text-slate-700 cursor-pointer shadow-2xs transition"
+                    >
+                      Back
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleConfirmPurchaseInward}
+                      disabled={isSubmittingInward || inwardItems.length === 0}
+                      className="h-8 px-4 text-xs bg-[#065f46] hover:bg-[#044e39] text-white font-bold rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
+                    >
+                      {isSubmittingInward ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Adding...</span>
+                        </>
+                      ) : (
+                        <span>Add to Inventory</span>
+                      )}
+                    </button>
                   </div>
                 </div>
               );
