@@ -7771,525 +7771,520 @@ export default function PharmacyPage() {
 
               return (
                 <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3 shrink-0" ref={inwardSearchContainerRef}>
-                  <div className="flex flex-col md:flex-row gap-4 text-xs">
-                    {/* 3 Columns Form */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 flex-1">
-                      {/* Column 1: Medicine Identifiers & Suppliers */}
-                      <div className="space-y-2">
-                        {/* Row 1: Item Code */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Item Code</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={inwardItemCode}
-                              onChange={(e) => setInwardItemCode(e.target.value)}
-                              placeholder="e.g. MED00123"
-                              className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowInwardBrowseMedModal(true)}
-                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                              title="Browse Medicine Catalog"
-                            >
-                              ...
-                            </button>
-                          </div>
+                  {/* 3 Columns Form */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 text-xs">
+                    {/* Column 1: Medicine Identifiers & Categorization */}
+                    <div className="space-y-2">
+                      {/* Row 1: Item Code */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Item Code</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={inwardItemCode}
+                            onChange={(e) => setInwardItemCode(e.target.value)}
+                            placeholder="e.g. MED00123"
+                            className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowInwardBrowseMedModal(true)}
+                            className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                            title="Browse Medicine Catalog"
+                          >
+                            ...
+                          </button>
                         </div>
+                      </div>
 
-                        {/* Row 2: Medicine Name (Search & Autocomplete) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Medicine Name</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 relative">
-                            <input
-                              ref={inwardSearchInputRef}
-                              type="text"
-                              value={inwardMedSearch}
-                              onChange={(e) => {
-                                setInwardMedSearch(e.target.value);
-                                setInwardShowDropdown(true);
-                                setInwardHighlightedSearchIndex(0);
-                              }}
-                              onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
-                              onKeyDown={(e) => {
-                                if (inwardShowDropdown && inwardFilteredResults.length > 0) {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
-                                    if (chosen) handleSelectMedForInwardBar(chosen);
-                                    return;
-                                  }
-                                  if (e.key === "ArrowDown") {
-                                    e.preventDefault();
-                                    setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
-                                    return;
-                                  }
-                                  if (e.key === "ArrowUp") {
-                                    e.preventDefault();
-                                    setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
-                                    return;
-                                  }
-                                } else if (e.key === "Enter") {
+                      {/* Row 2: Medicine Name (Search & Autocomplete) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Medicine Name</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 relative">
+                          <input
+                            ref={inwardSearchInputRef}
+                            type="text"
+                            value={inwardMedSearch}
+                            onChange={(e) => {
+                              setInwardMedSearch(e.target.value);
+                              setInwardShowDropdown(true);
+                              setInwardHighlightedSearchIndex(0);
+                            }}
+                            onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
+                            onKeyDown={(e) => {
+                              if (inwardShowDropdown && inwardFilteredResults.length > 0) {
+                                if (e.key === "Enter") {
                                   e.preventDefault();
-                                  handleAddInwardEntryFromBar();
+                                  const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
+                                  if (chosen) handleSelectMedForInwardBar(chosen);
+                                  return;
                                 }
-                              }}
-                              placeholder="e.g. Amoxicillin 500mg"
-                              className="w-full h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            />
+                                if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
+                                  return;
+                                }
+                                if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
+                                  return;
+                                }
+                              } else if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddInwardEntryFromBar();
+                              }
+                            }}
+                            placeholder="e.g. Amoxicillin 500mg"
+                            className="w-full h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
 
-                            {/* Autocomplete Dropdown */}
-                            {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
-                              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                                {inwardFilteredResults.map((med, idx) => {
-                                  const isSel = idx === inwardHighlightedSearchIndex;
-                                  const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
-                                    ? Number(med.purchase_price)
-                                    : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
-                                  return (
-                                    <div
-                                      key={med.name || med.id || idx}
-                                      onClick={() => handleSelectMedForInwardBar(med)}
-                                      onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
-                                      className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
-                                        isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
-                                      }`}
-                                    >
-                                      <div>
-                                        <div className="font-bold">{med.medicine_name}</div>
-                                        <div className="text-[10px] text-slate-500">{med.dosage_form || "Tablet"} • {med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
-                                      </div>
-                                      <div className="text-right font-mono">
-                                        <span className="text-[10px] text-slate-500">{lastP > 0 ? `Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
-                                        <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
-                                      </div>
+                          {/* Autocomplete Dropdown */}
+                          {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
+                            <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                              {inwardFilteredResults.map((med, idx) => {
+                                const isSel = idx === inwardHighlightedSearchIndex;
+                                const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
+                                  ? Number(med.purchase_price)
+                                  : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
+                                return (
+                                  <div
+                                    key={med.name || med.id || idx}
+                                    onClick={() => handleSelectMedForInwardBar(med)}
+                                    onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
+                                    className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
+                                      isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
+                                    }`}
+                                  >
+                                    <div>
+                                      <div className="font-bold">{med.medicine_name}</div>
+                                      <div className="text-[10px] text-slate-500">{med.dosage_form || "Tablet"} • {med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
                                     </div>
-                                  );
-                                })}
-                                <div
-                                  onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
-                                  className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
-                                >
-                                  + Add &quot;{inwardMedSearch}&quot; as Custom Item
-                                </div>
+                                    <div className="text-right font-mono">
+                                      <span className="text-[10px] text-slate-500">{lastP > 0 ? `Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
+                                      <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              <div
+                                onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
+                                className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
+                              >
+                                + Add &quot;{inwardMedSearch}&quot; as Custom Item
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
+                      </div>
 
-                        {/* Row 3: Generic Name */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Generic Name</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="text"
-                            value={inwardGenericName}
-                            onChange={(e) => setInwardGenericName(e.target.value)}
-                            placeholder="e.g. Paracetamol"
+                      {/* Row 3: Generic Name */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Generic Name</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="text"
+                          value={inwardGenericName}
+                          onChange={(e) => setInwardGenericName(e.target.value)}
+                          placeholder="e.g. Paracetamol"
+                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Row 4: Dosage Form (What type of medicine it is) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Dosage Form</span>
+                          <span>:</span>
+                        </Label>
+                        <select
+                          value={inwardDosageForm}
+                          onChange={(e) => handleDosageFormChange(e.target.value)}
+                          className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        >
+                          {DOSAGE_FORM_OPTIONS.map(form => (
+                            <option key={form} value={form}>{form}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Row 5: Category */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Category</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 flex items-center gap-1">
+                          <select
+                            value={inwardCategory}
+                            onChange={(e) => {
+                              if (e.target.value === "__add_custom__") {
+                                setShowAddCategoryModal(true);
+                              } else {
+                                setInwardCategory(e.target.value);
+                              }
+                            }}
                             className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Row 4: Dosage Form (What type of medicine it is) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Dosage Form</span>
-                            <span>:</span>
-                          </Label>
-                          <select
-                            value={inwardDosageForm}
-                            onChange={(e) => handleDosageFormChange(e.target.value)}
-                            className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                           >
-                            {DOSAGE_FORM_OPTIONS.map(form => (
-                              <option key={form} value={form}>{form}</option>
+                            {inwardCategoriesList.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
                             ))}
+                            <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
                           </select>
-                        </div>
-
-                        {/* Row 5: Category */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Category</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1">
-                            <select
-                              value={inwardCategory}
-                              onChange={(e) => {
-                                if (e.target.value === "__add_custom__") {
-                                  setShowAddCategoryModal(true);
-                                } else {
-                                  setInwardCategory(e.target.value);
-                                }
-                              }}
-                              className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            >
-                              {inwardCategoriesList.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                              <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => setShowAddCategoryModal(true)}
-                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                              title="Add Custom Category"
-                            >
-                              ...
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Row 6: Supplier */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Supplier</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={inwardSupplier}
-                              onChange={(e) => setInwardSupplier(e.target.value)}
-                              placeholder="Select or enter supplier..."
-                              className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowSupplierSelectModal(true)}
-                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                              title="Select Supplier from List"
-                            >
-                              ...
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Column 2: Packaging, Unit & Batch */}
-                      <div className="space-y-2">
-                        {/* Row 1: Purchase Unit (How medicine is purchased/stocked) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Purchase Unit</span>
-                            <span>:</span>
-                          </Label>
-                          <select
-                            value={inwardPurchaseUnit}
-                            onChange={(e) => handlePurchaseUnitChange(e.target.value)}
-                            className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          <button
+                            type="button"
+                            onClick={() => setShowAddCategoryModal(true)}
+                            className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                            title="Add Custom Category"
                           >
-                            {PURCHASE_UNIT_OPTIONS.map(unit => (
-                              <option key={unit} value={unit}>{unit}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Row 2: Pack Size (How much is in one purchase unit) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Pack Size</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1 relative">
-                            <input
-                              type="text"
-                              list="inward-packsize-presets"
-                              value={inwardPackSize}
-                              onChange={(e) => handlePackSizeChange(e.target.value)}
-                              placeholder="e.g. 10 Tablets, 100 ml"
-                              className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            />
-                            <datalist id="inward-packsize-presets">
-                              <option value="10 Tablets">10 Tablets</option>
-                              <option value="15 Tablets">15 Tablets</option>
-                              <option value="20 Tablets">20 Tablets</option>
-                              <option value="30 Tablets">30 Tablets</option>
-                              <option value="100 Tablets">100 Tablets</option>
-                              <option value="10 Capsules">10 Capsules</option>
-                              <option value="15 Capsules">15 Capsules</option>
-                              <option value="100 ml">100 ml</option>
-                              <option value="200 ml">200 ml</option>
-                              <option value="500 ml">500 ml</option>
-                              <option value="2 ml">2 ml</option>
-                              <option value="5 ml">5 ml</option>
-                              <option value="10 ml">10 ml</option>
-                              <option value="15 g">15 g</option>
-                              <option value="20 g">20 g</option>
-                              <option value="30 g">30 g</option>
-                              <option value="50 g">50 g</option>
-                              <option value="100 g">100 g</option>
-                              <option value="10 Sachets">10 Sachets</option>
-                              <option value="1 Sachet">1 Sachet</option>
-                              <option value="1 Piece">1 Piece</option>
-                              <option value="1 Unit">1 Unit</option>
-                            </datalist>
-                          </div>
-                        </div>
-
-                        {/* Row 3: Batch No */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Batch No</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="text"
-                            value={inwardBatch}
-                            onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
-                            placeholder="e.g. PM65024"
-                            className="flex-1 h-7 text-xs font-mono font-bold uppercase rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Row 4: Expiry Date (Explicit Month & Year Selectors) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Expiry Date</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1.5">
-                            {/* Month Selector */}
-                            <select
-                              value={inwardExp ? (inwardExp.split("-")[1] || "") : ""}
-                              onChange={(e) => {
-                                const m = e.target.value;
-                                const curY = inwardExp && inwardExp.split("-")[0] && inwardExp.split("-")[0].length === 4
-                                  ? inwardExp.split("-")[0]
-                                  : `${new Date().getFullYear() + 2}`;
-                                setInwardExp(m ? `${curY}-${m}` : "");
-                              }}
-                              className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
-                            >
-                              <option value="">Month</option>
-                              <option value="01">01 - Jan</option>
-                              <option value="02">02 - Feb</option>
-                              <option value="03">03 - Mar</option>
-                              <option value="04">04 - Apr</option>
-                              <option value="05">05 - May</option>
-                              <option value="06">06 - Jun</option>
-                              <option value="07">07 - Jul</option>
-                              <option value="08">08 - Aug</option>
-                              <option value="09">09 - Sep</option>
-                              <option value="10">10 - Oct</option>
-                              <option value="11">11 - Nov</option>
-                              <option value="12">12 - Dec</option>
-                            </select>
-
-                            {/* Year Selector */}
-                            <select
-                              value={inwardExp ? (inwardExp.split("-")[0] || "") : ""}
-                              onChange={(e) => {
-                                const y = e.target.value;
-                                const curM = inwardExp && inwardExp.split("-")[1] ? inwardExp.split("-")[1] : "12";
-                                setInwardExp(y ? `${y}-${curM}` : "");
-                              }}
-                              className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
-                            >
-                              <option value="">Year</option>
-                              {Array.from({ length: 16 }, (_, i) => 2025 + i).map((yr) => (
-                                <option key={yr} value={String(yr)}>
-                                  {yr}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Row 5: Rack No */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Rack No</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="text"
-                            value={inwardRack}
-                            onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
-                            placeholder="e.g. A-01"
-                            className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Column 3: Quantity, Pricing & Tax */}
-                      <div className="space-y-2">
-                        {/* Row 1: Quantity (Purchase Unit Quantity) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Quantity</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              min="1"
-                              value={inwardQty}
-                              onChange={(e) => setInwardQty(e.target.value)}
-                              placeholder="e.g. 26"
-                              className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                            />
-                            <span className="text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2 rounded h-7 flex items-center shrink-0">
-                              {inwardPurchaseUnit}{Number(inwardQty) > 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Row 2: Total Units (Automatically Calculated) */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Total Units</span>
-                            <span>:</span>
-                          </Label>
-                          <div className="flex-1 h-7 px-2 bg-emerald-50 border border-emerald-300 rounded flex items-center justify-between font-mono font-bold text-xs text-emerald-900 shadow-inner">
-                            <span>{totalIndividualUnits} {unitDerived}</span>
-                            <span className="text-[10px] font-medium text-emerald-700 font-sans">({parsedQty} × {parsedUnitsPerPack})</span>
-                          </div>
-                        </div>
-
-                        {/* Row 3: Purchase Rate */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Purchase Rate</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={inwardPrice}
-                            onChange={(e) => setInwardPrice(e.target.value)}
-                            placeholder="0.00"
-                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Row 4: MRP */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>MRP</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={inwardMrp}
-                            onChange={(e) => setInwardMrp(e.target.value)}
-                            placeholder="0.00"
-                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Row 5: Sale Rate */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>Sale Rate</span>
-                            <span>:</span>
-                          </Label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={inwardSaleRate}
-                            onChange={(e) => setInwardSaleRate(e.target.value)}
-                            placeholder="0.00"
-                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          />
-                        </div>
-
-                        {/* Row 6: GST % */}
-                        <div className="flex items-center gap-2">
-                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                            <span>GST %</span>
-                            <span>:</span>
-                          </Label>
-                          <select
-                            value={inwardGstPct}
-                            onChange={(e) => setInwardGstPct(e.target.value)}
-                            className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                          >
-                            <option value="0">0</option>
-                            <option value="5">5</option>
-                            <option value="12">12</option>
-                            <option value="18">18</option>
-                            <option value="28">28</option>
-                          </select>
+                            ...
+                          </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right Action Buttons Stack */}
-                    <div className="flex flex-row md:flex-col gap-2 justify-start md:w-28 md:pl-3 md:border-l md:border-slate-200 shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleAddInwardEntryFromBar}
-                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-emerald-500 hover:text-emerald-700"
-                      >
-                        <PlusCircle className="w-4 h-4 text-emerald-600" />
-                        <span>Add</span>
-                      </button>
+                    {/* Column 2: Packaging, Unit & Batch */}
+                    <div className="space-y-2">
+                      {/* Row 1: Purchase Unit (How medicine is purchased/stocked) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Purchase Unit</span>
+                          <span>:</span>
+                        </Label>
+                        <select
+                          value={inwardPurchaseUnit}
+                          onChange={(e) => handlePurchaseUnitChange(e.target.value)}
+                          className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        >
+                          {PURCHASE_UNIT_OPTIONS.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={handleClearInwardBar}
-                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-amber-500 hover:text-amber-700"
-                      >
-                        <RotateCcw className="w-4 h-4 text-amber-600" />
-                        <span>Clear</span>
-                      </button>
+                      {/* Row 2: Pack Size (How much is in one purchase unit) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Pack Size</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 flex items-center gap-1 relative">
+                          <input
+                            type="text"
+                            list="inward-packsize-presets"
+                            value={inwardPackSize}
+                            onChange={(e) => handlePackSizeChange(e.target.value)}
+                            placeholder="e.g. 10 Tablets, 100 ml"
+                            className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                          <datalist id="inward-packsize-presets">
+                            <option value="10 Tablets">10 Tablets</option>
+                            <option value="15 Tablets">15 Tablets</option>
+                            <option value="20 Tablets">20 Tablets</option>
+                            <option value="30 Tablets">30 Tablets</option>
+                            <option value="100 Tablets">100 Tablets</option>
+                            <option value="10 Capsules">10 Capsules</option>
+                            <option value="15 Capsules">15 Capsules</option>
+                            <option value="100 ml">100 ml</option>
+                            <option value="200 ml">200 ml</option>
+                            <option value="500 ml">500 ml</option>
+                            <option value="2 ml">2 ml</option>
+                            <option value="5 ml">5 ml</option>
+                            <option value="10 ml">10 ml</option>
+                            <option value="15 g">15 g</option>
+                            <option value="20 g">20 g</option>
+                            <option value="30 g">30 g</option>
+                            <option value="50 g">50 g</option>
+                            <option value="100 g">100 g</option>
+                            <option value="10 Sachets">10 Sachets</option>
+                            <option value="1 Sachet">1 Sachet</option>
+                            <option value="1 Piece">1 Piece</option>
+                            <option value="1 Unit">1 Unit</option>
+                          </datalist>
+                        </div>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => saveInwardDraft(false)}
-                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-blue-500 hover:text-blue-700"
-                        title="Save current invoice & medicines draft"
-                      >
-                        <Save className="w-4 h-4 text-blue-600" />
-                        <span>Save</span>
-                      </button>
+                      {/* Row 3: Batch No */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Batch No</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="text"
+                          value={inwardBatch}
+                          onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
+                          placeholder="e.g. PM65024"
+                          className="flex-1 h-7 text-xs font-mono font-bold uppercase rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Row 4: Expiry Date (Explicit Month & Year Selectors) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Expiry Date</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 flex items-center gap-1.5">
+                          {/* Month Selector */}
+                          <select
+                            value={inwardExp ? (inwardExp.split("-")[1] || "") : ""}
+                            onChange={(e) => {
+                              const m = e.target.value;
+                              const curY = inwardExp && inwardExp.split("-")[0] && inwardExp.split("-")[0].length === 4
+                                ? inwardExp.split("-")[0]
+                                : `${new Date().getFullYear() + 2}`;
+                              setInwardExp(m ? `${curY}-${m}` : "");
+                            }}
+                            className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
+                          >
+                            <option value="">Month</option>
+                            <option value="01">01 - Jan</option>
+                            <option value="02">02 - Feb</option>
+                            <option value="03">03 - Mar</option>
+                            <option value="04">04 - Apr</option>
+                            <option value="05">05 - May</option>
+                            <option value="06">06 - Jun</option>
+                            <option value="07">07 - Jul</option>
+                            <option value="08">08 - Aug</option>
+                            <option value="09">09 - Sep</option>
+                            <option value="10">10 - Oct</option>
+                            <option value="11">11 - Nov</option>
+                            <option value="12">12 - Dec</option>
+                          </select>
+
+                          {/* Year Selector */}
+                          <select
+                            value={inwardExp ? (inwardExp.split("-")[0] || "") : ""}
+                            onChange={(e) => {
+                              const y = e.target.value;
+                              const curM = inwardExp && inwardExp.split("-")[1] ? inwardExp.split("-")[1] : "12";
+                              setInwardExp(y ? `${y}-${curM}` : "");
+                            }}
+                            className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
+                          >
+                            <option value="">Year</option>
+                            {Array.from({ length: 16 }, (_, i) => 2025 + i).map((yr) => (
+                              <option key={yr} value={String(yr)}>
+                                {yr}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 5: Rack No */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Rack No</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="text"
+                          value={inwardRack}
+                          onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
+                          placeholder="e.g. A-01"
+                          className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Column 3: Quantity, Pricing & Tax */}
+                    <div className="space-y-2">
+                      {/* Row 1: Quantity (Purchase Unit Quantity) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Quantity</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min="1"
+                            value={inwardQty}
+                            onChange={(e) => setInwardQty(e.target.value)}
+                            placeholder="e.g. 26"
+                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                          <span className="text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2 rounded h-7 flex items-center shrink-0">
+                            {inwardPurchaseUnit}{Number(inwardQty) > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Total Units (Automatically Calculated) */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Total Units</span>
+                          <span>:</span>
+                        </Label>
+                        <div className="flex-1 h-7 px-2 bg-emerald-50 border border-emerald-300 rounded flex items-center justify-between font-mono font-bold text-xs text-emerald-900 shadow-inner">
+                          <span>{totalIndividualUnits} {unitDerived}</span>
+                          <span className="text-[10px] font-medium text-emerald-700 font-sans">({parsedQty} × {parsedUnitsPerPack})</span>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Purchase Rate */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Purchase Rate</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={inwardPrice}
+                          onChange={(e) => setInwardPrice(e.target.value)}
+                          placeholder="0.00"
+                          className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Row 4: MRP */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>MRP</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={inwardMrp}
+                          onChange={(e) => setInwardMrp(e.target.value)}
+                          placeholder="0.00"
+                          className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Row 5: Sale Rate */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>Sale Rate</span>
+                          <span>:</span>
+                        </Label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={inwardSaleRate}
+                          onChange={(e) => setInwardSaleRate(e.target.value)}
+                          placeholder="0.00"
+                          className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Row 6: GST % */}
+                      <div className="flex items-center gap-2">
+                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                          <span>GST %</span>
+                          <span>:</span>
+                        </Label>
+                        <select
+                          value={inwardGstPct}
+                          onChange={(e) => setInwardGstPct(e.target.value)}
+                          className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                        >
+                          <option value="0">0</option>
+                          <option value="5">5</option>
+                          <option value="12">12</option>
+                          <option value="18">18</option>
+                          <option value="28">28</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             })()}
 
-            {/* Metadata Bar with Invoice No, Invoice Date & Clear Table */}
-            <div className="bg-[#f4f8fd] border border-[#bcd2ee] px-4 py-1.5 flex items-center justify-between gap-4 flex-wrap text-xs rounded-md shrink-0 mb-1">
-              <div className="flex items-center gap-6 flex-wrap">
-                <div className="flex items-center gap-2">
+            {/* Metadata & Actions Bar with Invoice No, Invoice Date, Supplier, and Action Buttons */}
+            <div className="bg-[#f4f8fd] border border-[#bcd2ee] px-3 py-1.5 flex items-center justify-between gap-3 flex-wrap text-xs rounded-md shrink-0 mb-1">
+              {/* Left Group: Invoice Details */}
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-slate-800">Invoice No :</span>
                   <input
                     type="text"
                     value={inwardInvoiceNo}
                     onChange={(e) => setInwardInvoiceNo(e.target.value)}
                     placeholder="e.g. PUR-2026-09-015"
-                    className="h-7 w-44 px-2 text-xs font-mono font-bold uppercase bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                    className="h-7 w-36 px-2 text-xs font-mono font-bold uppercase bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-slate-800">Invoice Date :</span>
                   <input
                     type="date"
                     value={inwardDate}
                     onChange={(e) => setInwardDate(e.target.value)}
-                    className="h-7 w-36 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                    className="h-7 w-32 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
                   />
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-800">Supplier :</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={inwardSupplier}
+                      onChange={(e) => setInwardSupplier(e.target.value)}
+                      placeholder="Select or enter supplier..."
+                      className="h-7 w-44 px-2 text-xs font-semibold bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSupplierSelectModal(true)}
+                      className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                      title="Select Supplier from List"
+                    >
+                      ...
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div>
+              {/* Right Group: Add, Clear, Save, and Clear Table */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleAddInwardEntryFromBar}
+                  className="h-7 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-emerald-500 hover:text-emerald-700"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Add</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearInwardBar}
+                  className="h-7 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-amber-500 hover:text-amber-700"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Clear</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => saveInwardDraft(false)}
+                  className="h-7 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-blue-500 hover:text-blue-700"
+                  title="Save current invoice & medicines draft"
+                >
+                  <Save className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Save</span>
+                </button>
+
+                <div className="h-4 w-px bg-slate-300 mx-0.5" />
+
                 <Button
                   type="button"
                   variant="outline"
