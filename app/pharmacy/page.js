@@ -8580,17 +8580,13 @@ export default function PharmacyPage() {
 
               return (
                 <div className="flex flex-col lg:flex-row items-stretch gap-2.5 shrink-0">
-                  {/* Box 1: Selected Item Summary */}
-                  <div className="flex-1 bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-2.5 px-3 shadow-2xs flex flex-col justify-between">
-                    <div className="text-xs font-bold text-[#1e3a8a] mb-1.5">
-                      Selected Item Summary
-                    </div>
-
-                    <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                  {/* Box 1: Selected Item Summary Values */}
+                  <div className="flex-1 bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-2.5 px-3.5 shadow-2xs flex items-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full">
                       {/* Stock Added */}
                       <div>
                         <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Stock Added</div>
-                        <div className="h-7 px-2.5 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="h-7 px-2.5 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs whitespace-nowrap overflow-hidden text-ellipsis">
                           +{stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
                         </div>
                       </div>
@@ -8598,7 +8594,7 @@ export default function PharmacyPage() {
                       {/* Old Purchase Rate */}
                       <div>
                         <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Old Purchase Rate</div>
-                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs whitespace-nowrap">
                           ₹ {oldRate > 0 ? oldRate.toFixed(2) : "0.00"}
                         </div>
                       </div>
@@ -8606,7 +8602,7 @@ export default function PharmacyPage() {
                       {/* New Purchase Rate */}
                       <div>
                         <div className="text-[10px] font-semibold text-slate-500 mb-0.5">New Purchase Rate</div>
-                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                        <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs whitespace-nowrap">
                           ₹ {newRate.toFixed(2)}
                         </div>
                       </div>
@@ -8614,7 +8610,7 @@ export default function PharmacyPage() {
                       {/* Rate Difference */}
                       <div>
                         <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Rate Difference</div>
-                        <div className={`h-7 px-2.5 font-bold font-mono rounded flex items-center text-xs shadow-2xs ${
+                        <div className={`h-7 px-2.5 font-bold font-mono rounded flex items-center text-xs shadow-2xs whitespace-nowrap ${
                           rateDiff < 0
                             ? 'bg-[#fee2e2] border border-[#fca5a5] text-[#b91c1c]'
                             : rateDiff > 0
