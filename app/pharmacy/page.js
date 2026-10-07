@@ -7770,14 +7770,14 @@ export default function PharmacyPage() {
               const unitDerived = getDerivedUnitLabel(inwardDosageForm, inwardPackSize);
 
               return (
-                <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3 shrink-0" ref={inwardSearchContainerRef}>
-                  {/* 3 Columns Form */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 text-xs">
+                <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3.5 shrink-0" ref={inwardSearchContainerRef}>
+                  {/* 3 Columns Form - Balanced 5 Rows Each */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2.5 text-xs">
                     {/* Column 1: Medicine Identifiers & Categorization */}
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {/* Row 1: Item Code */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Item Code</span>
                           <span>:</span>
                         </Label>
@@ -7802,7 +7802,7 @@ export default function PharmacyPage() {
 
                       {/* Row 2: Medicine Name (Search & Autocomplete) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Medicine Name</span>
                           <span>:</span>
                         </Label>
@@ -7885,7 +7885,7 @@ export default function PharmacyPage() {
 
                       {/* Row 3: Generic Name */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Generic Name</span>
                           <span>:</span>
                         </Label>
@@ -7900,7 +7900,7 @@ export default function PharmacyPage() {
 
                       {/* Row 4: Dosage Form (What type of medicine it is) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Dosage Form</span>
                           <span>:</span>
                         </Label>
@@ -7917,7 +7917,7 @@ export default function PharmacyPage() {
 
                       {/* Row 5: Category */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Category</span>
                           <span>:</span>
                         </Label>
@@ -7951,10 +7951,10 @@ export default function PharmacyPage() {
                     </div>
 
                     {/* Column 2: Packaging, Unit & Batch */}
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {/* Row 1: Purchase Unit (How medicine is purchased/stocked) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Purchase Unit</span>
                           <span>:</span>
                         </Label>
@@ -7971,7 +7971,7 @@ export default function PharmacyPage() {
 
                       {/* Row 2: Pack Size (How much is in one purchase unit) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Pack Size</span>
                           <span>:</span>
                         </Label>
@@ -8013,7 +8013,7 @@ export default function PharmacyPage() {
 
                       {/* Row 3: Batch No */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Batch No</span>
                           <span>:</span>
                         </Label>
@@ -8028,7 +8028,7 @@ export default function PharmacyPage() {
 
                       {/* Row 4: Expiry Date (Explicit Month & Year Selectors) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Expiry Date</span>
                           <span>:</span>
                         </Label>
@@ -8082,7 +8082,7 @@ export default function PharmacyPage() {
 
                       {/* Row 5: Rack No */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Rack No</span>
                           <span>:</span>
                         </Label>
@@ -8096,11 +8096,11 @@ export default function PharmacyPage() {
                       </div>
                     </div>
 
-                    {/* Column 3: Quantity, Pricing & Tax */}
-                    <div className="space-y-2">
+                    {/* Column 3: Quantity & Pricing (Balanced 5 Rows) */}
+                    <div className="space-y-2.5">
                       {/* Row 1: Quantity (Purchase Unit Quantity) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Quantity</span>
                           <span>:</span>
                         </Label>
@@ -8121,7 +8121,7 @@ export default function PharmacyPage() {
 
                       {/* Row 2: Total Units (Automatically Calculated) */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Total Units</span>
                           <span>:</span>
                         </Label>
@@ -8133,7 +8133,7 @@ export default function PharmacyPage() {
 
                       {/* Row 3: Purchase Rate */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Purchase Rate</span>
                           <span>:</span>
                         </Label>
@@ -8150,7 +8150,7 @@ export default function PharmacyPage() {
 
                       {/* Row 4: MRP */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>MRP</span>
                           <span>:</span>
                         </Label>
@@ -8167,7 +8167,7 @@ export default function PharmacyPage() {
 
                       {/* Row 5: Sale Rate */}
                       <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                        <Label className="w-28 text-xs font-semibold text-slate-700 shrink-0 flex items-center justify-between">
                           <span>Sale Rate</span>
                           <span>:</span>
                         </Label>
@@ -8181,37 +8181,18 @@ export default function PharmacyPage() {
                           className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                         />
                       </div>
-
-                      {/* Row 6: GST % */}
-                      <div className="flex items-center gap-2">
-                        <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                          <span>GST %</span>
-                          <span>:</span>
-                        </Label>
-                        <select
-                          value={inwardGstPct}
-                          onChange={(e) => setInwardGstPct(e.target.value)}
-                          className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        >
-                          <option value="0">0</option>
-                          <option value="5">5</option>
-                          <option value="12">12</option>
-                          <option value="18">18</option>
-                          <option value="28">28</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                 </div>
               );
             })()}
 
-            {/* Metadata & Actions Bar with Invoice No, Invoice Date, Supplier, and Action Buttons */}
-            <div className="bg-[#f4f8fd] border border-[#bcd2ee] px-3 py-1.5 flex items-center justify-between gap-3 flex-wrap text-xs rounded-md shrink-0 mb-1">
-              {/* Left Group: Invoice Details */}
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-800">Invoice No :</span>
+            {/* Metadata & Actions Bar with Invoice No, Invoice Date, Supplier, GST %, and Action Buttons */}
+            <div className="bg-[#f4f8fd] border border-[#bcd2ee] px-3.5 py-2 flex items-center justify-between gap-4 flex-wrap text-xs rounded-md shrink-0 mb-1">
+              {/* Left Group: Invoice Details + GST % */}
+              <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 text-xs shrink-0">Invoice No :</span>
                   <input
                     type="text"
                     value={inwardInvoiceNo}
@@ -8221,8 +8202,8 @@ export default function PharmacyPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-800">Invoice Date :</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 text-xs shrink-0">Invoice Date :</span>
                   <input
                     type="date"
                     value={inwardDate}
@@ -8231,15 +8212,15 @@ export default function PharmacyPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-800">Supplier :</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 text-xs shrink-0">Supplier :</span>
                   <div className="flex items-center gap-1">
                     <input
                       type="text"
                       value={inwardSupplier}
                       onChange={(e) => setInwardSupplier(e.target.value)}
                       placeholder="Select or enter supplier..."
-                      className="h-7 w-44 px-2 text-xs font-semibold bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                      className="h-7 w-48 px-2 text-xs font-semibold bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
                     />
                     <button
                       type="button"
@@ -8251,10 +8232,25 @@ export default function PharmacyPage() {
                     </button>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 text-xs shrink-0">GST % :</span>
+                  <select
+                    value={inwardGstPct}
+                    onChange={(e) => setInwardGstPct(e.target.value)}
+                    className="h-7 w-20 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                  >
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                    <option value="28">28%</option>
+                  </select>
+                </div>
               </div>
 
               {/* Right Group: Add, Clear, Save, and Clear Table */}
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleAddInwardEntryFromBar}
