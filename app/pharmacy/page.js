@@ -7804,12 +7804,6 @@ export default function PharmacyPage() {
 
               return (
                 <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3.5 shrink-0" ref={inwardSearchContainerRef}>
-                  {/* Header */}
-                  <div className="flex items-center gap-1.5 pb-2 mb-3 border-b border-slate-200">
-                    <Package className="w-4 h-4 text-blue-600" />
-                    <span className="font-bold text-xs uppercase tracking-wide text-slate-800">Item Entry</span>
-                  </div>
-
                   {/* 3 Rows x 5 Uniform Columns Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                     {/* ===== ROW 1 ===== */}
@@ -8559,15 +8553,16 @@ export default function PharmacyPage() {
               </div>
             </div>
 
-            {/* Bottom Section: Rate Update Info + Totals Summary (Matching Image) */}
+            {/* Bottom Section: Selected Item Summary & Actions (Matching Mockup) */}
             {(() => {
               const activeIdx = (selectedInwardRowIndex >= 0 && selectedInwardRowIndex < inwardItems.length)
                 ? selectedInwardRowIndex
                 : 0;
               const selItem = inwardItems[activeIdx] || null;
               const stockUpdated = selItem ? (parseInt(selItem.quantity, 10) || 0) : (parseInt(inwardQty, 10) || 0);
-              const selUnit = selItem?.purchase_unit || inwardPurchaseUnit || "Units";
-              const selTotUnits = selItem ? (selItem.total_units || (stockUpdated * (selItem.units_per_pack || 10))) : (stockUpdated * (parseInt(inwardUnitsPerPack, 10) || 10));
+              const selUnit = selItem?.purchase_unit || inwardPurchaseUnit || "Strip";
+              const selUnitsPerPack = selItem ? (selItem.units_per_pack || extractUnitsPerPack(selItem.pack_size, 10)) : (parseInt(inwardUnitsPerPack, 10) || extractUnitsPerPack(inwardPackSize, 10));
+              const selTotUnits = stockUpdated * selUnitsPerPack;
               const selUnitDerived = getDerivedUnitLabel(selItem?.dosage_form || inwardDosageForm, selItem?.pack_size || inwardPackSize);
               const oldRate = selItem
                 ? (Number(selItem.last_purchase_price) || Number(selItem.old_purchase_price) || 0)
@@ -8583,121 +8578,116 @@ export default function PharmacyPage() {
               const frt = parseFloat(inwardFreight) || 0;
               const rnd = parseFloat(inwardRoundOff) || 0;
               const grandTot = Math.max(0, subTotal - discAmt + addChg + frt + rnd);
-              const totalUnits = inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0);
+              const totalUnitsInBill = inwardItems.reduce((acc, it) => {
+                const q = parseInt(it.quantity, 10) || 0;
+                const upp = it.units_per_pack || extractUnitsPerPack(it.pack_size, 10);
+                return acc + (q * upp);
+              }, 0);
 
               return (
-                <div className="flex flex-col lg:flex-row gap-3 items-stretch shrink-0">
-                  {/* Left: Rate Update Information Panel */}
-                  <div className="flex-1 bg-white rounded-md border border-[#bcd2ee] overflow-hidden shadow-2xs flex flex-col justify-between">
-                    <div className="bg-[#dce8f6] px-3.5 py-1.5 border-b border-[#bcd2ee]">
-                      <h3 className="text-xs font-bold text-[#0f3662] tracking-wide">
-                        Rate Update Information (For Selected Item)
-                      </h3>
-                    </div>
-                    <div className="p-3 bg-[#f8fbff] flex items-center justify-start gap-4 md:gap-6 flex-wrap text-xs font-medium flex-1">
-                      {/* Stock Updated */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-800 font-semibold">Stock Updated :</span>
-                        <span className="px-2.5 py-0.5 bg-white border border-emerald-400 text-emerald-700 font-bold font-mono rounded text-xs shadow-2xs">
-                          + {stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
-                        </span>
-                      </div>
-
-                      {/* Old Purchase Rate */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-800 font-semibold">Old Purchase Rate :</span>
-                        {oldRate > 0 ? (
-                          <span className="px-2.5 py-0.5 bg-[#fef9c3] border border-amber-300 text-amber-900 font-bold font-mono rounded text-xs shadow-2xs">
-                            ₹ {oldRate.toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 bg-sky-50 border border-sky-300 text-sky-800 font-bold text-[11px] rounded shadow-2xs">
-                            New Item
-                          </span>
-                        )}
-                      </div>
-
-                      {/* New Purchase Rate */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-800 font-semibold">New Purchase Rate :</span>
-                        <span className="px-2.5 py-0.5 bg-[#fef9c3] border border-amber-300 text-amber-900 font-bold font-mono rounded text-xs shadow-2xs">
-                          ₹ {newRate.toFixed(2)}
-                        </span>
-                      </div>
-
-                      {/* Rate Difference */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-800 font-semibold">Rate Difference :</span>
-                        {oldRate > 0 ? (
-                          <span className="px-2.5 py-0.5 bg-[#fee2e2] border border-rose-300 text-rose-700 font-bold font-mono rounded text-xs shadow-2xs">
-                            ₹ {rateDiff >= 0 ? rateDiff.toFixed(2) : `(${Math.abs(rateDiff).toFixed(2)})`}
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 bg-sky-50 border border-sky-300 text-sky-800 font-bold text-[11px] rounded shadow-2xs">
-                            New Item (N/A)
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                <div className="bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-3.5 shadow-2xs shrink-0">
+                  <div className="text-xs font-bold text-[#1e3a8a] mb-2.5">
+                    Selected Item Summary
                   </div>
 
-                  {/* Right: Totals Summary Card */}
-                  <div className="bg-white rounded-md border border-[#bcd2ee] p-2.5 shadow-2xs flex items-center gap-4 text-xs font-medium min-w-[320px] justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-800 font-semibold">Total Items :</span>
-                      <div className="h-7 w-12 px-2 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-xs text-slate-900 shadow-inner">
-                        {inwardItems.length}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    {/* Metrics Group */}
+                    <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+                      {/* 1. Stock Added */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Stock Added</div>
+                        <div className="h-7 px-3 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                          +{stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
+                        </div>
+                      </div>
+
+                      {/* 2. Old Purchase Rate */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Old Purchase Rate</div>
+                        <div className="h-7 px-3 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                          ₹ {oldRate > 0 ? oldRate.toFixed(2) : "0.00"}
+                        </div>
+                      </div>
+
+                      {/* 3. New Purchase Rate */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">New Purchase Rate</div>
+                        <div className="h-7 px-3 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
+                          ₹ {newRate.toFixed(2)}
+                        </div>
+                      </div>
+
+                      {/* 4. Rate Difference */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Rate Difference</div>
+                        <div className={`h-7 px-3 font-bold font-mono rounded flex items-center text-xs shadow-2xs ${
+                          rateDiff < 0
+                            ? 'bg-[#fee2e2] border border-[#fca5a5] text-[#b91c1c]'
+                            : rateDiff > 0
+                              ? 'bg-[#dcfce7] border border-[#86efac] text-[#15803d]'
+                              : 'bg-slate-50 border border-slate-200 text-slate-700'
+                        }`}>
+                          ₹ {rateDiff < 0 ? `(${Math.abs(rateDiff).toFixed(2)})` : rateDiff.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div className="h-7 w-px bg-slate-300 mx-1 hidden lg:block" />
+
+                      {/* 5. Items */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Items</div>
+                        <div className="h-7 min-w-[48px] px-2.5 bg-white border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
+                          {inwardItems.length}
+                        </div>
+                      </div>
+
+                      {/* 6. Total Units */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Total Units</div>
+                        <div className="h-7 min-w-[56px] px-2.5 bg-white border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
+                          {totalUnitsInBill > 0 ? totalUnitsInBill : inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0)}
+                        </div>
+                      </div>
+
+                      {/* 7. Invoice Total */}
+                      <div>
+                        <div className="text-[11px] font-semibold text-slate-600 mb-1">Invoice Total</div>
+                        <div className="h-7 px-3 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] font-black font-mono rounded flex items-center text-xs shadow-2xs">
+                          ₹ {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-800 font-semibold">Total Qty :</span>
-                      <div className="h-7 w-14 px-2 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-bold text-xs text-slate-900 shadow-inner">
-                        {totalUnits}
-                      </div>
-                    </div>
+                    {/* Actions Group */}
+                    <div className="flex items-center gap-2.5 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleTabChange('dashboard')}
+                        className="h-8 px-4 text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-300 rounded-md text-slate-700 cursor-pointer shadow-2xs transition"
+                      >
+                        Back
+                      </button>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#0f3662] font-bold text-xs">Total Amount :</span>
-                      <div className="h-8 px-3 bg-slate-50 border border-slate-300 rounded flex items-center justify-center font-mono font-black text-sm text-[#0f3662] shadow-inner min-w-[100px]">
-                        ₹ {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={handleConfirmPurchaseInward}
+                        disabled={isSubmittingInward || inwardItems.length === 0}
+                        className="h-8 px-5 text-xs bg-[#065f46] hover:bg-[#044e39] text-white font-bold rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
+                      >
+                        {isSubmittingInward ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Adding...</span>
+                          </>
+                        ) : (
+                          <span>Add to Inventory</span>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
               );
             })()}
-
-            {/* Action Buttons Bar */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-300 shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleTabChange('dashboard')}
-                className="h-8 px-4 text-xs border-slate-300 cursor-pointer"
-              >
-                Return to POS
-              </Button>
-
-              <Button
-                type="button"
-                onClick={handleConfirmPurchaseInward}
-                disabled={isSubmittingInward || inwardItems.length === 0}
-                className="h-8 px-6 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                {isSubmittingInward ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving to Inventory...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Confirm &amp; Inward Stock ({inwardItems.length} Medicines)</span>
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
         </TabsContent>
       </Tabs>
