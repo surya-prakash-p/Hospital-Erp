@@ -252,6 +252,7 @@ export default function PharmacyPage() {
   const [inwardSaleRate, setInwardSaleRate] = useState("");
   const [inwardGstPct, setInwardGstPct] = useState("12");
   const [inwardRack, setInwardRack] = useState("");
+  const [inwardHsn, setInwardHsn] = useState("30049099");
   const [inwardDosageForm, setInwardDosageForm] = useState("Tablet");
   const [inwardPurchaseUnit, setInwardPurchaseUnit] = useState("Strip");
   const [inwardUnitsPerPack, setInwardUnitsPerPack] = useState(10);
@@ -1044,6 +1045,7 @@ export default function PharmacyPage() {
         inwardSaleRate,
         inwardGstPct,
         inwardRack,
+        inwardHsn,
         inwardBillDiscountPct,
         inwardAdditionalCharges,
         inwardFreight,
@@ -1095,6 +1097,7 @@ export default function PharmacyPage() {
           if (draft.inwardSaleRate) setInwardSaleRate(draft.inwardSaleRate);
           if (draft.inwardGstPct) setInwardGstPct(draft.inwardGstPct);
           if (draft.inwardRack) setInwardRack(draft.inwardRack);
+          if (draft.inwardHsn) setInwardHsn(draft.inwardHsn);
           if (draft.inwardBillDiscountPct) setInwardBillDiscountPct(draft.inwardBillDiscountPct);
           if (draft.inwardAdditionalCharges) setInwardAdditionalCharges(draft.inwardAdditionalCharges);
           if (draft.inwardFreight) setInwardFreight(draft.inwardFreight);
@@ -1134,6 +1137,7 @@ export default function PharmacyPage() {
     inwardSaleRate,
     inwardGstPct,
     inwardRack,
+    inwardHsn,
     inwardBillDiscountPct,
     inwardAdditionalCharges,
     inwardFreight,
@@ -1395,6 +1399,7 @@ export default function PharmacyPage() {
     setInwardExp(expVal ? expVal.slice(0, 7) : "");
 
     setInwardRack(med.rack_location || med.rack || "");
+    setInwardHsn(med.hsn_code || med.hsn || "30049099");
     setInwardPacksCount("");
     setInwardGstPct(med.gst || med.gst_pct ? String(med.gst || med.gst_pct) : "12");
     setInwardShowDropdown(false);
@@ -1440,6 +1445,7 @@ export default function PharmacyPage() {
     const expDate = inwardExp.trim() ? (inwardExp.trim().length === 7 ? inwardExp.trim() : inwardExp.trim().slice(0, 7)) : "";
     const pack = inwardPackSize.trim() || `${unitsPerPack} ${getDerivedUnitLabel(inwardDosageForm, "")}`;
     const rack = inwardRack.trim() || (existingMed?.rack_location || "");
+    const hsn = inwardHsn.trim() || (existingMed?.hsn_code || "30049099");
     const mrp = inwardMrp !== "" ? parseFloat(inwardMrp) || (enteredPrice * 1.5 || 0) : (enteredPrice * 1.5 || 0);
     const saleRate = inwardSaleRate !== "" ? parseFloat(inwardSaleRate) || (enteredPrice * 1.25 || 0) : (enteredPrice * 1.25 || 0);
     const gstPct = parseFloat(inwardGstPct) || 12;
@@ -1470,6 +1476,7 @@ export default function PharmacyPage() {
       batch_number: batchNo,
       exp_date: expDate,
       rack_location: rack,
+      hsn_code: hsn,
       current_stock: Number(existingMed?.stock) || 0,
       last_purchase_price: lastPrice,
       purchase_price: enteredPrice,
@@ -1530,6 +1537,7 @@ export default function PharmacyPage() {
     setInwardBatch("");
     setInwardExp("");
     setInwardRack("");
+    setInwardHsn("30049099");
     setInwardPacksCount("");
     setInwardQty("");
     setInwardPrice("");
@@ -7826,11 +7834,6 @@ export default function PharmacyPage() {
           <div className="space-y-2 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
             {/* 1. Top Section: Medicine Inward Entry Form */}
             {(() => {
-              const parsedQty = parseInt(inwardQty, 10) || 0;
-              const parsedUnitsPerPack = parseInt(inwardUnitsPerPack, 10) || extractUnitsPerPack(inwardPackSize, 10);
-              const totalIndividualUnits = parsedQty * parsedUnitsPerPack;
-              const unitDerived = getDerivedUnitLabel(inwardDosageForm, inwardPackSize);
-
               return (
                 <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3.5 shrink-0" ref={inwardSearchContainerRef}>
                   {/* 3 Rows x 5 Uniform Columns Grid */}
@@ -8114,14 +8117,14 @@ export default function PharmacyPage() {
                       </div>
                     </div>
 
-                    {/* Col 5: Rack No */}
+                    {/* Col 5: HSN Code */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Rack No</label>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">HSN Code</label>
                       <input
                         type="text"
-                        value={inwardRack}
-                        onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
-                        placeholder="e.g. A-01"
+                        value={inwardHsn}
+                        onChange={(e) => setInwardHsn(e.target.value)}
+                        placeholder="e.g. 30049099"
                         className="w-full h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
                       />
                     </div>
@@ -8145,13 +8148,16 @@ export default function PharmacyPage() {
                       </div>
                     </div>
 
-                    {/* Col 2: Total Units */}
+                    {/* Col 2: Rack No */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Total Units</label>
-                      <div className="h-7 px-2 bg-emerald-50 border border-emerald-300 rounded flex items-center justify-between font-mono font-bold text-xs text-emerald-900 shadow-inner">
-                        <span>{totalIndividualUnits} {unitDerived}</span>
-                        <span className="text-[10px] font-medium text-emerald-700 font-sans">({parsedQty} × {parsedUnitsPerPack})</span>
-                      </div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Rack No</label>
+                      <input
+                        type="text"
+                        value={inwardRack}
+                        onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
+                        placeholder="e.g. A-01"
+                        className="w-full h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                      />
                     </div>
 
                     {/* Col 3: Purchase Rate */}
@@ -8573,17 +8579,17 @@ export default function PharmacyPage() {
               }, 0);
 
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch shrink-0">
+                <div className="flex flex-col lg:flex-row items-stretch gap-2.5 shrink-0">
                   {/* Box 1: Selected Item Summary */}
-                  <div className="lg:col-span-6 bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex flex-col justify-between">
-                    <div className="text-xs font-bold text-[#1e3a8a] mb-2">
+                  <div className="flex-1 bg-[#f8faff] rounded-lg border border-[#c7d9f1] p-2.5 px-3 shadow-2xs flex flex-col justify-between">
+                    <div className="text-xs font-bold text-[#1e3a8a] mb-1.5">
                       Selected Item Summary
                     </div>
 
                     <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
                       {/* Stock Added */}
                       <div>
-                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Stock Added</div>
+                        <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Stock Added</div>
                         <div className="h-7 px-2.5 bg-[#e6f7ef] border border-[#a3e6cd] text-[#065f46] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           +{stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
                         </div>
@@ -8591,7 +8597,7 @@ export default function PharmacyPage() {
 
                       {/* Old Purchase Rate */}
                       <div>
-                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Old Purchase Rate</div>
+                        <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Old Purchase Rate</div>
                         <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           ₹ {oldRate > 0 ? oldRate.toFixed(2) : "0.00"}
                         </div>
@@ -8599,7 +8605,7 @@ export default function PharmacyPage() {
 
                       {/* New Purchase Rate */}
                       <div>
-                        <div className="text-[10px] font-semibold text-slate-500 mb-1">New Purchase Rate</div>
+                        <div className="text-[10px] font-semibold text-slate-500 mb-0.5">New Purchase Rate</div>
                         <div className="h-7 px-2.5 bg-[#fefce8] border border-[#fef08a] text-[#854d0e] font-bold font-mono rounded flex items-center text-xs shadow-2xs">
                           ₹ {newRate.toFixed(2)}
                         </div>
@@ -8607,7 +8613,7 @@ export default function PharmacyPage() {
 
                       {/* Rate Difference */}
                       <div>
-                        <div className="text-[10px] font-semibold text-slate-500 mb-1">Rate Difference</div>
+                        <div className="text-[10px] font-semibold text-slate-500 mb-0.5">Rate Difference</div>
                         <div className={`h-7 px-2.5 font-bold font-mono rounded flex items-center text-xs shadow-2xs ${
                           rateDiff < 0
                             ? 'bg-[#fee2e2] border border-[#fca5a5] text-[#b91c1c]'
@@ -8622,10 +8628,10 @@ export default function PharmacyPage() {
                   </div>
 
                   {/* Box 2: Invoice Totals */}
-                  <div className="lg:col-span-4 bg-white rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex items-center justify-around gap-3 flex-wrap">
+                  <div className="shrink-0 bg-white rounded-lg border border-[#c7d9f1] p-2.5 px-3.5 shadow-2xs flex items-center gap-3">
                     {/* Items */}
                     <div>
-                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Items</div>
+                      <div className="text-[10px] font-semibold text-slate-500 mb-0.5 text-center">Items</div>
                       <div className="h-7 min-w-[48px] px-2.5 bg-[#f8fafc] border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
                         {inwardItems.length}
                       </div>
@@ -8633,7 +8639,7 @@ export default function PharmacyPage() {
 
                     {/* Total Units */}
                     <div>
-                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Total Units</div>
+                      <div className="text-[10px] font-semibold text-slate-500 mb-0.5 text-center">Total Units</div>
                       <div className="h-7 min-w-[56px] px-2.5 bg-[#f8fafc] border border-slate-300 text-slate-800 font-bold font-mono rounded flex items-center justify-center text-xs shadow-2xs">
                         {totalUnitsInBill > 0 ? totalUnitsInBill : inwardItems.reduce((acc, it) => acc + (parseInt(it.quantity, 10) || 0), 0)}
                       </div>
@@ -8641,15 +8647,15 @@ export default function PharmacyPage() {
 
                     {/* Invoice Total */}
                     <div>
-                      <div className="text-[10px] font-semibold text-slate-500 mb-1 text-center">Invoice Total</div>
-                      <div className="h-7 px-3 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] font-black font-mono rounded flex items-center text-xs shadow-2xs">
+                      <div className="text-[10px] font-semibold text-slate-500 mb-0.5 text-center">Invoice Total</div>
+                      <div className="h-7 px-3 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] font-black font-mono rounded flex items-center text-xs shadow-2xs whitespace-nowrap">
                         ₹ {grandTot.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
 
                   {/* Box 3: Actions */}
-                  <div className="lg:col-span-2 bg-white rounded-lg border border-[#c7d9f1] p-3 shadow-2xs flex items-center justify-center gap-2">
+                  <div className="shrink-0 bg-white rounded-lg border border-[#c7d9f1] p-2.5 px-3 shadow-2xs flex items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleTabChange('dashboard')}
@@ -8662,7 +8668,7 @@ export default function PharmacyPage() {
                       type="button"
                       onClick={handleConfirmPurchaseInward}
                       disabled={isSubmittingInward || inwardItems.length === 0}
-                      className="h-8 px-4 text-xs bg-[#065f46] hover:bg-[#044e39] text-white font-bold rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50"
+                      className="h-8 px-4 text-xs bg-[#065f46] hover:bg-[#044e39] text-white font-bold rounded-md cursor-pointer flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50 whitespace-nowrap"
                     >
                       {isSubmittingInward ? (
                         <>
