@@ -252,6 +252,9 @@ export default function PharmacyPage() {
   const [inwardSaleRate, setInwardSaleRate] = useState("");
   const [inwardGstPct, setInwardGstPct] = useState("12");
   const [inwardRack, setInwardRack] = useState("");
+  const [inwardDosageForm, setInwardDosageForm] = useState("Tablet");
+  const [inwardPurchaseUnit, setInwardPurchaseUnit] = useState("Strip");
+  const [inwardUnitsPerPack, setInwardUnitsPerPack] = useState(10);
   const [inwardPackSize, setInwardPackSize] = useState("10 Tablets");
   const [inwardPacksCount, setInwardPacksCount] = useState("");
   const [isSubmittingInward, setIsSubmittingInward] = useState(false);
@@ -1027,6 +1030,9 @@ export default function PharmacyPage() {
         inwardItemCode,
         inwardMedSearch,
         inwardGenericName,
+        inwardDosageForm,
+        inwardPurchaseUnit,
+        inwardUnitsPerPack,
         inwardManufacturer,
         inwardBatch,
         inwardExp,
@@ -1076,6 +1082,9 @@ export default function PharmacyPage() {
           if (draft.inwardItemCode) setInwardItemCode(draft.inwardItemCode);
           if (draft.inwardMedSearch) setInwardMedSearch(draft.inwardMedSearch);
           if (draft.inwardGenericName) setInwardGenericName(draft.inwardGenericName);
+          if (draft.inwardDosageForm) setInwardDosageForm(draft.inwardDosageForm);
+          if (draft.inwardPurchaseUnit) setInwardPurchaseUnit(draft.inwardPurchaseUnit);
+          if (draft.inwardUnitsPerPack) setInwardUnitsPerPack(draft.inwardUnitsPerPack);
           if (draft.inwardBatch) setInwardBatch(draft.inwardBatch);
           if (draft.inwardExp) setInwardExp(draft.inwardExp);
           if (draft.inwardPackSize) setInwardPackSize(draft.inwardPackSize);
@@ -1118,6 +1127,154 @@ export default function PharmacyPage() {
     isMounted
   ]);
 
+  const DOSAGE_FORM_OPTIONS = [
+    "Tablet",
+    "Capsule",
+    "Syrup",
+    "Injection",
+    "Ointment",
+    "Drops",
+    "Powder",
+    "Cream",
+    "Suspension",
+    "Sachet",
+    "Other"
+  ];
+
+  const PURCHASE_UNIT_OPTIONS = [
+    "Strip",
+    "Bottle",
+    "Box",
+    "Vial",
+    "Tube",
+    "Pack",
+    "Piece",
+    "Sachet",
+    "Nos"
+  ];
+
+  const getDerivedUnitLabel = (form, packSize) => {
+    const psLower = (packSize || "").toLowerCase();
+    if (psLower.includes("ml")) return "ml";
+    if (psLower.includes("mg")) return "mg";
+    if (psLower.includes("gm") || psLower.includes(" g") || psLower.endsWith("g")) return "g";
+    if (psLower.includes("tab")) return "Tablets";
+    if (psLower.includes("cap")) return "Capsules";
+    if (psLower.includes("vial")) return "Vials";
+    if (psLower.includes("amp")) return "Ampoules";
+    if (psLower.includes("sachet")) return "Sachets";
+    if (psLower.includes("tube")) return "Tubes";
+    if (psLower.includes("patch")) return "Patches";
+    if (psLower.includes("drop")) return "Drops";
+    if (psLower.includes("puff")) return "Puffs";
+    if (form === "Tablet") return "Tablets";
+    if (form === "Capsule") return "Capsules";
+    if (form === "Syrup" || form === "Suspension" || form === "Drops") return "ml";
+    if (form === "Injection") return "Vials";
+    if (form === "Ointment" || form === "Cream" || form === "Powder") return "g";
+    if (form === "Sachet") return "Sachets";
+    return form ? `${form}s` : "Units";
+  };
+
+  const extractUnitsPerPack = (packStr, fallback = 10) => {
+    if (!packStr) return fallback;
+    const match = String(packStr).match(/(\d+(\.\d+)?)/);
+    if (match) {
+      const val = parseFloat(match[1]);
+      return val > 0 ? val : fallback;
+    }
+    return fallback;
+  };
+
+  const handleDosageFormChange = (newForm) => {
+    setInwardDosageForm(newForm);
+    if (newForm === "Tablet") {
+      setInwardPurchaseUnit("Strip");
+      setInwardPackSize("10 Tablets");
+      setInwardUnitsPerPack(10);
+    } else if (newForm === "Capsule") {
+      setInwardPurchaseUnit("Strip");
+      setInwardPackSize("10 Capsules");
+      setInwardUnitsPerPack(10);
+    } else if (newForm === "Syrup") {
+      setInwardPurchaseUnit("Bottle");
+      setInwardPackSize("100 ml");
+      setInwardUnitsPerPack(100);
+    } else if (newForm === "Injection") {
+      setInwardPurchaseUnit("Vial");
+      setInwardPackSize("2 ml");
+      setInwardUnitsPerPack(2);
+    } else if (newForm === "Ointment") {
+      setInwardPurchaseUnit("Tube");
+      setInwardPackSize("20 g");
+      setInwardUnitsPerPack(20);
+    } else if (newForm === "Cream") {
+      setInwardPurchaseUnit("Tube");
+      setInwardPackSize("20 g");
+      setInwardUnitsPerPack(20);
+    } else if (newForm === "Drops") {
+      setInwardPurchaseUnit("Bottle");
+      setInwardPackSize("10 ml");
+      setInwardUnitsPerPack(10);
+    } else if (newForm === "Powder") {
+      setInwardPurchaseUnit("Bottle");
+      setInwardPackSize("100 g");
+      setInwardUnitsPerPack(100);
+    } else if (newForm === "Suspension") {
+      setInwardPurchaseUnit("Bottle");
+      setInwardPackSize("100 ml");
+      setInwardUnitsPerPack(100);
+    } else if (newForm === "Sachet") {
+      setInwardPurchaseUnit("Box");
+      setInwardPackSize("10 Sachets");
+      setInwardUnitsPerPack(10);
+    } else {
+      setInwardPurchaseUnit("Pack");
+      setInwardPackSize("1 Unit");
+      setInwardUnitsPerPack(1);
+    }
+  };
+
+  const handlePurchaseUnitChange = (newUnit) => {
+    setInwardPurchaseUnit(newUnit);
+    if (newUnit === "Piece" || newUnit === "Nos") {
+      setInwardPackSize(`1 ${inwardDosageForm}`);
+      setInwardUnitsPerPack(1);
+    } else if (newUnit === "Strip") {
+      setInwardPackSize(`10 ${inwardDosageForm === "Capsule" ? "Capsules" : "Tablets"}`);
+      setInwardUnitsPerPack(10);
+    } else if (newUnit === "Bottle") {
+      if (inwardDosageForm === "Drops") {
+        setInwardPackSize("10 ml");
+        setInwardUnitsPerPack(10);
+      } else if (inwardDosageForm === "Powder") {
+        setInwardPackSize("100 g");
+        setInwardUnitsPerPack(100);
+      } else {
+        setInwardPackSize("100 ml");
+        setInwardUnitsPerPack(100);
+      }
+    } else if (newUnit === "Vial") {
+      setInwardPackSize("2 ml");
+      setInwardUnitsPerPack(2);
+    } else if (newUnit === "Tube") {
+      setInwardPackSize("20 g");
+      setInwardUnitsPerPack(20);
+    } else if (newUnit === "Box") {
+      setInwardPackSize(`10 ${inwardDosageForm === "Sachet" ? "Sachets" : (inwardDosageForm === "Capsule" ? "Capsules" : "Tablets")}`);
+      setInwardUnitsPerPack(10);
+    } else if (newUnit === "Sachet") {
+      setInwardPackSize("1 Sachet");
+      setInwardUnitsPerPack(1);
+    }
+  };
+
+  const handlePackSizeChange = (newPack) => {
+    setInwardPackSize(newPack);
+    const num = extractUnitsPerPack(newPack, inwardUnitsPerPack || 10);
+    setInwardUnitsPerPack(num);
+  };
+
   const handleOpenPurchaseInwardModal = () => {
     handleTabChange("purchase-inward");
     setTimeout(() => {
@@ -1139,6 +1296,20 @@ export default function PharmacyPage() {
     if (med.supplier) {
       setInwardSupplier(med.supplier);
     }
+
+    const dForm = med.dosage_form || "Tablet";
+    setInwardDosageForm(dForm);
+
+    const pUnit = med.purchase_unit || (dForm === "Syrup" || dForm === "Suspension" || dForm === "Drops" ? "Bottle" : (dForm === "Injection" ? "Vial" : (dForm === "Cream" || dForm === "Ointment" ? "Tube" : (dForm === "Sachet" ? "Box" : "Strip"))));
+    setInwardPurchaseUnit(pUnit);
+
+    const uPerPack = med.units_per_pack ? Number(med.units_per_pack) : extractUnitsPerPack(med.pack_size, (dForm === "Syrup" || dForm === "Suspension" ? 100 : (dForm === "Injection" ? 2 : (dForm === "Cream" || dForm === "Ointment" ? 20 : 10))));
+    setInwardUnitsPerPack(uPerPack);
+
+    const pSize = med.pack_size 
+      ? (typeof med.pack_size === 'number' ? `${med.pack_size} ${getDerivedUnitLabel(dForm, "")}` : med.pack_size) 
+      : `${uPerPack} ${getDerivedUnitLabel(dForm, "")}`;
+    setInwardPackSize(pSize);
 
     const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
       ? Number(med.purchase_price)
@@ -1162,8 +1333,6 @@ export default function PharmacyPage() {
     setInwardExp(expVal ? expVal.slice(0, 7) : "");
 
     setInwardRack(med.rack_location || med.rack || "");
-    const pSize = med.pack_size ? `${med.pack_size} Tablets` : "10 Tablets";
-    setInwardPackSize(pSize);
     setInwardPacksCount("");
     setInwardGstPct(med.gst || med.gst_pct ? String(med.gst || med.gst_pct) : "12");
     setInwardShowDropdown(false);
@@ -1174,6 +1343,25 @@ export default function PharmacyPage() {
       showToast("Please enter or select a medicine name", "error");
       return;
     }
+    if (!inwardDosageForm) {
+      showToast("Dosage Form is required", "error");
+      return;
+    }
+    if (!inwardPurchaseUnit) {
+      showToast("Purchase Unit is required", "error");
+      return;
+    }
+    const enteredQty = parseInt(inwardQty, 10);
+    if (isNaN(enteredQty) || enteredQty <= 0) {
+      showToast("Quantity must be greater than 0", "error");
+      return;
+    }
+    const unitsPerPack = parseInt(inwardUnitsPerPack, 10) || extractUnitsPerPack(inwardPackSize, 10);
+    if (isNaN(unitsPerPack) || unitsPerPack <= 0) {
+      showToast("Units per pack must be greater than 0", "error");
+      return;
+    }
+
     const cleanName = inwardMedSearch.trim();
     const existingMed = medicines.find(
       m => m.medicine_name.toLowerCase() === cleanName.toLowerCase() ||
@@ -1185,12 +1373,10 @@ export default function PharmacyPage() {
       : (existingMed?.batches?.[0]?.purchase_price ? Number(existingMed.batches[0].purchase_price) : 0);
 
     const enteredPrice = inwardPrice !== "" ? (parseFloat(inwardPrice) || 0) : (lastPrice > 0 ? lastPrice : 0);
-    const enteredQty = parseInt(inwardQty, 10) || 1;
     const itemCode = inwardItemCode.trim() || (existingMed?.item_code || `MED${Math.floor(10000 + Math.random() * 90000)}`);
     const batchNo = inwardBatch.trim() || (existingMed?.batch_number || `BATCH${Math.floor(1000 + Math.random() * 9000)}`);
     const expDate = inwardExp.trim() ? (inwardExp.trim().length === 7 ? inwardExp.trim() : inwardExp.trim().slice(0, 7)) : "";
-    const pack = inwardPackSize.trim() || "10 Tablets";
-    const packsCount = parseInt(inwardPacksCount, 10) || 1;
+    const pack = inwardPackSize.trim() || `${unitsPerPack} ${getDerivedUnitLabel(inwardDosageForm, "")}`;
     const rack = inwardRack.trim() || (existingMed?.rack_location || "");
     const mrp = inwardMrp !== "" ? parseFloat(inwardMrp) || (enteredPrice * 1.5 || 0) : (enteredPrice * 1.5 || 0);
     const saleRate = inwardSaleRate !== "" ? parseFloat(inwardSaleRate) || (enteredPrice * 1.25 || 0) : (enteredPrice * 1.25 || 0);
@@ -1199,6 +1385,7 @@ export default function PharmacyPage() {
     const company = inwardManufacturer.trim() || existingMed?.brand || existingMed?.supplier || "";
     const supplier = inwardSupplier.trim() || "";
     const genericName = inwardGenericName.trim() || existingMed?.generic_name || cleanName;
+    const totalUnits = enteredQty * unitsPerPack;
 
     const newItem = {
       id: `inw-${Date.now()}-${Math.random()}`,
@@ -1206,6 +1393,13 @@ export default function PharmacyPage() {
       medicine: cleanName,
       medicine_name: cleanName,
       generic_name: genericName,
+      dosage_form: inwardDosageForm || "Tablet",
+      purchase_unit: inwardPurchaseUnit || "Strip",
+      pack_size: pack,
+      units_per_pack: unitsPerPack,
+      no_of_packs: enteredQty,
+      quantity: enteredQty,
+      total_units: totalUnits,
       category: category,
       company: company,
       manufacturer: company,
@@ -1214,9 +1408,6 @@ export default function PharmacyPage() {
       batch_number: batchNo,
       exp_date: expDate,
       rack_location: rack,
-      pack_size: pack,
-      no_of_packs: packsCount,
-      quantity: enteredQty,
       current_stock: Number(existingMed?.stock) || 0,
       last_purchase_price: lastPrice,
       purchase_price: enteredPrice,
@@ -1235,7 +1426,7 @@ export default function PharmacyPage() {
     });
     // Automatically erase/clear top medicine form fields for next entry (preserves supplier, invoice no, date)
     handleClearInwardBar();
-    showToast(`Added ${cleanName} to inward bill`, "success");
+    showToast(`Added ${cleanName} (${enteredQty} ${inwardPurchaseUnit}${enteredQty !== 1 ? 's' : ''} = ${totalUnits} ${getDerivedUnitLabel(inwardDosageForm, pack)}) to inward bill`, "success");
     setTimeout(() => {
       inwardSearchInputRef.current?.focus();
     }, 60);
@@ -1249,6 +1440,10 @@ export default function PharmacyPage() {
     setInwardMedSearch(customName);
     setInwardItemCode(`MED${Math.floor(10000 + Math.random() * 90000)}`);
     setInwardGenericName(customName);
+    setInwardDosageForm("Tablet");
+    setInwardPurchaseUnit("Strip");
+    setInwardPackSize("10 Tablets");
+    setInwardUnitsPerPack(10);
     setInwardSelectedMed(null);
     setInwardPrice("");
     setInwardMrp("");
@@ -1256,7 +1451,6 @@ export default function PharmacyPage() {
     setInwardBatch("");
     setInwardExp("");
     setInwardRack("");
-    setInwardPackSize("10 Tablets");
     setInwardPacksCount("");
     setInwardGstPct("12");
     setInwardShowDropdown(false);
@@ -1266,11 +1460,14 @@ export default function PharmacyPage() {
     setInwardItemCode("");
     setInwardMedSearch("");
     setInwardGenericName("");
+    setInwardDosageForm("Tablet");
+    setInwardPurchaseUnit("Strip");
+    setInwardPackSize("10 Tablets");
+    setInwardUnitsPerPack(10);
     setInwardManufacturer("");
     setInwardBatch("");
     setInwardExp("");
     setInwardRack("");
-    setInwardPackSize("10 Tablets");
     setInwardPacksCount("");
     setInwardQty("");
     setInwardPrice("");
@@ -1285,9 +1482,13 @@ export default function PharmacyPage() {
     setInwardItems(prev => prev.map((item, idx) => {
       if (idx !== index) return item;
       const updated = { ...item, [field]: value };
-      if (field === "quantity" || field === "purchase_price") {
+      if (field === "quantity" || field === "purchase_price" || field === "pack_size") {
         const q = field === "quantity" ? Math.max(1, parseInt(value, 10) || 0) : (parseInt(item.quantity, 10) || 0);
         const p = field === "purchase_price" ? (parseFloat(value) || 0) : (parseFloat(item.purchase_price) || 0);
+        const u = field === "pack_size" ? extractUnitsPerPack(value, item.units_per_pack || 10) : (item.units_per_pack || 10);
+        updated.quantity = q;
+        updated.units_per_pack = u;
+        updated.total_units = q * u;
         updated.line_total = parseFloat((q * p).toFixed(2));
         const lastP = Number(item.last_purchase_price) || 0;
         updated.price_diff = p - lastP;
@@ -1302,9 +1503,11 @@ export default function PharmacyPage() {
       const curQty = parseInt(item.quantity) || 0;
       const newQty = Math.max(1, curQty + delta);
       const p = parseFloat(item.purchase_price) || 0;
+      const u = item.units_per_pack || 10;
       return {
         ...item,
         quantity: newQty,
+        total_units: newQty * u,
         line_total: parseFloat((newQty * p).toFixed(2))
       };
     }));
@@ -7560,468 +7763,506 @@ export default function PharmacyPage() {
         <TabsContent value="purchase-inward" className="flex-1 min-h-0 flex flex-col overflow-hidden h-full space-y-2 focus-visible:outline-none">
           <div className="space-y-2 text-xs flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
             {/* 1. Top Section: Medicine Inward Entry Form */}
-            <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3 shrink-0" ref={inwardSearchContainerRef}>
-              <div className="flex flex-col md:flex-row gap-4 text-xs">
-                {/* 3 Columns Form */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 flex-1">
-                  {/* Column 1: Medicine Identifiers & Suppliers */}
-                  <div className="space-y-2">
-                    {/* Row 1: Item Code */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Item Code</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={inwardItemCode}
-                          onChange={(e) => setInwardItemCode(e.target.value)}
-                          placeholder="e.g. MED00123"
-                          className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowInwardBrowseMedModal(true)}
-                          className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                          title="Browse Medicine Catalog"
-                        >
-                          ...
-                        </button>
-                      </div>
-                    </div>
+            {(() => {
+              const parsedQty = parseInt(inwardQty, 10) || 0;
+              const parsedUnitsPerPack = parseInt(inwardUnitsPerPack, 10) || extractUnitsPerPack(inwardPackSize, 10);
+              const totalIndividualUnits = parsedQty * parsedUnitsPerPack;
+              const unitDerived = getDerivedUnitLabel(inwardDosageForm, inwardPackSize);
 
-                    {/* Row 2: Medicine Name (Search & Autocomplete) */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Medicine Name</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 relative">
-                        <input
-                          ref={inwardSearchInputRef}
-                          type="text"
-                          value={inwardMedSearch}
-                          onChange={(e) => {
-                            setInwardMedSearch(e.target.value);
-                            setInwardShowDropdown(true);
-                            setInwardHighlightedSearchIndex(0);
-                          }}
-                          onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
-                          onKeyDown={(e) => {
-                            if (inwardShowDropdown && inwardFilteredResults.length > 0) {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
-                                if (chosen) handleSelectMedForInwardBar(chosen);
-                                return;
-                              }
-                              if (e.key === "ArrowDown") {
-                                e.preventDefault();
-                                setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
-                                return;
-                              }
-                              if (e.key === "ArrowUp") {
-                                e.preventDefault();
-                                setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
-                                return;
-                              }
-                            } else if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleAddInwardEntryFromBar();
-                            }
-                          }}
-                          placeholder="e.g. Paracetamol 650mg"
-                          className="w-full h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        />
-
-                        {/* Autocomplete Dropdown */}
-                        {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
-                          <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
-                            {inwardFilteredResults.map((med, idx) => {
-                              const isSel = idx === inwardHighlightedSearchIndex;
-                              const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
-                                ? Number(med.purchase_price)
-                                : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
-                              return (
-                                <div
-                                  key={med.name || med.id || idx}
-                                  onClick={() => handleSelectMedForInwardBar(med)}
-                                  onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
-                                  className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
-                                    isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
-                                  }`}
-                                >
-                                  <div>
-                                    <div className="font-bold">{med.medicine_name}</div>
-                                    <div className="text-[10px] text-slate-500">{med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
-                                  </div>
-                                  <div className="text-right font-mono">
-                                    <span className="text-[10px] text-slate-500">{lastP > 0 ? `Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
-                                    <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div
-                              onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
-                              className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
+              return (
+                <div className="bg-white rounded-lg border border-slate-300 shadow-2xs p-3 shrink-0" ref={inwardSearchContainerRef}>
+                  <div className="flex flex-col md:flex-row gap-4 text-xs">
+                    {/* 3 Columns Form */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2 flex-1">
+                      {/* Column 1: Medicine Identifiers & Suppliers */}
+                      <div className="space-y-2">
+                        {/* Row 1: Item Code */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Item Code</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={inwardItemCode}
+                              onChange={(e) => setInwardItemCode(e.target.value)}
+                              placeholder="e.g. MED00123"
+                              className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowInwardBrowseMedModal(true)}
+                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                              title="Browse Medicine Catalog"
                             >
-                              + Add &quot;{inwardMedSearch}&quot; as Custom Item
-                            </div>
+                              ...
+                            </button>
                           </div>
-                        )}
+                        </div>
+
+                        {/* Row 2: Medicine Name (Search & Autocomplete) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Medicine Name</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 relative">
+                            <input
+                              ref={inwardSearchInputRef}
+                              type="text"
+                              value={inwardMedSearch}
+                              onChange={(e) => {
+                                setInwardMedSearch(e.target.value);
+                                setInwardShowDropdown(true);
+                                setInwardHighlightedSearchIndex(0);
+                              }}
+                              onFocus={() => { if (inwardMedSearch.trim()) setInwardShowDropdown(true); }}
+                              onKeyDown={(e) => {
+                                if (inwardShowDropdown && inwardFilteredResults.length > 0) {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const chosen = inwardFilteredResults[inwardHighlightedSearchIndex] || inwardFilteredResults[0];
+                                    if (chosen) handleSelectMedForInwardBar(chosen);
+                                    return;
+                                  }
+                                  if (e.key === "ArrowDown") {
+                                    e.preventDefault();
+                                    setInwardHighlightedSearchIndex(prev => (prev + 1) % inwardFilteredResults.length);
+                                    return;
+                                  }
+                                  if (e.key === "ArrowUp") {
+                                    e.preventDefault();
+                                    setInwardHighlightedSearchIndex(prev => (prev - 1 + inwardFilteredResults.length) % inwardFilteredResults.length);
+                                    return;
+                                  }
+                                } else if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleAddInwardEntryFromBar();
+                                }
+                              }}
+                              placeholder="e.g. Amoxicillin 500mg"
+                              className="w-full h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            />
+
+                            {/* Autocomplete Dropdown */}
+                            {inwardShowDropdown && inwardMedSearch.trim().length >= 1 && (
+                              <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-2xl border border-slate-300 z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                {inwardFilteredResults.map((med, idx) => {
+                                  const isSel = idx === inwardHighlightedSearchIndex;
+                                  const lastP = (med.purchase_price !== undefined && med.purchase_price !== null && med.purchase_price !== "")
+                                    ? Number(med.purchase_price)
+                                    : (med.batches?.[0]?.purchase_price ? Number(med.batches[0].purchase_price) : 0);
+                                  return (
+                                    <div
+                                      key={med.name || med.id || idx}
+                                      onClick={() => handleSelectMedForInwardBar(med)}
+                                      onMouseEnter={() => setInwardHighlightedSearchIndex(idx)}
+                                      className={`p-2 px-3 cursor-pointer flex items-center justify-between text-xs ${
+                                        isSel ? "bg-blue-50 text-blue-900 font-semibold" : "hover:bg-slate-50 text-slate-800"
+                                      }`}
+                                    >
+                                      <div>
+                                        <div className="font-bold">{med.medicine_name}</div>
+                                        <div className="text-[10px] text-slate-500">{med.dosage_form || "Tablet"} • {med.generic_name} • {med.brand || med.supplier || "Cipla Ltd"}</div>
+                                      </div>
+                                      <div className="text-right font-mono">
+                                        <span className="text-[10px] text-slate-500">{lastP > 0 ? `Pur: ₹${lastP.toFixed(2)}` : "New Drug"}</span>
+                                        <div className="font-bold text-slate-900">MRP: ₹{Number(med.mrp || med.selling_price || 0).toFixed(2)}</div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                <div
+                                  onClick={() => handleAddCustomInwardMed(inwardMedSearch)}
+                                  className="p-2 text-center bg-slate-50 hover:bg-emerald-50 text-xs text-emerald-800 font-bold cursor-pointer border-t border-slate-200"
+                                >
+                                  + Add &quot;{inwardMedSearch}&quot; as Custom Item
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Row 3: Generic Name */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Generic Name</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="text"
+                            value={inwardGenericName}
+                            onChange={(e) => setInwardGenericName(e.target.value)}
+                            placeholder="e.g. Paracetamol"
+                            className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Row 4: Dosage Form (What type of medicine it is) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Dosage Form</span>
+                            <span>:</span>
+                          </Label>
+                          <select
+                            value={inwardDosageForm}
+                            onChange={(e) => handleDosageFormChange(e.target.value)}
+                            className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          >
+                            {DOSAGE_FORM_OPTIONS.map(form => (
+                              <option key={form} value={form}>{form}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Row 5: Category */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Category</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1">
+                            <select
+                              value={inwardCategory}
+                              onChange={(e) => {
+                                if (e.target.value === "__add_custom__") {
+                                  setShowAddCategoryModal(true);
+                                } else {
+                                  setInwardCategory(e.target.value);
+                                }
+                              }}
+                              className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            >
+                              {inwardCategoriesList.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                              <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddCategoryModal(true)}
+                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                              title="Add Custom Category"
+                            >
+                              ...
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Row 6: Supplier */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Supplier</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={inwardSupplier}
+                              onChange={(e) => setInwardSupplier(e.target.value)}
+                              placeholder="Select or enter supplier..."
+                              className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSupplierSelectModal(true)}
+                              className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
+                              title="Select Supplier from List"
+                            >
+                              ...
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Column 2: Packaging, Unit & Batch */}
+                      <div className="space-y-2">
+                        {/* Row 1: Purchase Unit (How medicine is purchased/stocked) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Purchase Unit</span>
+                            <span>:</span>
+                          </Label>
+                          <select
+                            value={inwardPurchaseUnit}
+                            onChange={(e) => handlePurchaseUnitChange(e.target.value)}
+                            className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          >
+                            {PURCHASE_UNIT_OPTIONS.map(unit => (
+                              <option key={unit} value={unit}>{unit}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Row 2: Pack Size (How much is in one purchase unit) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Pack Size</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1 relative">
+                            <input
+                              type="text"
+                              list="inward-packsize-presets"
+                              value={inwardPackSize}
+                              onChange={(e) => handlePackSizeChange(e.target.value)}
+                              placeholder="e.g. 10 Tablets, 100 ml"
+                              className="flex-1 h-7 text-xs font-semibold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            />
+                            <datalist id="inward-packsize-presets">
+                              <option value="10 Tablets">10 Tablets</option>
+                              <option value="15 Tablets">15 Tablets</option>
+                              <option value="20 Tablets">20 Tablets</option>
+                              <option value="30 Tablets">30 Tablets</option>
+                              <option value="100 Tablets">100 Tablets</option>
+                              <option value="10 Capsules">10 Capsules</option>
+                              <option value="15 Capsules">15 Capsules</option>
+                              <option value="100 ml">100 ml</option>
+                              <option value="200 ml">200 ml</option>
+                              <option value="500 ml">500 ml</option>
+                              <option value="2 ml">2 ml</option>
+                              <option value="5 ml">5 ml</option>
+                              <option value="10 ml">10 ml</option>
+                              <option value="15 g">15 g</option>
+                              <option value="20 g">20 g</option>
+                              <option value="30 g">30 g</option>
+                              <option value="50 g">50 g</option>
+                              <option value="100 g">100 g</option>
+                              <option value="10 Sachets">10 Sachets</option>
+                              <option value="1 Sachet">1 Sachet</option>
+                              <option value="1 Piece">1 Piece</option>
+                              <option value="1 Unit">1 Unit</option>
+                            </datalist>
+                          </div>
+                        </div>
+
+                        {/* Row 3: Batch No */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Batch No</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="text"
+                            value={inwardBatch}
+                            onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
+                            placeholder="e.g. PM65024"
+                            className="flex-1 h-7 text-xs font-mono font-bold uppercase rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Row 4: Expiry Date (Explicit Month & Year Selectors) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Expiry Date</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1.5">
+                            {/* Month Selector */}
+                            <select
+                              value={inwardExp ? (inwardExp.split("-")[1] || "") : ""}
+                              onChange={(e) => {
+                                const m = e.target.value;
+                                const curY = inwardExp && inwardExp.split("-")[0] && inwardExp.split("-")[0].length === 4
+                                  ? inwardExp.split("-")[0]
+                                  : `${new Date().getFullYear() + 2}`;
+                                setInwardExp(m ? `${curY}-${m}` : "");
+                              }}
+                              className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
+                            >
+                              <option value="">Month</option>
+                              <option value="01">01 - Jan</option>
+                              <option value="02">02 - Feb</option>
+                              <option value="03">03 - Mar</option>
+                              <option value="04">04 - Apr</option>
+                              <option value="05">05 - May</option>
+                              <option value="06">06 - Jun</option>
+                              <option value="07">07 - Jul</option>
+                              <option value="08">08 - Aug</option>
+                              <option value="09">09 - Sep</option>
+                              <option value="10">10 - Oct</option>
+                              <option value="11">11 - Nov</option>
+                              <option value="12">12 - Dec</option>
+                            </select>
+
+                            {/* Year Selector */}
+                            <select
+                              value={inwardExp ? (inwardExp.split("-")[0] || "") : ""}
+                              onChange={(e) => {
+                                const y = e.target.value;
+                                const curM = inwardExp && inwardExp.split("-")[1] ? inwardExp.split("-")[1] : "12";
+                                setInwardExp(y ? `${y}-${curM}` : "");
+                              }}
+                              className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
+                            >
+                              <option value="">Year</option>
+                              {Array.from({ length: 16 }, (_, i) => 2025 + i).map((yr) => (
+                                <option key={yr} value={String(yr)}>
+                                  {yr}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Row 5: Rack No */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Rack No</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="text"
+                            value={inwardRack}
+                            onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
+                            placeholder="e.g. A-01"
+                            className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Column 3: Quantity, Pricing & Tax */}
+                      <div className="space-y-2">
+                        {/* Row 1: Quantity (Purchase Unit Quantity) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Quantity</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min="1"
+                              value={inwardQty}
+                              onChange={(e) => setInwardQty(e.target.value)}
+                              placeholder="e.g. 26"
+                              className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                            />
+                            <span className="text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2 rounded h-7 flex items-center shrink-0">
+                              {inwardPurchaseUnit}{Number(inwardQty) > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Row 2: Total Units (Automatically Calculated) */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Total Units</span>
+                            <span>:</span>
+                          </Label>
+                          <div className="flex-1 h-7 px-2 bg-emerald-50 border border-emerald-300 rounded flex items-center justify-between font-mono font-bold text-xs text-emerald-900 shadow-inner">
+                            <span>{totalIndividualUnits} {unitDerived}</span>
+                            <span className="text-[10px] font-medium text-emerald-700 font-sans">({parsedQty} × {parsedUnitsPerPack})</span>
+                          </div>
+                        </div>
+
+                        {/* Row 3: Purchase Rate */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Purchase Rate</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={inwardPrice}
+                            onChange={(e) => setInwardPrice(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Row 4: MRP */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>MRP</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={inwardMrp}
+                            onChange={(e) => setInwardMrp(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Row 5: Sale Rate */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>Sale Rate</span>
+                            <span>:</span>
+                          </Label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={inwardSaleRate}
+                            onChange={(e) => setInwardSaleRate(e.target.value)}
+                            placeholder="0.00"
+                            className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Row 6: GST % */}
+                        <div className="flex items-center gap-2">
+                          <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
+                            <span>GST %</span>
+                            <span>:</span>
+                          </Label>
+                          <select
+                            value={inwardGstPct}
+                            onChange={(e) => setInwardGstPct(e.target.value)}
+                            className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                          >
+                            <option value="0">0</option>
+                            <option value="5">5</option>
+                            <option value="12">12</option>
+                            <option value="18">18</option>
+                            <option value="28">28</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Row 3: Generic Name */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Generic Name</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="text"
-                        value={inwardGenericName}
-                        onChange={(e) => setInwardGenericName(e.target.value)}
-                        placeholder="e.g. Paracetamol"
-                        className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 4: Category (Replaces Manufacturer) */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Category</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 flex items-center gap-1">
-                        <select
-                          value={inwardCategory}
-                          onChange={(e) => {
-                            if (e.target.value === "__add_custom__") {
-                              setShowAddCategoryModal(true);
-                            } else {
-                              setInwardCategory(e.target.value);
-                            }
-                          }}
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        >
-                          {inwardCategoriesList.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                          <option value="__add_custom__" className="font-bold text-blue-700">+ Add Custom Category...</option>
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowAddCategoryModal(true)}
-                          className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                          title="Add Custom Category"
-                        >
-                          ...
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Row 5: Supplier */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Supplier</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={inwardSupplier}
-                          onChange={(e) => setInwardSupplier(e.target.value)}
-                          placeholder="Select or enter supplier..."
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowSupplierSelectModal(true)}
-                          className="h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded font-bold cursor-pointer text-xs text-slate-700"
-                          title="Select Supplier from List"
-                        >
-                          ...
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column 2: Batch, Expiry, Storage & Pack */}
-                  <div className="space-y-2">
-                    {/* Row 1: Batch No */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Batch No</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="text"
-                        value={inwardBatch}
-                        onChange={(e) => setInwardBatch(e.target.value.toUpperCase())}
-                        placeholder="e.g. PM65024"
-                        className="flex-1 h-7 text-xs font-mono font-bold uppercase rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 2: Expiry Date (Explicit Month & Year Selectors) */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Expiry Date</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 flex items-center gap-1.5">
-                        {/* Month Selector */}
-                        <select
-                          value={inwardExp ? (inwardExp.split("-")[1] || "") : ""}
-                          onChange={(e) => {
-                            const m = e.target.value;
-                            const curY = inwardExp && inwardExp.split("-")[0] && inwardExp.split("-")[0].length === 4
-                              ? inwardExp.split("-")[0]
-                              : `${new Date().getFullYear() + 2}`;
-                            setInwardExp(m ? `${curY}-${m}` : "");
-                          }}
-                          className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
-                        >
-                          <option value="">Month</option>
-                          <option value="01">01 - Jan</option>
-                          <option value="02">02 - Feb</option>
-                          <option value="03">03 - Mar</option>
-                          <option value="04">04 - Apr</option>
-                          <option value="05">05 - May</option>
-                          <option value="06">06 - Jun</option>
-                          <option value="07">07 - Jul</option>
-                          <option value="08">08 - Aug</option>
-                          <option value="09">09 - Sep</option>
-                          <option value="10">10 - Oct</option>
-                          <option value="11">11 - Nov</option>
-                          <option value="12">12 - Dec</option>
-                        </select>
-
-                        {/* Year Selector */}
-                        <select
-                          value={inwardExp ? (inwardExp.split("-")[0] || "") : ""}
-                          onChange={(e) => {
-                            const y = e.target.value;
-                            const curM = inwardExp && inwardExp.split("-")[1] ? inwardExp.split("-")[1] : "12";
-                            setInwardExp(y ? `${y}-${curM}` : "");
-                          }}
-                          className="w-1/2 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-1.5 focus:border-blue-600 focus:outline-none"
-                        >
-                          <option value="">Year</option>
-                          {Array.from({ length: 16 }, (_, i) => 2025 + i).map((yr) => (
-                            <option key={yr} value={String(yr)}>
-                              {yr}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Row 3: Rack No */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Rack No</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="text"
-                        value={inwardRack}
-                        onChange={(e) => setInwardRack(e.target.value.toUpperCase())}
-                        placeholder="e.g. A-01"
-                        className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 4: Pack Size (Allows custom value like 8, 9, etc. + presets) */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Pack Size</span>
-                        <span>:</span>
-                      </Label>
-                      <div className="flex-1 flex items-center gap-1 relative">
-                        <input
-                          type="text"
-                          list="inward-packsize-presets"
-                          value={inwardPackSize}
-                          onChange={(e) => {
-                            const newPack = e.target.value;
-                            setInwardPackSize(newPack);
-                            const num = parseInt(newPack.match(/\d+/)?.[0] || "1", 10);
-                            const packs = parseInt(inwardPacksCount || "1", 10) || 1;
-                            setInwardQty(String(packs * num));
-                          }}
-                          placeholder="e.g. 8, 9, 10 Tablets"
-                          className="flex-1 h-7 text-xs rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                        />
-                        <datalist id="inward-packsize-presets">
-                          <option value="8 Tablets">8 Tablets</option>
-                          <option value="9 Tablets">9 Tablets</option>
-                          <option value="10 Tablets">10 Tablets</option>
-                          <option value="15 Tablets">15 Tablets</option>
-                          <option value="20 Tablets">20 Tablets</option>
-                          <option value="24 Tablets">24 Tablets</option>
-                          <option value="30 Tablets">30 Tablets</option>
-                          <option value="10 Capsules">10 Capsules</option>
-                          <option value="1 Strip">1 Strip</option>
-                          <option value="1 Bottle">1 Bottle</option>
-                          <option value="1 Vial">1 Vial</option>
-                          <option value="1 Tube">1 Tube</option>
-                          <option value="100 Tablets">100 Tablets</option>
-                          <option value="1 Piece">1 Piece</option>
-                          <option value="500 ml">500 ml</option>
-                          <option value="100 ml">100 ml</option>
-                        </datalist>
-                      </div>
-                    </div>
-
-                    {/* Row 5: No. of Packs */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-24 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>No. of Packs</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={inwardPacksCount}
-                        onChange={(e) => {
-                          const pCount = e.target.value;
-                          setInwardPacksCount(pCount);
-                          const num = parseInt((inwardPackSize || "").match(/\d+/)?.[0] || "1", 10);
-                          const packs = parseInt(pCount || "1", 10) || 1;
-                          setInwardQty(String(packs * num));
-                        }}
-                        placeholder="1"
-                        className="flex-1 h-7 text-xs font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Column 3: Quantity, Pricing & Tax */}
-                  <div className="space-y-2">
-                    {/* Row 1: Quantity */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Quantity</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={inwardQty}
-                        onChange={(e) => setInwardQty(e.target.value)}
-                        placeholder="100"
-                        className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 2: Purchase Rate */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Purchase Rate</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={inwardPrice}
-                        onChange={(e) => setInwardPrice(e.target.value)}
-                        placeholder="0.00"
-                        className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 3: MRP */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>MRP</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={inwardMrp}
-                        onChange={(e) => setInwardMrp(e.target.value)}
-                        placeholder="0.00"
-                        className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 4: Sale Rate */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>Sale Rate</span>
-                        <span>:</span>
-                      </Label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={inwardSaleRate}
-                        onChange={(e) => setInwardSaleRate(e.target.value)}
-                        placeholder="0.00"
-                        className="flex-1 h-7 text-xs text-right font-mono font-bold rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Row 5: GST % */}
-                    <div className="flex items-center gap-2">
-                      <Label className="w-28 text-xs font-semibold text-slate-800 shrink-0 flex items-center justify-between">
-                        <span>GST %</span>
-                        <span>:</span>
-                      </Label>
-                      <select
-                        value={inwardGstPct}
-                        onChange={(e) => setInwardGstPct(e.target.value)}
-                        className="flex-1 h-7 text-xs font-mono rounded border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                    {/* Right Action Buttons Stack */}
+                    <div className="flex flex-row md:flex-col gap-2 justify-start md:w-28 md:pl-3 md:border-l md:border-slate-200 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleAddInwardEntryFromBar}
+                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-emerald-500 hover:text-emerald-700"
                       >
-                        <option value="0">0</option>
-                        <option value="5">5</option>
-                        <option value="12">12</option>
-                        <option value="18">18</option>
-                        <option value="28">28</option>
-                      </select>
+                        <PlusCircle className="w-4 h-4 text-emerald-600" />
+                        <span>Add</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleClearInwardBar}
+                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-amber-500 hover:text-amber-700"
+                      >
+                        <RotateCcw className="w-4 h-4 text-amber-600" />
+                        <span>Clear</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => saveInwardDraft(false)}
+                        className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-blue-500 hover:text-blue-700"
+                        title="Save current invoice & medicines draft"
+                      >
+                        <Save className="w-4 h-4 text-blue-600" />
+                        <span>Save</span>
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                {/* Right Action Buttons Stack */}
-                <div className="flex flex-row md:flex-col gap-2 justify-start md:w-28 md:pl-3 md:border-l md:border-slate-200 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleAddInwardEntryFromBar}
-                    className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-emerald-500 hover:text-emerald-700"
-                  >
-                    <PlusCircle className="w-4 h-4 text-emerald-600" />
-                    <span>Add</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearInwardBar}
-                    className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-amber-500 hover:text-amber-700"
-                  >
-                    <RotateCcw className="w-4 h-4 text-amber-600" />
-                    <span>Clear</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => saveInwardDraft(false)}
-                    className="flex-1 md:flex-none h-8 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition hover:border-blue-500 hover:text-blue-700"
-                    title="Save current invoice & medicines draft"
-                  >
-                    <Save className="w-4 h-4 text-blue-600" />
-                    <span>Save</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* 2. Middle Section: Purchase / Stock Receipt */}
             <div className="bg-[#dce8f6] border border-[#bcd2ee] px-4 py-2 rounded-t-md shrink-0 flex items-center justify-between">
@@ -8052,7 +8293,7 @@ export default function PharmacyPage() {
               </div>
             </div>
 
-            {/* Inward Bill Items Table (Matching Image) */}
+            {/* Inward Bill Items Table */}
             <div className="bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden flex flex-col flex-1 min-h-[180px]">
               <div className="overflow-auto flex-1 min-h-0">
                 <table className="w-full text-left border-collapse text-xs select-text">
@@ -8064,7 +8305,7 @@ export default function PharmacyPage() {
                       <th className="py-2 px-2 text-center w-24">Batch No.</th>
                       <th className="py-2 px-2 text-center w-24">Pack</th>
                       <th className="py-2 px-2 text-center w-24">Expiry</th>
-                      <th className="py-2 px-2 text-center w-16">Qty</th>
+                      <th className="py-2 px-2 text-center min-w-[100px]">Qty / Unit</th>
                       <th className="py-2 px-2 text-right w-24">Purchase Rate</th>
                       <th className="py-2 px-2 text-right w-20">MRP</th>
                       <th className="py-2 px-2 text-right w-22">Sale Rate</th>
@@ -8090,6 +8331,8 @@ export default function PharmacyPage() {
                         const pPrice = parseFloat(item.purchase_price) || 0;
                         const qty = parseInt(item.quantity, 10) || 0;
                         const lineTotal = Number(item.line_total || (qty * pPrice)).toFixed(2);
+                        const totUnits = item.total_units || (qty * (item.units_per_pack || 10));
+                        const derivedUnit = getDerivedUnitLabel(item.dosage_form, item.pack_size);
 
                         return (
                           <tr
@@ -8116,6 +8359,9 @@ export default function PharmacyPage() {
                             {/* 3. Medicine Name */}
                             <td className="py-1.5 px-2.5">
                               <div className={`font-bold ${isSelected ? "text-white" : "text-slate-900"}`}>{item.medicine_name || item.medicine}</div>
+                              <div className={`text-[10px] ${isSelected ? "text-blue-100" : "text-slate-500"}`}>
+                                {item.dosage_form || "Tablet"} • {item.generic_name || item.medicine_name}
+                              </div>
                             </td>
 
                             {/* 4. Batch No (Editable) */}
@@ -8146,7 +8392,7 @@ export default function PharmacyPage() {
                                   setSelectedInwardRowIndex(idx);
                                   e.stopPropagation();
                                 }}
-                                className={`w-20 h-6 px-1 text-center text-xs rounded border focus:outline-none ${
+                                className={`w-20 h-6 px-1 text-center text-xs rounded border focus:outline-none font-semibold ${
                                   isSelected
                                     ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
                                     : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
@@ -8204,23 +8450,31 @@ export default function PharmacyPage() {
                               </div>
                             </td>
 
-                            {/* 7. Qty (Editable) */}
+                            {/* 7. Qty / Unit (Editable) */}
                             <td className="py-1 px-1.5 text-center">
-                              <input
-                                type="number"
-                                min="1"
-                                value={item.quantity || ""}
-                                onChange={(e) => handleUpdateInwardRow(idx, "quantity", e.target.value)}
-                                onClick={(e) => {
-                                  setSelectedInwardRowIndex(idx);
-                                  e.stopPropagation();
-                                }}
-                                className={`w-14 h-6 px-1 text-center font-mono font-bold text-xs rounded border focus:outline-none ${
-                                  isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
-                                    : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
-                                }`}
-                              />
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity || ""}
+                                  onChange={(e) => handleUpdateInwardRow(idx, "quantity", e.target.value)}
+                                  onClick={(e) => {
+                                    setSelectedInwardRowIndex(idx);
+                                    e.stopPropagation();
+                                  }}
+                                  className={`w-12 h-6 px-1 text-center font-mono font-bold text-xs rounded border focus:outline-none ${
+                                    isSelected
+                                      ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
+                                      : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
+                                  }`}
+                                />
+                                <span className={`text-[11px] font-semibold ${isSelected ? "text-white" : "text-slate-700"}`}>
+                                  {item.purchase_unit || "Strip"}
+                                </span>
+                              </div>
+                              <div className={`text-[9px] font-mono mt-0.5 ${isSelected ? "text-blue-100" : "text-slate-500"}`}>
+                                (= {totUnits} {derivedUnit})
+                              </div>
                             </td>
 
                             {/* 8. Purchase Rate (Editable) */}
@@ -8294,7 +8548,7 @@ export default function PharmacyPage() {
                                 }}
                                 className={`h-6 px-1 text-center font-mono rounded border text-xs focus:outline-none ${
                                   isSelected
-                                    ? "bg-white/20 text-white border-white/40 focus:bg-white focus:text-slate-900"
+                                    ? "bg-white text-slate-900 border-white/40"
                                     : "bg-white text-slate-900 border-slate-300 focus:border-blue-600"
                                 }`}
                               >
@@ -8344,6 +8598,9 @@ export default function PharmacyPage() {
                 : 0;
               const selItem = inwardItems[activeIdx] || null;
               const stockUpdated = selItem ? (parseInt(selItem.quantity, 10) || 0) : (parseInt(inwardQty, 10) || 0);
+              const selUnit = selItem?.purchase_unit || inwardPurchaseUnit || "Units";
+              const selTotUnits = selItem ? (selItem.total_units || (stockUpdated * (selItem.units_per_pack || 10))) : (stockUpdated * (parseInt(inwardUnitsPerPack, 10) || 10));
+              const selUnitDerived = getDerivedUnitLabel(selItem?.dosage_form || inwardDosageForm, selItem?.pack_size || inwardPackSize);
               const oldRate = selItem
                 ? (Number(selItem.last_purchase_price) || Number(selItem.old_purchase_price) || 0)
                 : 0;
@@ -8374,7 +8631,7 @@ export default function PharmacyPage() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-slate-800 font-semibold">Stock Updated :</span>
                         <span className="px-2.5 py-0.5 bg-white border border-emerald-400 text-emerald-700 font-bold font-mono rounded text-xs shadow-2xs">
-                          + {stockUpdated}
+                          + {stockUpdated} {selUnit} ({selTotUnits} {selUnitDerived})
                         </span>
                       </div>
 
