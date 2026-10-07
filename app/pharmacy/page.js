@@ -8264,32 +8264,42 @@ export default function PharmacyPage() {
               );
             })()}
 
-            {/* 2. Middle Section: Purchase / Stock Receipt */}
-            <div className="bg-[#dce8f6] border border-[#bcd2ee] px-4 py-2 rounded-t-md shrink-0 flex items-center justify-between">
-              <h2 className="text-[#0f3662] font-bold text-sm tracking-wide">Purchase / Stock Receipt</h2>
-            </div>
+            {/* Metadata Bar with Invoice No, Invoice Date & Clear Table */}
+            <div className="bg-[#f4f8fd] border border-[#bcd2ee] px-4 py-1.5 flex items-center justify-between gap-4 flex-wrap text-xs rounded-md shrink-0 mb-1">
+              <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-800">Invoice No :</span>
+                  <input
+                    type="text"
+                    value={inwardInvoiceNo}
+                    onChange={(e) => setInwardInvoiceNo(e.target.value)}
+                    placeholder="e.g. PUR-2026-09-015"
+                    className="h-7 w-44 px-2 text-xs font-mono font-bold uppercase bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                  />
+                </div>
 
-            {/* Single Row Metadata Bar */}
-            <div className="bg-[#f4f8fd] border-x border-b border-[#bcd2ee] px-4 py-2 flex items-center justify-start gap-6 flex-wrap text-xs rounded-b-md shrink-0 mb-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800">Invoice No :</span>
-                <input
-                  type="text"
-                  value={inwardInvoiceNo}
-                  onChange={(e) => setInwardInvoiceNo(e.target.value)}
-                  placeholder="e.g. PUR-2026-09-015"
-                  className="h-7 w-44 px-2 text-xs font-mono font-bold uppercase bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-800">Invoice Date :</span>
+                  <input
+                    type="date"
+                    value={inwardDate}
+                    onChange={(e) => setInwardDate(e.target.value)}
+                    className="h-7 w-36 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800">Invoice Date :</span>
-                <input
-                  type="date"
-                  value={inwardDate}
-                  onChange={(e) => setInwardDate(e.target.value)}
-                  className="h-7 w-36 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-600"
-                />
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setInwardItems([])}
+                  disabled={inwardItems.length === 0}
+                  className="h-7 text-xs border-slate-300 bg-white hover:bg-rose-50 hover:text-rose-700 cursor-pointer text-slate-700 font-semibold px-2.5 shadow-2xs"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                  Clear Table
+                </Button>
               </div>
             </div>
 
@@ -8701,48 +8711,34 @@ export default function PharmacyPage() {
             })()}
 
             {/* Action Buttons Bar */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-300 shrink-0">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setInwardItems([])}
-                  className="h-8 text-xs border-slate-300 hover:bg-rose-50 hover:text-rose-700 cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                  Clear Table
-                </Button>
-              </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-300 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleTabChange('dashboard')}
+                className="h-8 px-4 text-xs border-slate-300 cursor-pointer"
+              >
+                Return to POS
+              </Button>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleTabChange('dashboard')}
-                  className="h-8 px-4 text-xs border-slate-300 cursor-pointer"
-                >
-                  Return to POS
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleConfirmPurchaseInward}
-                  disabled={isSubmittingInward || inwardItems.length === 0}
-                  className="h-8 px-6 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  {isSubmittingInward ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Saving to Inventory...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Confirm &amp; Inward Stock ({inwardItems.length} Medicines)</span>
-                    </>
-                  )}
-                </Button>
-              </div>
+              <Button
+                type="button"
+                onClick={handleConfirmPurchaseInward}
+                disabled={isSubmittingInward || inwardItems.length === 0}
+                className="h-8 px-6 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                {isSubmittingInward ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving to Inventory...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Confirm &amp; Inward Stock ({inwardItems.length} Medicines)</span>
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </TabsContent>
@@ -12292,36 +12288,38 @@ export default function PharmacyPage() {
         onClose={() => setShowShortcutsModal(false)}
       />
 
-      {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs */}
-      <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
-          {[
-            { id: "dashboard", label: "Billing", shortcut: "Alt + 1" },
-            { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
-            { id: "dispensing", label: "Prescription Queue", shortcut: "Alt + 3" },
-            { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
-            { id: "logistics", label: "Purchase & Receiving", shortcut: "Alt + 5" }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleTabChange?.(tab.id)}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer w-full text-center ${
-                activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`text-[9px] font-mono px-1 rounded ${
-                activeTab === tab.id ? "bg-blue-800 text-white" : "bg-slate-950 text-slate-400"
-              }`}>
-                {tab.shortcut}
-              </span>
-            </button>
-          ))}
+      {/* Global Bottom Pharmacy Module Navigation Bar - Sticky at bottom for all tabs except purchase inward */}
+      {activeTab !== "purchase-inward" && (
+        <div className="shrink-0 z-30 w-full mt-1 bg-slate-900 text-white rounded-lg border border-slate-800 p-1 shadow-md">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 w-full">
+            {[
+              { id: "dashboard", label: "Billing", shortcut: "Alt + 1" },
+              { id: "inventory", label: "Inventory", shortcut: "Alt + 2" },
+              { id: "dispensing", label: "Prescription Queue", shortcut: "Alt + 3" },
+              { id: "registers", label: "Compliance Records", shortcut: "Alt + 4" },
+              { id: "logistics", label: "Purchase & Receiving", shortcut: "Alt + 5" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleTabChange?.(tab.id)}
+                className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer w-full text-center ${
+                  activeTab === tab.id
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[9px] font-mono px-1 rounded ${
+                  activeTab === tab.id ? "bg-blue-800 text-white" : "bg-slate-950 text-slate-400"
+                }`}>
+                  {tab.shortcut}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
