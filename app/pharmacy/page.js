@@ -4791,13 +4791,10 @@ export default function PharmacyPage() {
         return;
       }
 
-      // 16. Alt + A -> Add Medicine Catalog Entry
+      // 16. Alt + A -> Add Medicine (Purchase Inward & Stock Entry)
       if (isAlt && key.toLowerCase() === 'a') {
         e.preventDefault();
-        if (activeTab !== 'inventory') {
-          handleTabChange('inventory');
-        }
-        setIsAddModalOpen(true);
+        handleOpenPurchaseInwardModal();
         return;
       }
 
@@ -5778,21 +5775,6 @@ export default function PharmacyPage() {
             <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 type="button"
-                onClick={() => {
-                  if (userRole === "Pharmacist") {
-                    showToast("Access Denied: Pharmacists cannot create new medication catalog records.", "error");
-                  } else {
-                    setIsAddModalOpen(true);
-                  }
-                }}
-                className="px-2.5 py-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Medicine</span>
-                <span className="text-[9px] bg-indigo-800 text-indigo-100 px-1 rounded font-mono">Alt + A</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => handleOpenAdjustModal(null)}
                 className="px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
                 title="Adjust stock in popup"
@@ -5804,10 +5786,11 @@ export default function PharmacyPage() {
                 type="button"
                 onClick={handleOpenPurchaseInwardModal}
                 className="px-2.5 py-1 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                title="Traditional purchase inward & supplier bill entry"
+                title="Add medicine via stock inward entry (Alt + A)"
               >
                 <PackageCheck className="w-3.5 h-3.5" />
-                <span>Purchase Inward</span>
+                <span>Add Medicine</span>
+                <span className="text-[9px] bg-emerald-900 text-emerald-100 px-1 rounded font-mono">Alt + A</span>
               </button>
               <button
                 type="button"
@@ -6237,29 +6220,6 @@ export default function PharmacyPage() {
                                       className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-700 hover:bg-slate-50 w-full cursor-pointer font-medium"
                                     >
                                       <Edit3 className="w-3.5 h-3.5 text-blue-500" /> Edit Medicine
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => {
-                                        if (userRole === "Store Manager") {
-                                          showToast("Access Denied: Store Managers cannot adjust stock.", "error");
-                                        } else {
-                                          setAdjustingMed(med);
-                                          setAdjustmentData({
-                                            medicine: med.medicine_name,
-                                            batch_number: med.batches && med.batches.length > 0 ? med.batches[0].batch_number : "",
-                                            adjustment_type: "Add Stock",
-                                            quantity: 0,
-                                            reason: "",
-                                            remarks: ""
-                                          });
-                                          setShowAdjustModal(true);
-                                        }
-                                        setActiveMenuMed(null);
-                                      }}
-                                      className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-700 hover:bg-slate-50 w-full cursor-pointer font-medium"
-                                    >
-                                      <Sliders className="w-3.5 h-3.5 text-amber-500" /> Stock Adjustment
                                     </button>
                                   </div>
 

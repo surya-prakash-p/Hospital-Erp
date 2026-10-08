@@ -1181,8 +1181,8 @@ export default function PharmacyPOSView({
         return;
       }
 
-      // Alt + I -> Purchase Inward & Stock Entry (Supplier Bill)
-      if (isAlt && !isCtrlOrMeta && !e.shiftKey && key.toLowerCase() === 'i') {
+      // Alt + A / Alt + I -> Add Medicine (Purchase Inward & Stock Entry)
+      if (isAlt && !isCtrlOrMeta && !e.shiftKey && (key.toLowerCase() === 'a' || key.toLowerCase() === 'i')) {
         e.preventDefault();
         e.stopImmediatePropagation();
         onOpenPurchaseInward?.();
@@ -1546,7 +1546,7 @@ export default function PharmacyPOSView({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 p-1 text-xs bg-white border border-slate-300 rounded-lg shadow-xl">
               <DropdownMenuItem onClick={onOpenPurchaseInward} className="flex items-center gap-2 cursor-pointer font-medium text-emerald-800">
-                <PackageCheck className="w-3.5 h-3.5 text-emerald-600" /> Purchase Inward (Alt + I)
+                <PackageCheck className="w-3.5 h-3.5 text-emerald-600" /> Add Medicine (Alt + A)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onOpenShortcuts} className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
                 <Keyboard className="w-3.5 h-3.5 text-amber-600" /> Keyboard Shortcuts (?)

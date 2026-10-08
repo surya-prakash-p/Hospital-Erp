@@ -20,8 +20,8 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: "1. Procurement, Inventory & Logistics",
     items: [
       {
-        keys: [{ kbd: "Alt" }, "+", { kbd: "I" }],
-        action: "Purchase Inward (Supplier Bill)",
+        keys: [{ kbd: "Alt" }, "+", { kbd: "A" }],
+        action: "Add Medicine (Purchase Inward)",
         description: "Opens POS-style purchase inward & stock entry with real-time rate variance.",
       },
       {
@@ -33,11 +33,6 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
         keys: [{ kbd: "Alt" }, "+", { kbd: "Shift" }, "+", { kbd: "S" }],
         action: "Add Drug Supplier",
         description: "Opens the verified supplier registration form.",
-      },
-      {
-        keys: [{ kbd: "Alt" }, "+", { kbd: "A" }],
-        action: "Add Medicine",
-        description: "Opens the new medicine/drug catalog entry form.",
       },
       {
         keys: [{ kbd: "Alt" }, "+", { kbd: "Shift" }, "+", { kbd: "P" }],

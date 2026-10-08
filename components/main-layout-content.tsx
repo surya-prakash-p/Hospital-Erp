@@ -67,8 +67,8 @@ export function MainLayoutContent({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Alt + I -> Navigate to Pharmacy Purchase Inward & Stock Entry
-      if (isAlt && !isCtrlOrMeta && !isShift && key.toLowerCase() === "i") {
+      // Alt + A / Alt + I -> Navigate to Pharmacy Add Medicine (Purchase Inward & Stock Entry)
+      if (isAlt && !isCtrlOrMeta && !isShift && (key.toLowerCase() === "a" || key.toLowerCase() === "i")) {
         e.preventDefault();
         router.push("/pharmacy?tab=purchase-inward");
         return;
@@ -85,13 +85,6 @@ export function MainLayoutContent({ children }: { children: React.ReactNode }) {
       if (isAlt && isShift && !isCtrlOrMeta && key.toLowerCase() === "s") {
         e.preventDefault();
         router.push("/pharmacy?tab=logistics&action=add_supplier");
-        return;
-      }
-
-      // Alt + A -> Navigate to Add Medicine
-      if (isAlt && !isCtrlOrMeta && !isShift && key.toLowerCase() === "a") {
-        e.preventDefault();
-        router.push("/pharmacy?tab=inventory&action=add_medicine");
         return;
       }
 
