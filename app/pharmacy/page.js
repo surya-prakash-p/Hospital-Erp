@@ -1511,6 +1511,8 @@ export default function PharmacyPage() {
       generic_name: "",
       dosage_form: "Tablet",
       category: "Regular",
+      hsn_code: "30049099",
+      hsn: "30049099",
       batch_number: "",
       pack_size: "10 Tablets",
       units_per_pack: 10,
@@ -1547,6 +1549,7 @@ export default function PharmacyPage() {
     const purchaseUnit = med.purchase_unit || (dosageForm === "Syrup" || dosageForm === "Suspension" ? "Bottle" : "Strip");
     const unitsPerPack = extractUnitsPerPack(pack, 10);
     const itemCode = med.item_code || med.name || (med.id ? `MED${med.id}` : `MED${Math.floor(10000 + Math.random() * 90000)}`);
+    const hsn = med.hsn_code || med.hsn || "30049099";
     const q = 1;
 
     setInwardItems(prev => prev.map((item, idx) => {
@@ -1559,6 +1562,8 @@ export default function PharmacyPage() {
         generic_name: med.generic_name || med.medicine_name,
         dosage_form: dosageForm,
         category: med.category || "Regular",
+        hsn_code: hsn,
+        hsn: hsn,
         purchase_unit: purchaseUnit,
         pack_size: pack,
         units_per_pack: unitsPerPack,
@@ -1590,6 +1595,8 @@ export default function PharmacyPage() {
         generic_name: customName,
         dosage_form: "Tablet",
         category: "Regular",
+        hsn_code: "30049099",
+        hsn: "30049099",
         purchase_unit: "Strip",
         pack_size: "10 Tablets",
         units_per_pack: 10,
@@ -7935,6 +7942,7 @@ export default function PharmacyPage() {
                       <th className="py-2 px-2 text-center w-12">S.No</th>
                       <th className="py-2 px-2 text-center w-28">Item Code</th>
                       <th className="py-2 px-2.5 min-w-[200px]">Medicine Name</th>
+                      <th className="py-2 px-2 text-center w-24">HSN</th>
                       <th className="py-2 px-2 text-center w-28">Batch No.</th>
                       <th className="py-2 px-2 text-center w-28">Pack</th>
                       <th className="py-2 px-2 text-center w-32">Expiry</th>
@@ -8079,7 +8087,26 @@ export default function PharmacyPage() {
                             </div>
                           </td>
 
-                          {/* 4. Batch No (Editable) */}
+                          {/* 4. HSN Code (Editable) */}
+                          <td className="py-1 px-1.5 text-center font-mono">
+                            <input
+                              type="text"
+                              value={item.hsn_code || item.hsn || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdateInwardRow(idx, "hsn_code", val);
+                                handleUpdateInwardRow(idx, "hsn", val);
+                              }}
+                              onClick={(e) => {
+                                setSelectedInwardRowIndex(idx);
+                                e.stopPropagation();
+                              }}
+                              placeholder="30049099"
+                              className="w-20 h-7 px-1.5 text-center font-mono font-medium text-xs rounded border border-slate-300 bg-white text-slate-800 focus:border-blue-600 focus:outline-none"
+                            />
+                          </td>
+
+                          {/* 5. Batch No (Editable) */}
                           <td className="py-1 px-1.5 text-center">
                             <input
                               type="text"
